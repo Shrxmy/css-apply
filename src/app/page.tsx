@@ -43,8 +43,8 @@ export default function Home() {
   const currentHeroPhrase = heroPhrases[heroPhraseIndex];
   const isSecondaryHeroPhrase = currentHeroPhrase !== "READY TO ENTER CSS?";
   const heroTitleSizeClass = isSecondaryHeroPhrase
-    ? "text-4xl md:text-6xl lg:text-7xl xl:text-8xl"
-    : "text-5xl md:text-7xl lg:text-8xl xl:text-9xl";
+    ? "text-2xl md:text-4xl lg:text-6xl xl:text-7xl"
+    : "text-2xl md:text-4xl lg:text-6xl xl:text-7xl";
 
   const committeeRoles = [
     { id: "academics", title: "Academics Committee", icon: "ri:book-fill" },
@@ -259,27 +259,27 @@ export default function Home() {
           </div>
 
           {/* Row 2: Text Content */}
-          <div className="w-full h-[320px] flex flex-col items-center justify-center text-center font-inter relative z-50">
-            <div className="h-8 flex items-center mb-2">
-              <h3 className="text-blue-200 text-sm md:text-base font-light tracking-wide uppercase leading-tight drop-shadow-[0_0_12px_rgba(59,130,246,0.8)] animate-fade-in-up">
+          <div className="w-full h-32 lg:h-52 flex flex-col items-center justify-center text-center font-inter relative z-50">
+            <div className="flex items-center mb-2">
+              <h3 className="text-blue-200 text-xs md:text-base font-light tracking-wide uppercase leading-tight drop-shadow-[0_0_12px_rgba(59,130,246,0.8)] animate-fade-in-up">
                 Your journey in tech starts here
               </h3>
             </div>
-            <div className="h-32 flex items-center justify-center mb-6">
+            <div className="lg:h-32 flex items-center justify-center ">
               <h1
                 key={heroPhraseIndex}
-                className={`${heroTitleSizeClass} font-bold bg-gradient-to-b from-white from-20% to-[#0768c3] to-70% bg-clip-text text-transparent tracking-tight leading-tight drop-shadow-[0_0_18px_rgba(59,130,246,0.75)] animate-fade-in-up animate-delay-200`}
+                className={`${heroTitleSizeClass} font-bold bg-gradient-to-b from-white from-20% to-[#0768c3] to-70% bg-clip-text text-transparent tracking-tight leading-tight drop-shadow-[0_0_18px_rgba(59,130,246,0.75)] animate-fade-in-up animate-delay-200 mb-2`}
                 aria-live="polite"
               >
                 {currentHeroPhrase}
               </h1>
             </div>
-            <div className="h-16 flex items-center">
+            <div className="flex items-center">
               {/* Enter Button */}
               <button
                 onClick={handleEnterClick}
                 disabled={isLoggingIn}
-                className="bg-[#0077FF] shadow-[inset_0_4px_15px_rgba(255,255,255,0.8)] rounded-full font-inter text-white py-2 px-16 font-medium text-xl hover:bg-[#0056CC] hover:scale-105 hover:shadow-[inset_0_4px_15px_rgba(255,255,255,0.8),0_10px_24px_rgba(0,0,0,0.18)] transition-all duration-300 animate-fade-in-up animate-delay-400 hover:animate-pulse cursor-pointer"
+                className="bg-[#0077FF] shadow-[inset_0_4px_15px_rgba(255,255,255,0.8)] rounded-full font-inter text-white py-2 px-16 font-medium text-sm lg:text-xl hover:bg-[#0056CC] hover:scale-105 hover:shadow-[inset_0_4px_15px_rgba(255,255,255,0.8),0_10px_24px_rgba(0,0,0,0.18)] transition-all duration-300 animate-fade-in-up animate-delay-400 hover:animate-pulse cursor-pointer"
               >
                 {isLoggingIn ? (
                   <div className="flex items-center justify-center">
