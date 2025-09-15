@@ -630,7 +630,7 @@ export default function Home() {
           >
             <div className="font-inter text-left text-white w-[80%] mb-14 ml-5">
               <p className="text-9xl font-extralight">01</p>
-              <p className="font-semibold text-lg mt-2">NEW PATHS AWAIT YOU</p>
+              <p className="font-semibold text-lg mt-2">NEW PATHS AWAIT</p>
               <p className="font-extralight text-md mt-2">
                 Events and workshops to power up your skills and connections.
               </p>
@@ -644,11 +644,11 @@ export default function Home() {
               backgroundImage: "url('/assets/pictures/s4_desktop_pic3.png')",
             }}
           >
-            <div className="font-inter text-left text-white w-[80%] mb-14 ml-5 ">
+            <div className="font-inter text-left text-white w-[83%] mb-14 ml-5 ">
               <p className="text-9xl font-extralight">02</p>
               <p className="font-semibold text-lg mt-2">UNITED WE RISE</p>
               <p className="font-extralight text-md mt-2">
-                A community where collaboration turn into friendships that last.
+                A place where teamwork sparks friendships to boost your growth.
               </p>
             </div>
           </div>
