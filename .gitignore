@@ -46,5 +46,3 @@ next-env.d.ts
 
 # agents
 AGENTS.md
-package-lock.json
-package.json
