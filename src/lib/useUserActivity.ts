@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from "react";
 
 interface UserActivityState {
   isActive: boolean;
@@ -17,16 +17,23 @@ interface UseUserActivityOptions {
 export function useUserActivity(options: UseUserActivityOptions = {}) {
   const {
     idleTimeout = 300000, // 5 minutes default
-    activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'],
+    activityEvents = [
+      "mousedown",
+      "mousemove",
+      "keypress",
+      "scroll",
+      "touchstart",
+      "click",
+    ],
     enableReload = false,
     reloadInterval = 60000, // 1 minute default
-    excludedPages = ['/user/apply', '/admin', '/personality-test']
+    excludedPages = ["/user/apply", "/admin", "/personality-test"],
   } = options;
 
   const [activityState, setActivityState] = useState<UserActivityState>({
     isActive: false,
     lastActivity: Date.now(),
-    isIdle: false
+    isIdle: false,
   });
 
   const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
@@ -37,8 +44,8 @@ export function useUserActivity(options: UseUserActivityOptions = {}) {
   // Check if current page should be excluded from auto-reload
   const checkExcludedPage = useCallback(() => {
     const currentPath = window.location.pathname;
-    isExcludedPage.current = excludedPages.some(excludedPath => 
-      currentPath.startsWith(excludedPath)
+    isExcludedPage.current = excludedPages.some((excludedPath) =>
+      currentPath.startsWith(excludedPath),
     );
   }, [excludedPages]);
 
@@ -58,25 +65,25 @@ export function useUserActivity(options: UseUserActivityOptions = {}) {
   // Initialize the refs immediately to avoid race conditions
   updateActivityRef.current = () => {
     const now = Date.now();
-    
+
     // Throttle updates to prevent excessive re-renders (max once per 500ms)
     if (now - lastUpdateTime.current < 500) {
       return;
     }
     lastUpdateTime.current = now;
-    
-    setActivityState(prev => {
+
+    setActivityState((prev) => {
       // Only update if there's actually a change (avoid unnecessary re-renders)
       if (prev.isActive && !prev.isIdle) {
         return {
           ...prev,
-          lastActivity: now
+          lastActivity: now,
         };
       }
       return {
         isActive: true,
         lastActivity: now,
-        isIdle: false
+        isIdle: false,
       };
     });
 
@@ -88,11 +95,11 @@ export function useUserActivity(options: UseUserActivityOptions = {}) {
 
     // Start idle timeout
     timeoutRef.current = setTimeout(() => {
-      setActivityState(prev => ({
+      setActivityState((prev) => ({
         ...prev,
-        isIdle: true
+        isIdle: true,
       }));
-      
+
       // Start reload timer if enabled
       if (enableReload && !isExcludedPage.current) {
         startReloadTimerRef.current?.();
@@ -105,7 +112,7 @@ export function useUserActivity(options: UseUserActivityOptions = {}) {
     // Initial setup
     const initializeActivity = () => {
       checkExcludedPage();
-      
+
       // Use the ref-based update to avoid infinite loops
       updateActivityRef.current?.();
     };
@@ -130,23 +137,26 @@ export function useUserActivity(options: UseUserActivityOptions = {}) {
     };
 
     // Add event listeners for user activity
-    activityEvents.forEach(event => {
+    activityEvents.forEach((event) => {
       document.addEventListener(event, handleActivityEvent, { passive: true });
     });
 
     // Listen for page visibility changes
-    document.addEventListener('visibilitychange', handleVisibilityChangeEvent);
+    document.addEventListener("visibilitychange", handleVisibilityChangeEvent);
 
     // Listen for popstate (back/forward navigation)
-    window.addEventListener('popstate', handleRouteChange);
+    window.addEventListener("popstate", handleRouteChange);
 
     return () => {
       // Cleanup event listeners
-      activityEvents.forEach(event => {
+      activityEvents.forEach((event) => {
         document.removeEventListener(event, handleActivityEvent);
       });
-      document.removeEventListener('visibilitychange', handleVisibilityChangeEvent);
-      window.removeEventListener('popstate', handleRouteChange);
+      document.removeEventListener(
+        "visibilitychange",
+        handleVisibilityChangeEvent,
+      );
+      window.removeEventListener("popstate", handleRouteChange);
 
       // Clear timeouts
       if (timeoutRef.current) {
@@ -161,7 +171,7 @@ export function useUserActivity(options: UseUserActivityOptions = {}) {
   // Update refs when options change
   useEffect(() => {
     // Silent ref updates - no logging in production
-    
+
     // Update the ref functions with latest values (updateActivityRef is already initialized above)
 
     startReloadTimerRef.current = () => {
@@ -169,17 +179,17 @@ export function useUserActivity(options: UseUserActivityOptions = {}) {
 
       reloadTimeoutRef.current = setTimeout(() => {
         // Check if still idle before reloading
-        setActivityState(prev => {
+        setActivityState((prev) => {
           if (prev.isIdle && Date.now() - prev.lastActivity > idleTimeout) {
             // Check if auto-reload is disabled for this page
             if (window.__DISABLE_AUTO_RELOAD__) {
-              if (process.env.NODE_ENV === 'development') {
+              if (process.env.NODE_ENV === "development") {
               }
               return prev;
             }
-            
+
             // Silent reload - no console logs in production
-            if (process.env.NODE_ENV === 'development') {
+            if (process.env.NODE_ENV === "development") {
             }
             window.location.reload();
           }
@@ -201,7 +211,14 @@ export function useUserActivity(options: UseUserActivityOptions = {}) {
         }
       }
     };
-  }, [idleTimeout, enableReload, reloadInterval, activityState.isIdle, activityEvents, checkExcludedPage]);
+  }, [
+    idleTimeout,
+    enableReload,
+    reloadInterval,
+    activityState.isIdle,
+    activityEvents,
+    checkExcludedPage,
+  ]);
 
   // Manual refresh function
   const refresh = useCallback(() => {
@@ -219,6 +236,6 @@ export function useUserActivity(options: UseUserActivityOptions = {}) {
     ...activityState,
     refresh,
     markActive,
-    isExcludedPage: isExcludedPage.current
+    isExcludedPage: isExcludedPage.current,
   };
 }

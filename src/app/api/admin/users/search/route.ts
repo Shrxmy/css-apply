@@ -19,17 +19,17 @@ export async function GET(request: NextRequest) {
     if (!hasSuperAdminAccess) {
       return NextResponse.json(
         { error: "Forbidden - Super Admin access required" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
     const { searchParams } = new URL(request.url);
-    const query = searchParams.get('q');
+    const query = searchParams.get("q");
 
     if (!query) {
       return NextResponse.json(
         { error: "Missing query parameter" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -40,22 +40,22 @@ export async function GET(request: NextRequest) {
           {
             name: {
               contains: query,
-              mode: 'insensitive'
-            }
+              mode: "insensitive",
+            },
           },
           {
             email: {
               contains: query,
-              mode: 'insensitive'
-            }
+              mode: "insensitive",
+            },
           },
           {
             studentNumber: {
               contains: query,
-              mode: 'insensitive'
-            }
-          }
-        ]
+              mode: "insensitive",
+            },
+          },
+        ],
       },
       include: {
         ebProfile: {
@@ -66,16 +66,16 @@ export async function GET(request: NextRequest) {
             meetingLink: true,
             isActive: true,
             createdAt: true,
-            updatedAt: true
-          }
+            updatedAt: true,
+          },
         },
         memberApplication: {
           select: {
             id: true,
             hasAccepted: true,
             paymentProof: true,
-            createdAt: true
-          }
+            createdAt: true,
+          },
         },
         eaApplication: {
           select: {
@@ -91,8 +91,8 @@ export async function GET(request: NextRequest) {
             hasFinishedInterview: true,
             cv: true,
             supabaseFilePath: true,
-            createdAt: true
-          }
+            createdAt: true,
+          },
         },
         committeeApplication: {
           select: {
@@ -109,39 +109,41 @@ export async function GET(request: NextRequest) {
             cv: true,
             supabaseFilePath: true,
             portfolioLink: true,
-            createdAt: true
-          }
-        }
+            createdAt: true,
+          },
+        },
       },
-      orderBy: { createdAt: "desc" }
+      orderBy: { createdAt: "desc" },
     });
 
     // Get overall statistics
-    const [totalUsers, totalEbMembers, totalAdmins, totalApplicants] = await Promise.all([
-      prisma.user.count(),
-      prisma.user.count({
-        where: {
-          ebProfile: {
-            isNot: null
-          }
-        }
-      }),
-      prisma.user.count({
-        where: {
-          role: {
-            in: ['admin', 'super_admin']
-          }
-        }
-      }),
-      // Count total applicants across all application types
-      Promise.all([
-        prisma.memberApplication.count(),
-        prisma.eAApplication.count(),
-        prisma.committeeApplication.count()
-      ]).then(([memberCount, eaCount, committeeCount]) => 
-        memberCount + eaCount + committeeCount
-      )
-    ]);
+    const [totalUsers, totalEbMembers, totalAdmins, totalApplicants] =
+      await Promise.all([
+        prisma.user.count(),
+        prisma.user.count({
+          where: {
+            ebProfile: {
+              isNot: null,
+            },
+          },
+        }),
+        prisma.user.count({
+          where: {
+            role: {
+              in: ["admin", "super_admin"],
+            },
+          },
+        }),
+        // Count total applicants across all application types
+        Promise.all([
+          prisma.memberApplication.count(),
+          prisma.eAApplication.count(),
+          prisma.committeeApplication.count(),
+        ]).then(
+          ([memberCount, eaCount, committeeCount]) =>
+            memberCount + eaCount + committeeCount,
+        ),
+      ]);
 
     return NextResponse.json({
       success: true,
@@ -150,16 +152,16 @@ export async function GET(request: NextRequest) {
         totalUsers,
         totalEbMembers,
         totalAdmins,
-        totalApplicants
+        totalApplicants,
       },
       searchQuery: query,
-      totalResults: users.length
+      totalResults: users.length,
     });
   } catch (error) {
     console.error("Error searching users:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

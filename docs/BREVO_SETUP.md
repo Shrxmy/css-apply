@@ -27,6 +27,7 @@ BREVO_FROM_EMAIL="noreply@yourdomain.com"
 ```
 
 **Important Notes:**
+
 - Replace `your-brevo-api-key-here` with your actual Brevo API key
 - Replace `noreply@yourdomain.com` with a verified sender email address in your Brevo account
 - The sender email must be verified in your Brevo account to send emails
@@ -93,6 +94,7 @@ To test the email functionality:
 ### Debug Mode
 
 To enable detailed logging, check the console output when submitting applications. The system logs:
+
 - Successful email sends with message IDs
 - Failed email attempts with error details
 

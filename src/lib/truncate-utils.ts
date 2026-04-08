@@ -8,6 +8,6 @@
  * @returns The truncated string showing only the last 7 characters
  */
 export function truncateToLast7(value: string | null | undefined): string {
-  if (!value) return '';
+  if (!value) return "";
   return value.slice(-7);
 }

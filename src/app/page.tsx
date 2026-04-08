@@ -186,9 +186,9 @@ function HomeContent() {
 
   return (
     <div className="h-full w-full overflow-x-hidden">
-      <section className="min-h-screen w-full bg-gradient-to-b from-[#000000] via-[rgb(1,124,238)] via-69% to-[#0054FF] relative overflow-hidden">
+      <section className="min-h-screen w-full bg-linear-to-b from-[#000000] via-[rgb(1,124,238)] via-69% to-[#0054FF] relative overflow-hidden">
         {/* Header */}
-        <header className="absolute top-0 left-0 w-full bg-gradient-to-b from-black/90 via-black/50 to-transparent flex justify-center sm:justify-start p-6 z-30">
+        <header className="absolute top-0 left-0 w-full bg-linear-to-b from-black/90 via-black/50 to-transparent flex justify-center sm:justify-start p-6 z-30">
           <Link
             href="/"
             className="inline-flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 rounded cursor-pointer hover:scale-105 transition-all duration-300"
@@ -336,7 +336,7 @@ function HomeContent() {
             <div className="lg:h-32 flex items-center justify-center ">
               <h1
                 key={heroPhraseIndex}
-                className={`${heroTitleSizeClass} font-bold bg-gradient-to-b from-white from-20% to-[#0768c3] to-70% bg-clip-text text-transparent tracking-tight leading-tight drop-shadow-[0_0_18px_rgba(59,130,246,0.75)] animate-fade-in-up animate-delay-200 mb-2`}
+                className={`${heroTitleSizeClass} font-bold bg-linear-to-b from-white from-20% to-[#0768c3] to-70% bg-clip-text text-transparent tracking-tight leading-tight drop-shadow-[0_0_18px_rgba(59,130,246,0.75)] animate-fade-in-up animate-delay-200 mb-2`}
                 aria-live="polite"
               >
                 {currentHeroPhrase}
@@ -480,7 +480,7 @@ function HomeContent() {
         </div>
 
         {/* Bottom gradient overlay */}
-        <div className="absolute bottom-0 left-0 w-full h-40 md:h-50 bg-gradient-to-t from-black/80 via-transparent to-transparent z-20 pointer-events-none"></div>
+        <div className="absolute bottom-0 left-0 w-full h-40 md:h-50 bg-linear-to-t from-black/80 via-transparent to-transparent z-20 pointer-events-none"></div>
       </section>
 
       <section
@@ -515,8 +515,8 @@ function HomeContent() {
           </div>
 
           {/* Image Slideshow */}
-          <div className="flex-shrink-0 flex justify-center items-center">
-            <div className="relative w-[450px] h-[450px] overflow-hidden rounded-lg shadow-lg">
+          <div className="shrink-0 flex justify-center items-center">
+            <div className="relative w-112.5 h-112.5 overflow-hidden rounded-lg shadow-lg">
               <Image
                 src="https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/pictures/sec2_pic1.jpg"
                 alt="Slideshow image 1"
@@ -576,7 +576,7 @@ function HomeContent() {
                 rel="noopener noreferrer"
                 className={`${partner.size} ${
                   partner.shape || "rounded-full"
-                } flex-shrink-0 overflow-hidden bg-white cursor-pointer transition-all duration-300 ease-in-out hover:scale-110 hover:shadow-lg hover:shadow-blue-500/25 ${
+                } shrink-0 overflow-hidden bg-white cursor-pointer transition-all duration-300 ease-in-out hover:scale-110 hover:shadow-lg hover:shadow-blue-500/25 ${
                   partner.shape === "rounded-lg"
                     ? "p-2 flex items-center justify-center"
                     : ""
@@ -591,8 +591,8 @@ function HomeContent() {
                     partner.alt === "ZeroCafe"
                       ? "object-contain"
                       : partner.shape === "rounded-lg"
-                      ? "object-contain"
-                      : "object-cover"
+                        ? "object-contain"
+                        : "object-cover"
                   }`}
                 />
               </a>
@@ -694,7 +694,7 @@ function HomeContent() {
         id="expect-section-desktop"
         className="hidden lg:block bg-black overflow-hidden mt-5"
       >
-        <div className="sm:flex sm:flex-row h-[700px] w-full">
+        <div className="sm:flex sm:flex-row h-175 w-full">
           {/* Header Card */}
           <div
             className="w-[28%] h-full bg-cover bg-center flex items-center pl-10"
@@ -831,10 +831,10 @@ function HomeContent() {
         </div>
       </section>
 
-      <section className="bg-gradient-to-r from-[#2F7EE3] to-[#0E2A4D] py-8 px-4 sm:py-12 sm:px-6 lg:px-8">
+      <section className="bg-linear-to-r from-[#2F7EE3] to-[#0E2A4D] py-8 px-4 sm:py-12 sm:px-6 lg:px-8">
         <div className="flex justify-center items-center mx-auto">
           <div className="flex flex-col lg:flex-row items-center justify-between gap-8 lg:gap-12">
-            <div className="flex-shrink-0 order-2 lg:order-1">
+            <div className="shrink-0 order-2 lg:order-1">
               <Image
                 src="https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/logos/csar.png"
                 alt="CSAR Logo"
@@ -893,15 +893,15 @@ function HomeContent() {
             </div>
 
             <div className="flex flex-col text-xs md:text-sm lg:text-md lg:flex-row gap-4 lg:gap-7 mt-7 font-inter">
-              {/* <button
-                onClick={() => handleApplyClick("/user/apply/member")}
+              <button
+                onClick={() => _handleApplyClick("/user/apply/member")}
                 className="bg-white lg:w-72 px-7 py-2 lg:py-4 rounded-3xl shadow-[0_12px_36px_rgba(0,0,0,0.55)] hover:shadow-[0_16px_44px_rgba(0,0,0,0.65)] hover:bg-[#d5d5d5] hover:scale-105 transition-all duration-300 cursor-pointer"
               >
                 Apply as Member
               </button>
 
               <button
-                onClick={() => handleApplyClick("/user/apply/committee-staff")}
+                onClick={() => _handleApplyClick("/user/apply/committee-staff")}
                 className="bg-white lg:w-72 px-7 py-2 lg:py-4 rounded-3xl shadow-[0_12px_36px_rgba(0,0,0,0.55)] hover:shadow-[0_16px_44px_rgba(0,0,0,0.65)] hover:bg-[#d5d5d5] hover:scale-105 transition-all duration-300 cursor-pointer"
               >
                 Apply as Staff
@@ -909,12 +909,12 @@ function HomeContent() {
 
               <button
                 onClick={() =>
-                  handleApplyClick("/user/apply/executive-assistant")
+                  _handleApplyClick("/user/apply/executive-assistant")
                 }
                 className="bg-white lg:w-72 px-7 py-2 lg:py-4 rounded-3xl shadow-[0_12px_36px_rgba(0,0,0,0.55)] hover:shadow-[0_16px_44px_rgba(0,0,0,0.65)] hover:bg-[#d5d5d5] hover:scale-105 transition-all duration-300 cursor-pointer"
               >
                 Apply as Executive Assistant
-              </button> */}
+              </button>
             </div>
           </div>
         </div>

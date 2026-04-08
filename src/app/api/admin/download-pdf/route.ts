@@ -20,19 +20,19 @@ export async function GET(request: NextRequest) {
     if (!hasAdminAccess) {
       return NextResponse.json(
         { error: "Forbidden - Admin access required" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
     const { searchParams } = new URL(request.url);
-    const applicationId = searchParams.get('applicationId');
-    const type = searchParams.get('type'); // 'cv' or 'portfolio'
-    const applicationType = searchParams.get('applicationType'); // 'ea' or 'committee'
+    const applicationId = searchParams.get("applicationId");
+    const type = searchParams.get("type"); // 'cv' or 'portfolio'
+    const applicationType = searchParams.get("applicationType"); // 'ea' or 'committee'
 
     if (!applicationId || !type || !applicationType) {
       return NextResponse.json(
         { error: "Missing required parameters" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
     let fileName: string;
 
     // Get application data based on type
-    if (applicationType === 'ea') {
+    if (applicationType === "ea") {
       application = await prisma.eAApplication.findUnique({
         where: { id: applicationId },
         include: {
@@ -55,17 +55,17 @@ export async function GET(request: NextRequest) {
           },
         },
       });
-      
-      if (type === 'cv') {
+
+      if (type === "cv") {
         supabaseFilePath = application?.supabaseFilePath || null;
         fileName = `${application?.user.name}_${application?.user.studentNumber}_CV.pdf`;
       } else {
         return NextResponse.json(
           { error: "Invalid type for EA application" },
-          { status: 400 }
+          { status: 400 },
         );
       }
-    } else if (applicationType === 'committee') {
+    } else if (applicationType === "committee") {
       application = await prisma.committeeApplication.findUnique({
         where: { id: applicationId },
         include: {
@@ -79,37 +79,37 @@ export async function GET(request: NextRequest) {
           },
         },
       });
-      
-      if (type === 'cv') {
+
+      if (type === "cv") {
         supabaseFilePath = application?.supabaseFilePath || null;
         fileName = `${application?.user.name}_${application?.user.studentNumber}_CV.pdf`;
-      } else if (type === 'portfolio') {
+      } else if (type === "portfolio") {
         supabaseFilePath = application?.portfolioLink || null;
         fileName = `${application?.user.name}_${application?.user.studentNumber}_Portfolio.pdf`;
       } else {
         return NextResponse.json(
           { error: "Invalid type for committee application" },
-          { status: 400 }
+          { status: 400 },
         );
       }
     } else {
       return NextResponse.json(
         { error: "Invalid application type" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!application) {
       return NextResponse.json(
         { error: "Application not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
     if (!supabaseFilePath) {
       return NextResponse.json(
         { error: "File not found for this application" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -118,22 +118,27 @@ export async function GET(request: NextRequest) {
       let filePath: string;
 
       // Check if supabaseFilePath is a full URL or just a path
-      if (supabaseFilePath.startsWith('http')) {
+      if (supabaseFilePath.startsWith("http")) {
         // It's a full URL, extract bucket and file path (handle both public and signed URLs)
-        const urlMatch = supabaseFilePath.match(/\/storage\/v1\/object\/(?:public|sign)\/([^\/]+)\/(.+?)(?:\?|$)/);
-        
+        const urlMatch = supabaseFilePath.match(
+          /\/storage\/v1\/object\/(?:public|sign)\/([^\/]+)\/(.+?)(?:\?|$)/,
+        );
+
         if (urlMatch) {
           bucketName = urlMatch[1];
           filePath = urlMatch[2];
         } else {
           return NextResponse.json(
             { error: "Invalid file URL format" },
-            { status: 400 }
+            { status: 400 },
           );
         }
       } else {
         // It's just a file path, determine bucket based on application type
-        bucketName = applicationType === 'ea' ? 'ea-applications' : 'committee-applications';
+        bucketName =
+          applicationType === "ea"
+            ? "ea-applications"
+            : "committee-applications";
         filePath = supabaseFilePath;
       }
 
@@ -146,14 +151,14 @@ export async function GET(request: NextRequest) {
         console.error("Supabase download error:", error);
         return NextResponse.json(
           { error: "Failed to download file from storage" },
-          { status: 500 }
+          { status: 500 },
         );
       }
 
       if (!data) {
         return NextResponse.json(
           { error: "File not found in storage" },
-          { status: 404 }
+          { status: 404 },
         );
       }
 
@@ -165,28 +170,26 @@ export async function GET(request: NextRequest) {
       return new NextResponse(uint8Array, {
         status: 200,
         headers: {
-          'Content-Type': 'application/pdf',
-          'Content-Disposition': `attachment; filename="${fileName}"`,
-          'Content-Length': arrayBuffer.byteLength.toString(),
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        }
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `attachment; filename="${fileName}"`,
+          "Content-Length": arrayBuffer.byteLength.toString(),
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          Pragma: "no-cache",
+          Expires: "0",
+        },
       });
-
     } catch (supabaseError) {
       console.error("Supabase storage error:", supabaseError);
       return NextResponse.json(
         { error: "Failed to access file" },
-        { status: 500 }
+        { status: 500 },
       );
     }
-
   } catch (error) {
     console.error("Error downloading PDF file:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

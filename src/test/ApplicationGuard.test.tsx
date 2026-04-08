@@ -35,8 +35,8 @@ function EASchedulePage() {
 // 4. Custom redirect path
 function CustomRedirectPage() {
   return (
-    <ApplicationGuard 
-      applicationType="member" 
+    <ApplicationGuard
+      applicationType="member"
       redirectPath="/custom/redirect/path"
     >
       <div>Custom Redirect Page Content</div>
@@ -48,5 +48,5 @@ export {
   MemberSchedulePage,
   CommitteeSchedulePage,
   EASchedulePage,
-  CustomRedirectPage
+  CustomRedirectPage,
 };

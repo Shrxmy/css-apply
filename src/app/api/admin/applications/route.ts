@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { sendEmail, emailTemplates } from "@/lib/email";
+import { applicationActionSchema } from "@/lib/schemas";
 
 // Type definitions for raw query results
 interface CountResult {
@@ -34,144 +35,138 @@ export async function GET(request: NextRequest) {
     if (!hasAdminAccess) {
       return NextResponse.json(
         { error: "Forbidden - Admin access required" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
     const { searchParams } = new URL(request.url);
-    const type = searchParams.get('type');
-    const status = searchParams.get('status');
-    const committee = searchParams.get('committee');
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '10');
+    const type = searchParams.get("type");
+    const status = searchParams.get("status");
+    const committee = searchParams.get("committee");
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "10");
     const skip = (page - 1) * limit;
 
-     if (type === 'member') {
-       let memberApplications;
-       let totalCount;
-       
-       if (status === 'accepted') {
-         // Get accepted applications
-         totalCount = await prisma.memberApplication.count({
-           where: { hasAccepted: true },
-         });
+    if (type === "member") {
+      let memberApplications;
+      let totalCount;
 
-         memberApplications = await prisma.memberApplication.findMany({
-           where: { hasAccepted: true },
-           orderBy: { createdAt: "desc" },
-           skip: skip,
-           take: limit,
-           include: {
-             user: {
-               select: {
-                 id: true,
-                 name: true,
-                 email: true,
-                 studentNumber: true,
-                 section: true,
-               },
-             },
-           },
-         });
-       } else if (status === 'pending') {
-         // Get pending applications (hasAccepted: false AND createdAt = updatedAt)
-         const rawQuery = `
-           SELECT * FROM "MemberApplication" 
-           WHERE "hasAccepted" = false 
-           AND "createdAt" = "updatedAt"
-           ORDER BY "createdAt" DESC
-           LIMIT ${limit} OFFSET ${skip}
-         `;
-         
-         const countQuery = `
-           SELECT COUNT(*) as count FROM "MemberApplication" 
-           WHERE "hasAccepted" = false 
-           AND "createdAt" = "updatedAt"
-         `;
+      if (status === "accepted") {
+        // Get accepted applications
+        totalCount = await prisma.memberApplication.count({
+          where: { hasAccepted: true },
+        });
 
-         const [applications, countResult] = await Promise.all([
-           prisma.$queryRawUnsafe(rawQuery),
-           prisma.$queryRawUnsafe(countQuery)
-         ]);
+        memberApplications = await prisma.memberApplication.findMany({
+          where: { hasAccepted: true },
+          orderBy: { createdAt: "desc" },
+          skip: skip,
+          take: limit,
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                studentNumber: true,
+                section: true,
+              },
+            },
+          },
+        });
+      } else if (status === "pending") {
+        // Get pending applications (hasAccepted: false AND createdAt = updatedAt)
+        const [applications, countResult] = await Promise.all([
+          prisma.$queryRaw<MemberApplicationRaw[]>`
+              SELECT * FROM "MemberApplication" 
+              WHERE "hasAccepted" = false 
+              AND "createdAt" = "updatedAt"
+              ORDER BY "createdAt" DESC
+              LIMIT ${limit} OFFSET ${skip}
+            `,
+          prisma.$queryRaw<CountResult[]>`
+              SELECT COUNT(*) as count FROM "MemberApplication" 
+              WHERE "hasAccepted" = false 
+              AND "createdAt" = "updatedAt"
+            `,
+        ]);
 
-         totalCount = Number((countResult as CountResult[])[0].count);
-         
-         // Get user data for each application
-         memberApplications = await Promise.all(
-           (applications as MemberApplicationRaw[]).map(async (app) => {
-             const user = await prisma.user.findUnique({
-               where: { studentNumber: app.studentNumber },
-               select: {
-                 id: true,
-                 name: true,
-                 email: true,
-                 studentNumber: true,
-                 section: true,
-               },
-             });
-             return { ...app, user };
-           })
-         );
-       } else if (status === 'rejected') {
-         // Get rejected applications (hasAccepted: false AND createdAt != updatedAt)
-         const rawQuery = `
-           SELECT * FROM "MemberApplication" 
-           WHERE "hasAccepted" = false 
-           AND "createdAt" != "updatedAt"
-           ORDER BY "createdAt" DESC
-           LIMIT ${limit} OFFSET ${skip}
-         `;
-         
-         const countQuery = `
-           SELECT COUNT(*) as count FROM "MemberApplication" 
-           WHERE "hasAccepted" = false 
-           AND "createdAt" != "updatedAt"
-         `;
+        totalCount = Number(countResult[0].count);
 
-         const [applications, countResult] = await Promise.all([
-           prisma.$queryRawUnsafe(rawQuery),
-           prisma.$queryRawUnsafe(countQuery)
-         ]);
+        // Batch fetch users to avoid N+1 queries
+        const studentNumbers = applications.map((app) => app.studentNumber);
+        const users = await prisma.user.findMany({
+          where: { studentNumber: { in: studentNumbers } },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            studentNumber: true,
+            section: true,
+          },
+        });
+        const userMap = new Map(users.map((u) => [u.studentNumber, u]));
+        memberApplications = applications.map((app) => ({
+          ...app,
+          user: userMap.get(app.studentNumber) ?? null,
+        }));
+      } else if (status === "rejected") {
+        // Get rejected applications (hasAccepted: false AND createdAt != updatedAt)
+        const [applications, countResult] = await Promise.all([
+          prisma.$queryRaw<MemberApplicationRaw[]>`
+              SELECT * FROM "MemberApplication" 
+              WHERE "hasAccepted" = false 
+              AND "createdAt" != "updatedAt"
+              ORDER BY "createdAt" DESC
+              LIMIT ${limit} OFFSET ${skip}
+            `,
+          prisma.$queryRaw<CountResult[]>`
+              SELECT COUNT(*) as count FROM "MemberApplication" 
+              WHERE "hasAccepted" = false 
+              AND "createdAt" != "updatedAt"
+            `,
+        ]);
 
-         totalCount = Number((countResult as CountResult[])[0].count);
-         
-         // Get user data for each application
-         memberApplications = await Promise.all(
-           (applications as MemberApplicationRaw[]).map(async (app) => {
-             const user = await prisma.user.findUnique({
-               where: { studentNumber: app.studentNumber },
-               select: {
-                 id: true,
-                 name: true,
-                 email: true,
-                 studentNumber: true,
-                 section: true,
-               },
-             });
-             return { ...app, user };
-           })
-         );
-       } else {
-         // Get all applications
-         totalCount = await prisma.memberApplication.count();
+        totalCount = Number(countResult[0].count);
 
-         memberApplications = await prisma.memberApplication.findMany({
-           orderBy: { createdAt: "desc" },
-           skip: skip,
-           take: limit,
-           include: {
-             user: {
-               select: {
-                 id: true,
-                 name: true,
-                 email: true,
-                 studentNumber: true,
-                 section: true,
-               },
-             },
-           },
-         });
-       }
+        // Batch fetch users to avoid N+1 queries
+        const studentNumbers = applications.map((app) => app.studentNumber);
+        const users = await prisma.user.findMany({
+          where: { studentNumber: { in: studentNumbers } },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            studentNumber: true,
+            section: true,
+          },
+        });
+        const userMap = new Map(users.map((u) => [u.studentNumber, u]));
+        memberApplications = applications.map((app) => ({
+          ...app,
+          user: userMap.get(app.studentNumber) ?? null,
+        }));
+      } else {
+        // Get all applications
+        totalCount = await prisma.memberApplication.count();
+
+        memberApplications = await prisma.memberApplication.findMany({
+          orderBy: { createdAt: "desc" },
+          skip: skip,
+          take: limit,
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                studentNumber: true,
+                section: true,
+              },
+            },
+          },
+        });
+      }
 
       return NextResponse.json({
         success: true,
@@ -182,42 +177,40 @@ export async function GET(request: NextRequest) {
           totalCount: totalCount,
           limit: limit,
           hasNextPage: page < Math.ceil(totalCount / limit),
-          hasPreviousPage: page > 1
-        }
+          hasPreviousPage: page > 1,
+        },
       });
     }
 
-    if (type === 'ea') {
+    if (type === "ea") {
       const whereClause: Record<string, unknown> = {};
-      
+
       // Filter by status if provided
-      if (status === 'accepted') {
+      if (status === "accepted") {
         whereClause.hasAccepted = true;
         whereClause.status = { not: null }; // Exclude applications with NULL status
-        console.log('EA Accepted filter applied:', whereClause);
-      } else if (status === 'pending') {
+      } else if (status === "pending") {
         whereClause.OR = [
           { hasAccepted: false, status: null },
-          { hasAccepted: false, status: 'pending' },
-          { hasAccepted: true, status: null } // Include accepted applications that were reset to NULL
+          { hasAccepted: false, status: "pending" },
+          { hasAccepted: true, status: null }, // Include accepted applications that were reset to NULL
         ];
-        console.log('EA Pending filter applied:', whereClause);
-      } else if (status === 'evaluating') {
-        whereClause.status = 'evaluating';
-      } else if (status === 'rejected') {
-        whereClause.status = 'failed';
-      } else if (status === 'no-schedule') {
+      } else if (status === "evaluating") {
+        whereClause.status = "evaluating";
+      } else if (status === "rejected") {
+        whereClause.status = "failed";
+      } else if (status === "redirected") {
+        whereClause.OR = [
+          { status: "redirected" },
+          { redirection: { not: null } },
+        ];
+      } else if (status === "no-schedule") {
         whereClause.OR = [
           { interviewSlotDay: null },
           { interviewSlotTimeStart: null },
-          { interviewSlotDay: '' },
-          { interviewSlotTimeStart: '' }
+          { interviewSlotDay: "" },
+          { interviewSlotTimeStart: "" },
         ];
-        console.log('No-schedule filter applied for EA applications:', whereClause);
-      } else if (status === 'all' || !status) {
-        // For 'all' status or no status, show ALL applications (no filtering)
-        // This is for the EA and Committee Staff tabs that should show all applications
-        console.log('EA All status - showing all applications');
       }
 
       // Get total count for pagination
@@ -243,35 +236,13 @@ export async function GET(request: NextRequest) {
         },
       });
 
-
-      if (status === 'no-schedule') {
-        console.log(`Found ${eaApplications.length} EA applications with no schedule`);
-        eaApplications.forEach(app => {
-          console.log(`EA App ${app.id}: day=${app.interviewSlotDay}, time=${app.interviewSlotTimeStart}`);
-        });
-      }
-
-      // Debug logging for all status filters
-      if (status === 'accepted' || status === 'pending') {
-        console.log(`Found ${eaApplications.length} EA applications with status: ${status}`);
-        eaApplications.forEach(app => {
-          console.log(`EA App ${app.id}: hasAccepted=${app.hasAccepted}, status=${app.status}, user=${app.user?.name}`);
-        });
-      }
-
-      // Add CV download links for EA applications
-      const eaApplicationsWithCvLinks = await Promise.all(
-        eaApplications.map(async (app) => {
-          const cvDownloadUrl = app.supabaseFilePath 
-            ? `/api/admin/cv-download?applicationId=${app.id}&type=ea`
-            : null;
-          
-          return {
-            ...app,
-            cvDownloadUrl,
-          };
-        })
-      );
+      // Add CV download links for EA applications (sync operation — no need for Promise.all)
+      const eaApplicationsWithCvLinks = eaApplications.map((app) => ({
+        ...app,
+        cvDownloadUrl: app.supabaseFilePath
+          ? `/api/admin/cv-download?applicationId=${app.id}&type=ea`
+          : null,
+      }));
 
       return NextResponse.json({
         success: true,
@@ -282,70 +253,69 @@ export async function GET(request: NextRequest) {
           totalCount: totalCount,
           limit: limit,
           hasNextPage: page < Math.ceil(totalCount / limit),
-          hasPreviousPage: page > 1
-        }
+          hasPreviousPage: page > 1,
+        },
       });
     }
 
-    if (type === 'committee') {
+    if (type === "committee") {
       const whereClause: Record<string, unknown> = {};
-      
+
       // Filter by committee if provided
-      if (committee && committee !== 'all') {
+      if (committee && committee !== "all") {
         // For committee-specific filtering, we need to handle redirected applications
         // A redirected application should only appear in the committee they were redirected TO
         // We need to handle both committee ID and committee title since redirections store the full title
-        
+
         // Get the committee title for the given committee ID
-        const { committeeRolesSubmitted } = await import('@/data/committeeRoles');
-        const committeeData = committeeRolesSubmitted.find(c => c.id === committee);
+        const { committeeRolesSubmitted } =
+          await import("@/data/committeeRoles");
+        const committeeData = committeeRolesSubmitted.find(
+          (c) => c.id === committee,
+        );
         const committeeTitle = committeeData?.title;
-        
+
         whereClause.OR = [
           // Direct applications to this committee (not redirected)
-          { 
+          {
             firstOptionCommittee: committee,
-            redirection: null // Not redirected
+            redirection: null, // Not redirected
           },
           // Applications redirected TO this committee (by ID or title)
-          ...(committeeTitle ? [
-            { redirection: committee }, // By committee ID
-            { redirection: committeeTitle } // By committee title
-          ] : [
-            { redirection: committee } // Fallback to just committee ID
-          ])
+          ...(committeeTitle
+            ? [
+                { redirection: committee }, // By committee ID
+                { redirection: committeeTitle }, // By committee title
+              ]
+            : [
+                { redirection: committee }, // Fallback to just committee ID
+              ]),
         ];
       }
-      
+
       // Filter by status if provided
-      if (status === 'accepted') {
+      if (status === "accepted") {
         whereClause.hasAccepted = true;
         whereClause.status = { not: null }; // Exclude applications with NULL status
-      } else if (status === 'pending') {
+      } else if (status === "pending") {
         whereClause.OR = [
           { hasAccepted: false, status: null },
-          { hasAccepted: false, status: 'pending' },
-          { hasAccepted: true, status: null } // Include accepted applications that were reset to NULL
+          { hasAccepted: false, status: "pending" },
+          { hasAccepted: true, status: null }, // Include accepted applications that were reset to NULL
         ];
-      } else if (status === 'evaluating') {
-        whereClause.status = 'evaluating';
-      } else if (status === 'rejected') {
-        whereClause.status = 'failed';
-      } else if (status === 'redirected') {
+      } else if (status === "evaluating") {
+        whereClause.status = "evaluating";
+      } else if (status === "rejected") {
+        whereClause.status = "failed";
+      } else if (status === "redirected") {
         whereClause.redirection = { not: null }; // Show only applications with redirection
-        console.log('Redirected filter applied for Committee applications:', whereClause);
-      } else if (status === 'no-schedule') {
+      } else if (status === "no-schedule") {
         whereClause.OR = [
           { interviewSlotDay: null },
           { interviewSlotTimeStart: null },
-          { interviewSlotDay: '' },
-          { interviewSlotTimeStart: '' }
+          { interviewSlotDay: "" },
+          { interviewSlotTimeStart: "" },
         ];
-        console.log('No-schedule filter applied for Committee applications:', whereClause);
-      } else if (status === 'all' || !status) {
-        // For 'all' status or no status, show ALL applications (no filtering)
-        // This is for the EA and Committee Staff tabs that should show all applications
-        console.log('Committee All status - showing all applications');
       }
 
       // Get total count for pagination
@@ -371,30 +341,17 @@ export async function GET(request: NextRequest) {
         },
       });
 
-      if (status === 'no-schedule') {
-        console.log(`Found ${committeeApplications.length} Committee applications with no schedule`);
-        committeeApplications.forEach(app => {
-          console.log(`Committee App ${app.id}: day=${app.interviewSlotDay}, time=${app.interviewSlotTimeStart}`);
-        });
-      }
-
-      // Add CV and Portfolio download links for Committee applications
-      const committeeApplicationsWithCvLinks = await Promise.all(
-        committeeApplications.map(async (app) => {
-          const cvDownloadUrl = app.supabaseFilePath 
+      // Add CV and Portfolio download links for Committee applications (sync — no need for Promise.all)
+      const committeeApplicationsWithCvLinks = committeeApplications.map(
+        (app) => ({
+          ...app,
+          cvDownloadUrl: app.supabaseFilePath
             ? `/api/admin/cv-download?applicationId=${app.id}&type=committee`
-            : null;
-          
-          const portfolioDownloadUrl = app.portfolioLink 
+            : null,
+          portfolioDownloadUrl: app.portfolioLink
             ? `/api/admin/portfolio-download?applicationId=${app.id}`
-            : null;
-          
-          return {
-            ...app,
-            cvDownloadUrl,
-            portfolioDownloadUrl,
-          };
-        })
+            : null,
+        }),
       );
 
       return NextResponse.json({
@@ -406,8 +363,8 @@ export async function GET(request: NextRequest) {
           totalCount: totalCount,
           limit: limit,
           hasNextPage: page < Math.ceil(totalCount / limit),
-          hasPreviousPage: page > 1
-        }
+          hasPreviousPage: page > 1,
+        },
       });
     }
 
@@ -416,12 +373,11 @@ export async function GET(request: NextRequest) {
       success: true,
       applications: [],
     });
-
   } catch (error) {
     console.error("Error fetching applications:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -442,7 +398,7 @@ export async function DELETE(_request: NextRequest) {
     if (!hasAdminAccess) {
       return NextResponse.json(
         { error: "Forbidden - Admin access required" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -450,40 +406,44 @@ export async function DELETE(_request: NextRequest) {
     // These are committee applications with status "redirected" where the corresponding EA application is "failed"
     const orphanedCommitteeApps = await prisma.committeeApplication.findMany({
       where: {
-        status: "redirected"
+        status: "redirected",
       },
       include: {
         user: {
           include: {
-            eaApplication: true
-          }
-        }
-      }
+            eaApplication: true,
+          },
+        },
+      },
     });
 
     let cleanedCount = 0;
     for (const committeeApp of orphanedCommitteeApps) {
       // Check if the corresponding EA application exists and is failed
-      if (committeeApp.user.eaApplication && committeeApp.user.eaApplication.status === "failed") {
+      if (
+        committeeApp.user.eaApplication &&
+        committeeApp.user.eaApplication.status === "failed"
+      ) {
         await prisma.committeeApplication.delete({
-          where: { id: committeeApp.id }
+          where: { id: committeeApp.id },
         });
         cleanedCount++;
-        console.log(`Cleaned up orphaned committee application for student: ${committeeApp.studentNumber}`);
+        console.log(
+          `Cleaned up orphaned committee application for student: ${committeeApp.studentNumber}`,
+        );
       }
     }
 
     return NextResponse.json({
       success: true,
       message: `Cleaned up ${cleanedCount} orphaned committee application records`,
-      cleanedCount
+      cleanedCount,
     });
-
   } catch (error) {
     console.error("Error cleaning up orphaned records:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -504,16 +464,22 @@ export async function PUT(request: NextRequest) {
     if (!hasAdminAccess) {
       return NextResponse.json(
         { error: "Forbidden - Admin access required" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
-    const { applicationId, type, action, redirection } = await request.json();
+    const body = await request.json();
+    const parsed = applicationActionSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
+    }
+
+    const { applicationId, type, action, redirection } = parsed.data;
 
     if (!applicationId || !type || !action) {
       return NextResponse.json(
         { error: "Missing required fields" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -538,16 +504,26 @@ export async function PUT(request: NextRequest) {
         });
 
         // Send acceptance email
-        if (updatedApplication?.user?.email && updatedApplication?.user?.name && updatedApplication?.user?.id) {
+        if (
+          updatedApplication?.user?.email &&
+          updatedApplication?.user?.name &&
+          updatedApplication?.user?.id
+        ) {
           try {
             const emailTemplate = emailTemplates.memberAccepted(
               updatedApplication.user.name,
-              updatedApplication.user.id
+              updatedApplication.user.id,
             );
-            await sendEmail(updatedApplication.user.email, emailTemplate.subject, emailTemplate.html);
-            console.log(`Acceptance email sent to ${updatedApplication.user.email} for member application`);
+            await sendEmail(
+              updatedApplication.user.email,
+              emailTemplate.subject,
+              emailTemplate.html,
+            );
+            console.log(
+              `Acceptance email sent to ${updatedApplication.user.email} for member application`,
+            );
           } catch (emailError) {
-            console.error('Failed to send acceptance email:', emailError);
+            console.error("Failed to send acceptance email:", emailError);
             // Don't fail the request if email fails
           }
         }
@@ -567,39 +543,27 @@ export async function PUT(request: NextRequest) {
             },
           },
         });
-      } else if (action === "evaluate") {
-        // For member applications, we don't need to set status as they don't have that field
-        // Just return the current application
-        updatedApplication = await prisma.memberApplication.findUnique({
-          where: { id: applicationId },
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                studentNumber: true,
-                section: true,
-              },
-            },
-          },
-        });
       }
     } else if (type === "committee") {
-      const updateData: {hasAccepted?: boolean; status?: string; redirection?: string} = {};
+      const updateData: {
+        hasAccepted?: boolean;
+        status?: string;
+        redirection?: string;
+      } = {};
 
-      if (action === "accept") {
+      if (action === "evaluate") {
+        updateData.hasAccepted = false;
+        updateData.status = "evaluating";
+      } else if (action === "accept") {
         updateData.hasAccepted = true;
         updateData.status = "passed";
       } else if (action === "reject") {
         updateData.hasAccepted = false;
         updateData.status = "failed";
       } else if (action === "redirect" && redirection) {
-        updateData.hasAccepted = true;
-        updateData.status = "passed";
-        updateData.redirection = redirection === 'member' ? 'Member' : redirection;
-      } else if (action === "evaluate") {
-        updateData.status = "evaluating";
+        updateData.hasAccepted = false;
+        updateData.status = "redirected";
+        updateData.redirection = redirection;
       }
 
       updatedApplication = await prisma.committeeApplication.update({
@@ -621,163 +585,181 @@ export async function PUT(request: NextRequest) {
       // Send appropriate email based on action
       if (updatedApplication?.user?.email && updatedApplication?.user?.name) {
         try {
-          if (action === "accept" && updatedApplication?.user?.id && updatedApplication?.firstOptionCommittee) {
+          if (
+            action === "accept" &&
+            updatedApplication?.user?.id &&
+            updatedApplication?.firstOptionCommittee
+          ) {
             const emailTemplate = emailTemplates.committeeAccepted(
               updatedApplication.user.name,
               updatedApplication.user.id,
-              updatedApplication.firstOptionCommittee
+              updatedApplication.firstOptionCommittee,
             );
-            await sendEmail(updatedApplication.user.email, emailTemplate.subject, emailTemplate.html);
-            console.log(`Acceptance email sent to ${updatedApplication.user.email} for committee application`);
-          } else if (action === "reject" && updatedApplication?.firstOptionCommittee) {
+            await sendEmail(
+              updatedApplication.user.email,
+              emailTemplate.subject,
+              emailTemplate.html,
+            );
+            console.log(
+              `Acceptance email sent to ${updatedApplication.user.email} for committee application`,
+            );
+          } else if (
+            action === "reject" &&
+            updatedApplication?.firstOptionCommittee
+          ) {
             const emailTemplate = emailTemplates.committeeRejected(
               updatedApplication.user.name,
-              updatedApplication.firstOptionCommittee
+              updatedApplication.firstOptionCommittee,
             );
-            await sendEmail(updatedApplication.user.email, emailTemplate.subject, emailTemplate.html);
-            console.log(`Rejection email sent to ${updatedApplication.user.email} for committee application`);
-          } else if (action === "redirect" && updatedApplication?.user?.id && redirection) {
+            await sendEmail(
+              updatedApplication.user.email,
+              emailTemplate.subject,
+              emailTemplate.html,
+            );
+            console.log(
+              `Rejection email sent to ${updatedApplication.user.email} for committee application`,
+            );
+          } else if (
+            action === "redirect" &&
+            updatedApplication?.user?.id &&
+            redirection
+          ) {
             // Check if redirecting to member
-            if (redirection === 'member') {
-              // Create MemberApplication record for the redirected user
-              await prisma.memberApplication.create({
-                data: {
-                  studentNumber: updatedApplication.studentNumber,
-                  hasAccepted: true, // Mark as accepted since this is a redirection
-                  paymentProof: "", // Will be updated when payment is received
-                }
-              });
-              console.log(`MemberApplication created for Committee redirection: ${updatedApplication.user.email}`);
-
+            if (redirection === "member") {
               const emailTemplate = emailTemplates.committeeRedirectedToMember(
                 updatedApplication.user.name,
                 updatedApplication.user.id,
-                updatedApplication.firstOptionCommittee || 'Original Committee'
+                updatedApplication.firstOptionCommittee || "Original Committee",
               );
-              await sendEmail(updatedApplication.user.email, emailTemplate.subject, emailTemplate.html);
-              console.log(`Member redirection email sent to ${updatedApplication.user.email} for committee application`);
+              await sendEmail(
+                updatedApplication.user.email,
+                emailTemplate.subject,
+                emailTemplate.html,
+              );
+              console.log(
+                `Member redirection email sent to ${updatedApplication.user.email} for committee application`,
+              );
             } else {
               // Check if redirecting to an EA role
-              const { roles } = await import('@/data/ebRoles');
-              const eaRole = roles.find(r => r.id === redirection);
-              
-              if (eaRole) {
-                // Create EAApplication record for the redirected user
-                await prisma.eAApplication.create({
-                  data: {
-                    studentNumber: updatedApplication.studentNumber,
-                    ebRole: redirection,
-                    firstOptionEb: redirection,
-                    secondOptionEb: "", // No second option for redirected applications
-                    cv: "", // Will be updated when they provide CV
-                    supabaseFilePath: "", // Will be updated when they provide CV
-                    interviewSlotDay: "",
-                    interviewSlotTimeStart: "",
-                    interviewSlotTimeEnd: "",
-                    hasAccepted: true, // Mark as accepted since this is a redirection
-                    hasFinishedInterview: false,
-                    status: "redirected",
-                    redirection: null, // This is the destination, not a redirection from here
-                  }
-                });
-                console.log(`EAApplication created for Committee redirection to ${redirection}: ${updatedApplication.user.email}`);
+              const { roles } = await import("@/data/ebRoles");
+              const eaRole = roles.find((r) => r.id === redirection);
 
+              if (eaRole) {
                 const emailTemplate = emailTemplates.committeeRedirected(
                   updatedApplication.user.name,
                   updatedApplication.user.id,
-                  updatedApplication.firstOptionCommittee || 'Original Committee',
-                  eaRole.title
+                  updatedApplication.firstOptionCommittee ||
+                    "Original Committee",
+                  eaRole.title,
                 );
-                await sendEmail(updatedApplication.user.email, emailTemplate.subject, emailTemplate.html);
-                console.log(`EA redirection email sent to ${updatedApplication.user.email} for committee application (redirected to ${eaRole.title})`);
+                await sendEmail(
+                  updatedApplication.user.email,
+                  emailTemplate.subject,
+                  emailTemplate.html,
+                );
+                console.log(
+                  `EA redirection email sent to ${updatedApplication.user.email} for committee application (redirected to ${eaRole.title})`,
+                );
               } else {
                 // Regular committee redirection (to another committee)
                 const emailTemplate = emailTemplates.committeeRedirected(
                   updatedApplication.user.name,
                   updatedApplication.user.id,
-                  updatedApplication.firstOptionCommittee || 'Original Committee',
-                  redirection
+                  updatedApplication.firstOptionCommittee ||
+                    "Original Committee",
+                  redirection,
                 );
-                await sendEmail(updatedApplication.user.email, emailTemplate.subject, emailTemplate.html);
-                console.log(`Redirect email sent to ${updatedApplication.user.email} for committee application (redirected to ${redirection})`);
+                await sendEmail(
+                  updatedApplication.user.email,
+                  emailTemplate.subject,
+                  emailTemplate.html,
+                );
+                console.log(
+                  `Redirect email sent to ${updatedApplication.user.email} for committee application (redirected to ${redirection})`,
+                );
               }
             }
-          } else if (action === "evaluate" && updatedApplication?.firstOptionCommittee) {
-            const emailTemplate = emailTemplates.committeeEvaluating(
-              updatedApplication.user.name,
-              updatedApplication.firstOptionCommittee
-            );
-            await sendEmail(updatedApplication.user.email, emailTemplate.subject, emailTemplate.html);
-            console.log(`Evaluation email sent to ${updatedApplication.user.email} for committee application`);
           }
         } catch (emailError) {
-          console.error('Failed to send email:', emailError);
-          // Don't fail the request if email fails
+          console.error("Failed to send email:", emailError);
         }
       }
     } else if (type === "ea") {
       // First get the current application data to check if it was redirected
       const currentApplication = await prisma.eAApplication.findUnique({
         where: { id: applicationId },
-        select: { status: true, redirection: true, studentNumber: true }
+        select: { status: true, redirection: true, studentNumber: true },
       });
 
-      const updateData: {hasAccepted?: boolean; status?: string; redirection?: string} = {};
+      const updateData: {
+        hasAccepted?: boolean;
+        status?: string;
+        redirection?: string;
+      } = {};
 
-      if (action === "accept") {
+      if (action === "evaluate") {
+        updateData.hasAccepted = false;
+        updateData.status = "evaluating";
+      } else if (action === "accept") {
         updateData.hasAccepted = true;
         updateData.status = "passed";
-        
+
         // If this EA application was redirected to a committee, clean up the committee application record
-        if (currentApplication?.status === "redirected" && currentApplication?.redirection) {
+        if (
+          currentApplication?.status === "redirected" &&
+          currentApplication?.redirection
+        ) {
           try {
             await prisma.committeeApplication.deleteMany({
               where: {
                 studentNumber: currentApplication.studentNumber,
                 status: "redirected",
-                redirection: currentApplication.redirection
-              }
+                redirection: currentApplication.redirection,
+              },
             });
-            console.log(`Cleaned up committee application record for accepted EA application: ${currentApplication.studentNumber}`);
+            console.log(
+              `Cleaned up committee application record for accepted EA application: ${currentApplication.studentNumber}`,
+            );
           } catch (error) {
-            console.error('Error cleaning up committee application record:', error);
+            console.error(
+              "Error cleaning up committee application record:",
+              error,
+            );
             // Don't fail the request if cleanup fails
           }
         }
       } else if (action === "reject") {
         updateData.hasAccepted = false;
         updateData.status = "failed";
-        
+
         // If this EA application was redirected to a committee, clean up the committee application record
-        if (currentApplication?.status === "redirected" && currentApplication?.redirection) {
+        if (
+          currentApplication?.status === "redirected" &&
+          currentApplication?.redirection
+        ) {
           try {
             await prisma.committeeApplication.deleteMany({
               where: {
                 studentNumber: currentApplication.studentNumber,
                 status: "redirected",
-                redirection: currentApplication.redirection
-              }
+                redirection: currentApplication.redirection,
+              },
             });
-            console.log(`Cleaned up committee application record for rejected EA application: ${currentApplication.studentNumber}`);
+            console.log(
+              `Cleaned up committee application record for rejected EA application: ${currentApplication.studentNumber}`,
+            );
           } catch (error) {
-            console.error('Error cleaning up committee application record:', error);
+            console.error(
+              "Error cleaning up committee application record:",
+              error,
+            );
             // Don't fail the request if cleanup fails
           }
         }
       } else if (action === "redirect" && redirection) {
-        updateData.hasAccepted = true;
+        updateData.hasAccepted = false;
         updateData.status = "redirected";
-        // For EA applications, store the proper committee title instead of raw committee ID
-        if (redirection.startsWith('committee-')) {
-          const committeeId = redirection.replace('committee-', '');
-          const { committeeRolesSubmitted } = await import('@/data/committeeRoles');
-          const committee = committeeRolesSubmitted.find(c => c.id === committeeId);
-          updateData.redirection = committee ? committee.title : committeeId;
-        } else {
-          updateData.redirection = redirection === 'member' ? 'Member' : redirection;
-        }
-      } else if (action === "evaluate") {
-        updateData.status = "evaluating";
+        updateData.redirection = redirection;
       }
 
       updatedApplication = await prisma.eAApplication.update({
@@ -796,110 +778,105 @@ export async function PUT(request: NextRequest) {
         },
       });
 
-      // If redirecting EA to committee-staff, create a committee application record
-      if (action === "redirect" && redirection && redirection.startsWith('committee-')) {
-        const committeeId = redirection.replace('committee-', '');
-        
-        // Import committee roles to get proper title
-        const { committeeRolesSubmitted } = await import('@/data/committeeRoles');
-        const committee = committeeRolesSubmitted.find(c => c.id === committeeId);
-        
-        // Create committee application record
-        await prisma.committeeApplication.create({
-          data: {
-            studentNumber: updatedApplication.studentNumber,
-            firstOptionCommittee: committeeId, // Store the committee they're redirected TO
-            secondOptionCommittee: "", // No second choice for redirected applications
-            hasAccepted: true, // Mark as accepted since this is a redirection
-            status: "redirected", // Mark as redirected
-            redirection: null, // This is the destination, not a redirection from here
-            interviewSlotDay: updatedApplication.interviewSlotDay,
-            interviewSlotTimeStart: updatedApplication.interviewSlotTimeStart,
-            interviewSlotTimeEnd: updatedApplication.interviewSlotTimeEnd,
-            interviewBy: updatedApplication.interviewBy,
-            supabaseFilePath: updatedApplication.supabaseFilePath,
-            portfolioLink: null, // EA applications don't have portfolio links
-            cv: updatedApplication.supabaseFilePath || "", // Use the CV file path as the cv field
-          }
-        });
-      }
-
       // Send appropriate email based on action
       if (updatedApplication?.user?.email && updatedApplication?.user?.name) {
         try {
-          if (action === "accept" && updatedApplication?.user?.id && updatedApplication?.ebRole) {
+          if (
+            action === "accept" &&
+            updatedApplication?.user?.id &&
+            updatedApplication?.ebRole
+          ) {
             const emailTemplate = emailTemplates.executiveAssistantAccepted(
               updatedApplication.user.name,
               updatedApplication.user.id,
-              updatedApplication.ebRole
+              updatedApplication.ebRole,
             );
-            await sendEmail(updatedApplication.user.email, emailTemplate.subject, emailTemplate.html);
-            console.log(`Acceptance email sent to ${updatedApplication.user.email} for EA application`);
+            await sendEmail(
+              updatedApplication.user.email,
+              emailTemplate.subject,
+              emailTemplate.html,
+            );
+            console.log(
+              `Acceptance email sent to ${updatedApplication.user.email} for EA application`,
+            );
           } else if (action === "reject" && updatedApplication?.ebRole) {
             const emailTemplate = emailTemplates.executiveAssistantRejected(
               updatedApplication.user.name,
-              updatedApplication.ebRole
+              updatedApplication.ebRole,
             );
-            await sendEmail(updatedApplication.user.email, emailTemplate.subject, emailTemplate.html);
-            console.log(`Rejection email sent to ${updatedApplication.user.email} for EA application`);
-          } else if (action === "redirect" && updatedApplication?.user?.id && redirection) {
+            await sendEmail(
+              updatedApplication.user.email,
+              emailTemplate.subject,
+              emailTemplate.html,
+            );
+            console.log(
+              `Rejection email sent to ${updatedApplication.user.email} for EA application`,
+            );
+          } else if (
+            action === "redirect" &&
+            updatedApplication?.user?.id &&
+            redirection
+          ) {
             // Check if redirecting to member
-            if (redirection === 'member') {
-              // Create MemberApplication record for the redirected user
-              await prisma.memberApplication.create({
-                data: {
-                  studentNumber: updatedApplication.studentNumber,
-                  hasAccepted: true, // Mark as accepted since this is a redirection
-                  paymentProof: "", // Will be updated when payment is received
-                }
-              });
-              console.log(`MemberApplication created for EA redirection: ${updatedApplication.user.email}`);
-
-              const emailTemplate = emailTemplates.executiveAssistantRedirectedToMember(
-                updatedApplication.user.name,
-                updatedApplication.user.id,
-                updatedApplication.firstOptionEb || 'Executive Assistant'
+            if (redirection === "member") {
+              const emailTemplate =
+                emailTemplates.executiveAssistantRedirectedToMember(
+                  updatedApplication.user.name,
+                  updatedApplication.user.id,
+                  updatedApplication.firstOptionEb || "Executive Assistant",
+                );
+              await sendEmail(
+                updatedApplication.user.email,
+                emailTemplate.subject,
+                emailTemplate.html,
               );
-              await sendEmail(updatedApplication.user.email, emailTemplate.subject, emailTemplate.html);
-              console.log(`Member redirection email sent to ${updatedApplication.user.email} for EA application`);
-            } else if (redirection.startsWith('committee-')) {
-              const committeeId = redirection.replace('committee-', '');
-              const emailTemplate = emailTemplates.executiveAssistantRedirectedToCommittee(
-                updatedApplication.user.name,
-                updatedApplication.user.id,
-                updatedApplication.firstOptionEb || 'Executive Assistant',
-                committeeId
+              console.log(
+                `Member redirection email sent to ${updatedApplication.user.email} for EA application`,
               );
-              await sendEmail(updatedApplication.user.email, emailTemplate.subject, emailTemplate.html);
-              console.log(`Committee redirection email sent to ${updatedApplication.user.email} for EA application (redirected to ${committeeId})`);
+            } else if (redirection.startsWith("committee-")) {
+              const committeeId = redirection.replace("committee-", "");
+              const emailTemplate =
+                emailTemplates.executiveAssistantRedirectedToCommittee(
+                  updatedApplication.user.name,
+                  updatedApplication.user.id,
+                  updatedApplication.firstOptionEb || "Executive Assistant",
+                  committeeId,
+                );
+              await sendEmail(
+                updatedApplication.user.email,
+                emailTemplate.subject,
+                emailTemplate.html,
+              );
+              console.log(
+                `Committee redirection email sent to ${updatedApplication.user.email} for EA application (redirected to ${committeeId})`,
+              );
             } else {
               // Regular EA to EA redirection
               const emailTemplate = emailTemplates.executiveAssistantRedirected(
                 updatedApplication.user.name,
                 updatedApplication.user.id,
-                updatedApplication.firstOptionEb || 'Executive Assistant',
-                redirection
+                updatedApplication.firstOptionEb || "Executive Assistant",
+                redirection,
               );
-              await sendEmail(updatedApplication.user.email, emailTemplate.subject, emailTemplate.html);
-              console.log(`EA redirection email sent to ${updatedApplication.user.email} for EA application (redirected to ${redirection})`);
+              await sendEmail(
+                updatedApplication.user.email,
+                emailTemplate.subject,
+                emailTemplate.html,
+              );
+              console.log(
+                `EA redirection email sent to ${updatedApplication.user.email} for EA application (redirected to ${redirection})`,
+              );
             }
-          } else if (action === "evaluate" && updatedApplication?.ebRole) {
-            const emailTemplate = emailTemplates.executiveAssistantEvaluating(
-              updatedApplication.user.name,
-              updatedApplication.ebRole
-            );
-            await sendEmail(updatedApplication.user.email, emailTemplate.subject, emailTemplate.html);
-            console.log(`Evaluation email sent to ${updatedApplication.user.email} for EA application`);
           }
         } catch (emailError) {
-          console.error('Failed to send email:', emailError);
+          console.error("Failed to send email:", emailError);
           // Don't fail the request if email fails
         }
       }
     } else {
       return NextResponse.json(
         { error: "Invalid application type" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -912,7 +889,7 @@ export async function PUT(request: NextRequest) {
     console.error("Error updating application:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

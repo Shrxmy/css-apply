@@ -2,11 +2,11 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
-import MobileSidebar from '@/components/AdminMobileSB';
-import SidebarContent from '@/components/AdminSidebar';
-import { roles } from '@/data/ebRoles';
-import { Download } from "lucide-react";
+import MobileSidebar from "@/components/AdminMobileSB";
+import SidebarContent from "@/components/AdminSidebar";
+import { committeeRolesSubmitted } from "@/data/committeeRoles";
+import { roles } from "@/data/ebRoles";
+import { toast } from "sonner";
 
 interface EA {
   id: string;
@@ -31,11 +31,21 @@ interface EA {
 }
 
 const EAs = () => {
-  const { data: session, status } = useSession();
-  const router = useRouter();
+  const { status } = useSession();
   const [eas, setEAs] = useState<EA[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedStatus, setSelectedStatus] = useState<'all' | 'accepted' | 'pending' | 'rejected' | 'no-schedule'>('all');
+  const [processingId, setProcessingId] = useState<string | null>(null);
+  const [showRedirectModal, setShowRedirectModal] = useState(false);
+  const [selectedEA, setSelectedEA] = useState<EA | null>(null);
+  const [redirectTo, setRedirectTo] = useState("");
+  const [selectedStatus, setSelectedStatus] = useState<
+    | "all"
+    | "accepted"
+    | "pending"
+    | "rejected"
+    | "redirected"
+    | "no-schedule"
+  >("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState({
     currentPage: 1,
@@ -43,17 +53,17 @@ const EAs = () => {
     totalCount: 0,
     limit: 10,
     hasNextPage: false,
-    hasPreviousPage: false
+    hasPreviousPage: false,
   });
 
   const fetchEAs = useCallback(async () => {
     try {
       setLoading(true);
       const params = new URLSearchParams({
-        type: 'ea',
+        type: "ea",
         page: currentPage.toString(),
-        limit: '10',
-        ...(selectedStatus !== 'all' && { status: selectedStatus })
+        limit: "10",
+        ...(selectedStatus !== "all" && { status: selectedStatus }),
       });
 
       const response = await fetch(`/api/admin/applications?${params}`);
@@ -63,65 +73,40 @@ const EAs = () => {
         setPagination(data.pagination);
       }
     } catch (error) {
-      console.error('Error fetching EAs:', error);
+      console.error("Error fetching EAs:", error);
     } finally {
       setLoading(false);
     }
   }, [selectedStatus, currentPage]);
 
   useEffect(() => {
-    if (status === 'loading') return;
-
-    if (status === 'unauthenticated') {
-      router.push('/auth/signin');
-      return;
-    }
-
-    if (session?.user?.role !== 'admin' && session?.user?.role !== 'super_admin') {
-      router.push('/user');
-      return;
-    }
-
+    if (status === "loading") return;
     fetchEAs();
-  }, [status, session?.user?.role, selectedStatus, fetchEAs, router]);
+  }, [status, fetchEAs]);
 
-  // Reset to page 1 when status changes
   useEffect(() => {
     setCurrentPage(1);
   }, [selectedStatus]);
 
   const handleCSVExport = async () => {
     try {
-      const params = new URLSearchParams({
-        type: 'ea'
-        // Note: We don't pass status since we only export accepted applications
-      });
-      
-      const response = await fetch(`/api/admin/export/csv?${params}`);
-      
+      const response = await fetch(`/api/admin/export/csv?type=ea`);
       if (response.ok) {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
+        const link = document.createElement("a");
         link.href = url;
-        
-        // Get filename from response headers
-        const contentDisposition = response.headers.get('Content-Disposition');
-        const filename = contentDisposition 
-          ? contentDisposition.split('filename=')[1]?.replace(/"/g, '')
-          : `accepted-ea-applications-${new Date().toISOString().split('T')[0]}.csv`;
-        
-        link.download = filename;
+        const contentDisposition = response.headers.get("Content-Disposition");
+        link.download = contentDisposition
+          ? contentDisposition.split("filename=")[1]?.replace(/"/g, "")
+          : `accepted-ea-applications-${new Date().toISOString().split("T")[0]}.csv`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         window.URL.revokeObjectURL(url);
-      } else {
-        alert('Failed to export CSV');
       }
     } catch (error) {
-      console.error('CSV export error:', error);
-      alert('Error exporting CSV');
+      console.error("CSV export error:", error);
     }
   };
 
@@ -130,49 +115,109 @@ const EAs = () => {
   };
 
   const getStatusBadge = (ea: EA) => {
-    // Priority 1: Check for redirection first (overrides hasAccepted)
-    if (ea.redirection) {
-      return <span className="px-2 py-1 text-xs font-semibold text-white bg-gradient-to-r from-[#044FAF] to-[#134687] rounded-full">Redirected</span>;
-    }
-    
-    // Priority 2: Check status field
-    if (ea.status === 'redirected') {
-      return <span className="px-2 py-1 text-xs font-semibold text-white bg-gradient-to-r from-[#044FAF] to-[#134687] rounded-full">Redirected</span>;
-    } else if (ea.status === 'failed') {
-      return <span className="px-2 py-1 text-xs font-semibold text-white bg-gradient-to-r from-[#FFBC2B] to-[#CE9823] rounded-full">Rejected</span>;
+    if (ea.redirection || ea.status === "redirected") {
+      return (
+        <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-[#044FAF]/10 text-[#044FAF]">
+          Redirected
+        </span>
+      );
+    } else if (ea.status === "failed") {
+      return (
+        <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-[#FFE7B4]/40 text-[#5B4515]">
+          Rejected
+        </span>
+      );
     } else if (ea.hasAccepted && ea.status !== null) {
-      return <span className="px-2 py-1 text-xs font-semibold text-white bg-gradient-to-r from-[#044FAF] to-[#134687] rounded-full">Accepted</span>;
+      return (
+        <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-[#044FAF]/10 text-[#044FAF]">
+          Accepted
+        </span>
+      );
     } else if (!ea.interviewSlotDay || !ea.interviewSlotTimeStart) {
-      return <span className="px-2 py-1 text-xs font-semibold text-orange-800 bg-orange-100 rounded-full">No Schedule</span>;
+      return (
+        <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-orange-50 text-orange-600">
+          No Schedule
+        </span>
+      );
     } else {
-      return <span className="px-2 py-1 text-xs font-semibold text-[#5B4515] bg-gradient-to-r from-[#FFE7B4] to-[#FFF3D6] rounded-full">Pending</span>;
+      return (
+        <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-[#FFE7B4]/40 text-[#5B4515]">
+          Pending
+        </span>
+      );
     }
   };
 
   const handleDownloadCV = async (ea: EA) => {
     try {
-      // Use the new download endpoint that forces download
-      const downloadUrl = `/api/admin/download-pdf?applicationId=${ea.id}&type=cv&applicationType=ea`;
-      
-      // Create a temporary link to download the file
-      const link = document.createElement('a');
-      link.href = downloadUrl;
+      const link = document.createElement("a");
+      link.href = `/api/admin/download-pdf?applicationId=${ea.id}&type=cv&applicationType=ea`;
       link.download = `${ea.user.name}_CV.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
     } catch (error) {
-      console.error('Error downloading CV:', error);
-      alert('Error downloading CV');
+      console.error("Error downloading CV:", error);
     }
   };
 
-  if (status === 'loading' || loading) {
+  const handleEAAction = useCallback(
+    async (
+      applicationId: string,
+      action: "evaluate" | "accept" | "reject" | "redirect",
+    ) => {
+      try {
+        setProcessingId(applicationId);
+
+        const body: {
+          applicationId: string;
+          type: "ea";
+          action: "evaluate" | "accept" | "reject" | "redirect";
+          redirection?: string;
+        } = {
+          applicationId,
+          type: "ea",
+          action,
+        };
+
+        if (action === "redirect") {
+          body.redirection = redirectTo;
+        }
+
+        const response = await fetch("/api/admin/applications", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+
+        if (response.ok) {
+          if (action === "evaluate") toast.success("Application set to evaluating");
+          if (action === "accept") toast.success("Application accepted");
+          if (action === "reject") toast.success("Application rejected");
+          if (action === "redirect") toast.success("Application redirected");
+          setShowRedirectModal(false);
+          setSelectedEA(null);
+          setRedirectTo("");
+          await fetchEAs();
+        } else {
+          const err = await response.json();
+          toast.error(err.error || "Failed to update application");
+        }
+      } catch {
+        toast.error("Failed to update application");
+      } finally {
+        setProcessingId(null);
+      }
+    },
+    [fetchEAs, redirectTo],
+  );
+
+  if (status === "loading") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F3F3FD] bg-[url('https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/pictures/background.png')] bg-cover bg-repeat">
         <div className="flex flex-col items-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#044FAF]"></div>
-          <p className="mt-4 text-[#134687]">Loading executive assistants...</p>
+          <p className="mt-4 text-[#134687]">Loading session...</p>
         </div>
       </div>
     );
@@ -180,100 +225,165 @@ const EAs = () => {
 
   return (
     <div className="min-h-screen flex bg-[#F3F3FD] bg-[url('https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/pictures/background.png')] bg-cover bg-repeat overflow-x-hidden">
-      {/* Sidebar Navigation */}
       <MobileSidebar>
         <SidebarContent activePage="eas" />
       </MobileSidebar>
 
-      {/* MAIN CONTENT */}
       <div className="flex-1 p-6 md:p-8 pt-16 md:pt-12 overflow-y-auto h-screen">
-        {/* PAGE HEADER */}
+        {/* Header */}
         <div className="mb-8 mt-12 md:mt-8 text-center md:text-left">
-          <div className="rounded-[45px] text-white text-lg lg:text-4xl font-poppins font-medium px-6 py-2 lg:py-4 text-center [background:linear-gradient(90deg,_#2F7EE3_0%,_#0349A2_100%)] w-fit mb-4">
+          <div className="rounded-[45px] text-white text-lg lg:text-4xl font-poppins font-medium px-6 py-2 lg:py-4 text-center [background:linear-gradient(90deg,#2F7EE3_0%,#0349A2_100%)] w-fit mb-4">
             Executive Assistants
           </div>
           <p className="text-black text-xs lg:text-lg font-Inter font-light leading-5 mb-4 md:mb-6">
-            View and manage all executive assistant applications and members for CSS Apply.
+            View and manage all executive assistant applications and members for
+            CSS Apply.
           </p>
           <hr className="border-[#005FD9]" />
         </div>
 
-        {/* FILTERS */}
-        <div className="bg-white rounded-xl shadow-sm border-2 border-[#005FD9] p-6 mb-6">
+        {/* Filters */}
+        <div className="bg-white rounded-xl border border-[#005FD9]/10 p-5 mb-5">
           <div className="flex flex-wrap gap-4 items-center justify-between">
-            <div className="flex flex-wrap gap-4 items-center">
-              <div>
-                <label className="block text-sm font-medium text-[#134687] mb-2">Status</label>
-                <select
-                  value={selectedStatus}
-                  onChange={(e) => setSelectedStatus(e.target.value as 'all' | 'accepted' | 'pending' | 'rejected' | 'no-schedule')}
-                  className="px-3 py-2 border-2 border-[#005FD9] rounded-md focus:outline-none focus:ring-2 focus:ring-[#044FAF]"
-                >
-                  <option value="all">All Applications</option>
-                  <option value="accepted">Accepted</option>
-                  <option value="pending">Pending</option>
-                  <option value="rejected">Rejected</option>
-                  <option value="no-schedule">No Schedule</option>
-                </select>
-              </div>
-            </div>
-            
-            {/* CSV Export Button */}
-            <div className="flex gap-2 items-center">
-              <button 
-                onClick={() => handleCSVExport()}
-                className="px-4 py-2 bg-gradient-to-r from-[#10B981] to-[#059669] text-white text-sm rounded-md hover:from-[#059669] hover:to-[#047857] transition-all duration-200 flex items-center gap-2"
-                title="Export All Accepted Executive Assistant Applications to CSV"
+            <div>
+              <label className="block text-xs font-medium text-[#134687]/50 uppercase tracking-wider font-mono mb-1">
+                Status
+              </label>
+              <select
+                value={selectedStatus}
+                onChange={(e) =>
+                  setSelectedStatus(
+                    e.target.value as
+                      | "all"
+                      | "accepted"
+                      | "pending"
+                      | "rejected"
+                      | "redirected"
+                      | "no-schedule",
+                  )
+                }
+                className="px-3 py-2 border border-[#005FD9]/15 rounded-lg text-sm text-[#134687] focus:outline-none focus:ring-2 focus:ring-[#044FAF]/20"
               >
-                📊 Export Accepted CSV
-              </button>
+                <option value="all">All Applications</option>
+                <option value="accepted">Accepted</option>
+                <option value="pending">Pending</option>
+                <option value="rejected">Rejected</option>
+                <option value="redirected">Redirected</option>
+                <option value="no-schedule">No Schedule</option>
+              </select>
             </div>
+            <button
+              onClick={handleCSVExport}
+              className="px-4 py-2 text-sm text-[#134687] border border-[#005FD9]/15 rounded-lg hover:bg-[#F3F3FD] transition-colors font-medium"
+            >
+              Export CSV
+            </button>
           </div>
         </div>
 
-        {/* EAS LIST */}
-        <div className="bg-white rounded-xl shadow-sm border-2 border-[#005FD9] p-6 mb-6 min-h-[calc(100vh-180px)] md:min-h-[calc(100vh-280px)]">
-          {eas.length === 0 ? (
+        {/* EAs List */}
+        <div className="bg-white rounded-xl border border-[#005FD9]/10 p-5 mb-5 min-h-[calc(100vh-180px)] md:min-h-[calc(100vh-280px)]">
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#044FAF]"></div>
+              <p className="mt-3 text-sm text-[#134687]/60">
+                Loading applications...
+              </p>
+            </div>
+          ) : eas.length === 0 ? (
             <div className="text-center py-12">
-              <p className="text-gray-500 text-lg">No executive assistant applications found</p>
+              <p className="text-[#134687]/40 text-sm">
+                No executive assistant applications found
+              </p>
             </div>
           ) : (
             <div className="space-y-3">
               {eas.map((ea) => {
-                const firstEB = roles.find(r => r.id === ea.firstOptionEb);
-                const secondEB = roles.find(r => r.id === ea.secondOptionEb);
-                
+                const firstEB = roles.find((r) => r.id === ea.firstOptionEb);
+                const secondEB = roles.find((r) => r.id === ea.secondOptionEb);
                 return (
-                  <div key={ea.id} className="border-2 border-[#005FD9] rounded-lg p-3 hover:shadow-sm transition-shadow bg-white">
+                  <div
+                    key={ea.id}
+                    className="border border-[#005FD9]/10 rounded-lg p-4 hover:bg-[#F3F3FD]/50 transition-colors"
+                  >
                     <div className="flex justify-between items-start">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <h3 className="text-base font-semibold text-[#134687] truncate">{ea.user.name}</h3>
+                          <h3 className="text-sm font-semibold text-[#134687] truncate">
+                            {ea.user.name}
+                          </h3>
                           {getStatusBadge(ea)}
                         </div>
-                        <div className="text-xs text-[#134687] space-y-0.5">
-                          <div>Student #: {ea.studentNumber} | Section: {ea.user.section}</div>
-                          <div>Email: {ea.user.email}</div>
-                          <div>First Choice: {firstEB?.title}</div>
-                          <div>Second Choice: {secondEB?.title}</div>
+                        <div className="text-xs text-[#134687]/60 font-mono space-y-0.5">
+                          <div>
+                            {ea.studentNumber} &middot; {ea.user.section}{" "}
+                            &middot; {ea.user.email}
+                          </div>
+                          <div>
+                            {firstEB?.title} / {secondEB?.title}
+                          </div>
                           {ea.interviewSlotDay && (
-                            <div>Interview: {ea.interviewSlotDay} at {ea.interviewSlotTimeStart}</div>
+                            <div>
+                              Interview: {ea.interviewSlotDay} at{" "}
+                              {ea.interviewSlotTimeStart}
+                            </div>
                           )}
                           {ea.redirection && (
                             <div>Redirected to: {ea.redirection}</div>
                           )}
-                          <div>Applied: {new Date(ea.createdAt).toLocaleDateString()}</div>
+                          <div>
+                            Applied:{" "}
+                            {new Date(ea.createdAt).toLocaleDateString()}
+                          </div>
                         </div>
                       </div>
-                      <div className="flex flex-col gap-1 ml-3">
+                      <div className="flex flex-col gap-2 ml-3 shrink-0 items-end">
                         {ea.cvDownloadUrl && (
                           <button
                             onClick={() => handleDownloadCV(ea)}
-                            className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-[#044FAF] to-[#134687] text-white text-xs rounded hover:from-[#04387B] hover:to-[#0f3a6b] transition-all duration-200"
+                            className="px-2.5 py-1 text-xs text-[#134687] border border-[#005FD9]/15 rounded hover:bg-[#F3F3FD] transition-colors"
                           >
-                            <Download size={12} />
                             CV
                           </button>
+                        )}
+
+                        {(!ea.status || ea.status === "pending") && !ea.hasAccepted && !ea.redirection && (
+                          <button
+                            onClick={() => handleEAAction(ea.id, "evaluate")}
+                            disabled={processingId === ea.id}
+                            className="px-2.5 py-1 text-xs text-[#134687] border border-[#005FD9]/15 rounded hover:bg-[#F3F3FD] disabled:opacity-50 transition-all duration-200"
+                          >
+                            {processingId === ea.id ? "Processing..." : "Evaluate"}
+                          </button>
+                        )}
+
+                        {ea.status === "evaluating" && !ea.hasAccepted && !ea.redirection && (
+                          <div className="flex gap-1">
+                            <button
+                              onClick={() => handleEAAction(ea.id, "accept")}
+                              disabled={processingId === ea.id}
+                              className="px-2.5 py-1 text-xs text-[#134687] border border-[#005FD9]/15 rounded hover:bg-[#F3F3FD] disabled:opacity-50 transition-all duration-200"
+                            >
+                              Accept
+                            </button>
+                            <button
+                              onClick={() => handleEAAction(ea.id, "reject")}
+                              disabled={processingId === ea.id}
+                              className="px-2.5 py-1 text-xs text-[#134687]/60 border border-[#005FD9]/10 rounded hover:bg-[#F3F3FD]/50 disabled:opacity-50 transition-all duration-200"
+                            >
+                              Reject
+                            </button>
+                            <button
+                              onClick={() => {
+                                setShowRedirectModal(true);
+                                setSelectedEA(ea);
+                              }}
+                              disabled={processingId === ea.id}
+                              className="px-2.5 py-1 text-xs text-[#134687]/60 border border-[#005FD9]/10 rounded hover:bg-[#F3F3FD]/50 disabled:opacity-50 transition-all duration-200"
+                            >
+                              Redirect
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -284,63 +394,115 @@ const EAs = () => {
           )}
         </div>
 
-        {/* PAGINATION */}
+        {/* Pagination */}
         {eas.length > 0 && pagination.totalPages > 1 && (
-          <div className="bg-white rounded-xl shadow-sm border-2 border-[#005FD9] p-6">
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-600">
-                Showing {((pagination.currentPage - 1) * pagination.limit) + 1} to {Math.min(pagination.currentPage * pagination.limit, pagination.totalCount)} of {pagination.totalCount} applications
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handlePageChange(currentPage - 1)}
-                  disabled={!pagination.hasPreviousPage}
-                  className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Previous
-                </button>
-                
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
-                    let pageNum;
-                    if (pagination.totalPages <= 5) {
-                      pageNum = i + 1;
-                    } else if (currentPage <= 3) {
-                      pageNum = i + 1;
-                    } else if (currentPage >= pagination.totalPages - 2) {
-                      pageNum = pagination.totalPages - 4 + i;
-                    } else {
-                      pageNum = currentPage - 2 + i;
-                    }
-                    
-                    return (
-                      <button
-                        key={pageNum}
-                        onClick={() => handlePageChange(pageNum)}
-                        className={`px-3 py-1 text-sm rounded-md ${
-                          currentPage === pageNum
-                            ? 'bg-[#044FAF] text-white'
-                            : 'border border-gray-300 hover:bg-gray-50'
-                        }`}
-                      >
-                        {pageNum}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <button
-                  onClick={() => handlePageChange(currentPage + 1)}
-                  disabled={!pagination.hasNextPage}
-                  className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Next
-                </button>
-              </div>
+          <div className="bg-white rounded-xl border border-[#005FD9]/10 p-4 flex items-center justify-between">
+            <div className="text-xs text-[#134687]/40 font-mono">
+              {(pagination.currentPage - 1) * pagination.limit + 1}&ndash;
+              {Math.min(
+                pagination.currentPage * pagination.limit,
+                pagination.totalCount,
+              )}{" "}
+              / {pagination.totalCount}
+            </div>
+            <div className="flex gap-1">
+              <button
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={!pagination.hasPreviousPage}
+                className="px-2.5 py-1 text-xs font-mono border border-[#005FD9]/15 rounded hover:bg-[#F3F3FD] disabled:opacity-30 text-[#134687]"
+              >
+                prev
+              </button>
+              {Array.from(
+                { length: Math.min(5, pagination.totalPages) },
+                (_, i) => {
+                  let pageNum;
+                  if (pagination.totalPages <= 5) pageNum = i + 1;
+                  else if (currentPage <= 3) pageNum = i + 1;
+                  else if (currentPage >= pagination.totalPages - 2)
+                    pageNum = pagination.totalPages - 4 + i;
+                  else pageNum = currentPage - 2 + i;
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => handlePageChange(pageNum)}
+                      className={`px-2.5 py-1 text-xs font-mono rounded ${currentPage === pageNum ? "bg-[#044FAF] text-white" : "border border-[#005FD9]/15 hover:bg-[#F3F3FD] text-[#134687]"}`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                },
+              )}
+              <button
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={!pagination.hasNextPage}
+                className="px-2.5 py-1 text-xs font-mono border border-[#005FD9]/15 rounded hover:bg-[#F3F3FD] disabled:opacity-30 text-[#134687]"
+              >
+                next
+              </button>
             </div>
           </div>
         )}
       </div>
+
+      {showRedirectModal && selectedEA && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#134687]/35 backdrop-blur-sm px-4">
+          <div className="w-full max-w-md rounded-2xl border border-[#005FD9]/15 bg-white p-6 shadow-[0_20px_60px_-15px_rgba(4,79,175,0.35)]">
+            <h3 className="text-lg font-semibold text-[#134687] mb-1">Redirect Application</h3>
+            <p className="text-sm text-[#134687]/70 mb-4">
+              Redirect {selectedEA.user.name}&apos;s application to:
+            </p>
+            <select
+              value={redirectTo}
+              onChange={(e) => setRedirectTo(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg border border-[#005FD9]/15 bg-white text-sm text-[#134687] focus:outline-none focus:ring-2 focus:ring-[#044FAF]/20 mb-4"
+            >
+              <option value="">Select committee/role</option>
+              <optgroup label="Member">
+                <option value="member">Member</option>
+              </optgroup>
+              <optgroup label="Executive Assistant Roles">
+                {roles
+                  .filter((role) => role.id !== selectedEA.firstOptionEb)
+                  .map((role) => (
+                  <option key={role.id} value={role.id}>
+                    {role.title}
+                  </option>
+                  ))}
+              </optgroup>
+              <optgroup label="Committee Staff Roles">
+                {committeeRolesSubmitted.map((role) => (
+                  <option
+                    key={`committee-${role.id}`}
+                    value={`committee-${role.id}`}
+                  >
+                    {role.title} Staff
+                  </option>
+                ))}
+              </optgroup>
+            </select>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowRedirectModal(false);
+                  setSelectedEA(null);
+                  setRedirectTo("");
+                }}
+                className="flex-1 px-4 py-2 text-sm text-[#134687] border border-[#005FD9]/15 rounded-lg hover:bg-[#F3F3FD] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleEAAction(selectedEA.id, "redirect")}
+                disabled={!redirectTo || processingId === selectedEA.id}
+                className="flex-1 px-4 py-2 text-sm bg-[#044FAF] text-white rounded-lg hover:bg-[#033c87] disabled:opacity-50 transition-colors"
+              >
+                {processingId === selectedEA.id ? "Processing..." : "Redirect"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

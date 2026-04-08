@@ -12,7 +12,23 @@ interface ParsedName {
 
 // Common Filipino surname prefixes that should be kept with the surname
 const FILIPINO_SURNAME_PREFIXES = [
-  'de', 'del', 'dela', 'den', 'der', 'des', 'di', 'du', 'van', 'von', 'da', 'dos', 'das', 'la', 'le', 'los', 'las'
+  "de",
+  "del",
+  "dela",
+  "den",
+  "der",
+  "des",
+  "di",
+  "du",
+  "van",
+  "von",
+  "da",
+  "dos",
+  "das",
+  "la",
+  "le",
+  "los",
+  "las",
 ];
 
 export function parseFullName(fullName: string): ParsedName {
@@ -22,12 +38,12 @@ export function parseFullName(fullName: string): ParsedName {
   if (!trimmedName) return { firstName: "", lastName: "" };
 
   const nameParts = trimmedName.split(/\s+/);
-  
+
   if (nameParts.length === 1) {
     // Only one name provided, treat as first name
     return { firstName: nameParts[0], lastName: "" };
   }
-  
+
   if (nameParts.length === 2) {
     // Simple case: "Juan Santos" -> firstName: "Juan", lastName: "Santos"
     return { firstName: nameParts[0], lastName: nameParts[1] };
@@ -40,28 +56,28 @@ export function parseFullName(fullName: string): ParsedName {
   // - "Jose Dela Cruz" -> firstName: "Jose", lastName: "Dela Cruz"
   // - "Juan Carlos De La Torre" -> firstName: "Juan Carlos", lastName: "De La Torre"
   // - "Ana De Los Santos" -> firstName: "Ana", lastName: "De Los Santos"
-  
+
   // Look for surname prefixes starting from the second word
   for (let i = 1; i < nameParts.length; i++) {
     const word = nameParts[i].toLowerCase();
     if (FILIPINO_SURNAME_PREFIXES.includes(word)) {
       // Found a surname prefix, everything from this point is the surname
-      const firstName = nameParts.slice(0, i).join(' ');
-      const lastName = nameParts.slice(i).join(' ');
+      const firstName = nameParts.slice(0, i).join(" ");
+      const lastName = nameParts.slice(i).join(" ");
       return { firstName, lastName };
     }
   }
-  
+
   // No surname prefixes found, assume last word is surname
   // This handles cases like "Joevanni Paulo Gumban" where "Gumban" is the surname
   if (nameParts.length >= 3) {
-    const firstName = nameParts.slice(0, -1).join(' ');
+    const firstName = nameParts.slice(0, -1).join(" ");
     const lastName = nameParts[nameParts.length - 1];
     return { firstName, lastName };
   }
-  
+
   // Fallback: first word as first name, rest as last name
   const firstName = nameParts[0];
-  const lastName = nameParts.slice(1).join(' ');
+  const lastName = nameParts.slice(1).join(" ");
   return { firstName, lastName };
 }

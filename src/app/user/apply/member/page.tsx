@@ -7,21 +7,28 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Image from "next/image";
 import Header from "@/components/Header";
+import LoadingScreen from "@/components/LoadingScreen";
 import { parseFullName } from "@/lib/name-parsing";
 import { useFormPersistence } from "@/lib/useFormPersistence";
-import { usePageReload } from "@/lib/usePageReload";
+import { useApplicationStatus } from "@/lib/useApplicationStatus";
+import { useApplicationsOpen } from "@/lib/useApplicationsOpen";
+import { memberApplicationSchema } from "@/lib/schemas";
 
 export default function MemberApplication() {
   const [isChecked, setIsChecked] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [hasCheckedApplications, setHasCheckedApplications] = useState(false);
   const [error, setError] = useState("");
   const [hasFetchedData, setHasFetchedData] = useState(false);
   const router = useRouter();
   const { data: session, status } = useSession();
 
-  // Disable auto-reload on application pages to prevent data loss
-  usePageReload({ disableReload: true });
+  // SWR hook — shared with user dashboard, no duplicate fetch
+  const { data: appStatus, isLoading: isAppLoading } = useApplicationStatus(
+    status === "authenticated",
+  );
+
+  // Gate: redirect to /user when applications are closed
+  const applicationsOpen = useApplicationsOpen("/user");
 
   const initialFormData = {
     studentNumber: "",
@@ -34,6 +41,20 @@ export default function MemberApplication() {
     initialFormData,
     "member-application"
   );
+
+  useEffect(() => {
+    if (!appStatus || status !== "authenticated") return;
+    if (appStatus.hasMemberApplication)
+      router.push("/user/apply/member/progress");
+    else if (appStatus.hasCommitteeApplication && appStatus.committeeId)
+      router.push(
+        `/user/apply/committee-staff/${appStatus.committeeId}/progress`,
+      );
+    else if (appStatus.hasEAApplication && appStatus.ebRole)
+      router.push(
+        `/user/apply/executive-assistant/${appStatus.ebRole}/progress`,
+      );
+  }, [appStatus, status, router]);
 
   useEffect(() => {
     const fetchApplicationData = async () => {
@@ -80,37 +101,16 @@ export default function MemberApplication() {
     fetchApplicationData();
   }, [session, status, isLoaded, updateFormData, hasFetchedData, formData.studentNumber, formData.section]);
 
-  if (status === "authenticated" && !hasCheckedApplications) {
-    const checkApplications = async () => {
-      try {
-        const response = await fetch("/api/applications/check-existing");
-        if (response.ok) {
-          const data = await response.json();
-
-          // Redirect based on existing applications
-          if (data.hasMemberApplication) {
-            router.push("/user/apply/member/progress");
-          } else if (data.hasCommitteeApplication) {
-            const committeeId = data.applications.committee?.firstOptionCommittee;
-            if (committeeId) {
-              router.push(`/user/apply/committee-staff/${committeeId}/progress`);
-            }
-          } else if (data.hasEAApplication) {
-            const ebRole = data.applications.ea?.firstOptionEb;
-            if (ebRole) {
-              router.push(`/user/apply/executive-assistant/${ebRole}/progress`);
-            }
-          }
-        }
-      } catch (error) {
-        console.error("Error checking applications:", error);
-      } finally {
-        setHasCheckedApplications(true);
-      }
-    };
-
-    checkApplications();
-  }
+  // Early returns AFTER all hooks
+  if (status === "loading" || isAppLoading) return <LoadingScreen />;
+  if (
+    appStatus &&
+    (appStatus.hasMemberApplication ||
+      appStatus.hasCommitteeApplication ||
+      appStatus.hasEAApplication)
+  )
+    return <LoadingScreen />;
+  if (!applicationsOpen) return <LoadingScreen />;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -124,26 +124,25 @@ export default function MemberApplication() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError("");
+
+    // Zod validation
+    const parsed = memberApplicationSchema.safeParse({
+      studentNumber: formData.studentNumber,
+      section: formData.section,
+    });
+
+    if (!parsed.success) {
+      setError(parsed.error.issues[0].message);
+      return;
+    }
 
     if (!isChecked) {
       setError("Please agree to the data privacy terms");
-      setLoading(false);
       return;
     }
 
-    if (!formData.studentNumber || formData.studentNumber.length !== 10) {
-      setError("Please enter a valid 10-digit student number");
-      setLoading(false);
-      return;
-    }
-
-    if (!formData.section) {
-      setError("Please enter your section");
-      setLoading(false);
-      return;
-    }
+    setLoading(true);
 
     try {
       const response = await fetch("/api/applications/member", {

@@ -43,12 +43,14 @@ CSSApply is a comprehensive recruitment management system designed specifically 
 ### Installation
 
 1. **Clone the repository**
+
    ```bash
    git clone https://github.com/your-org/css-apply.git
    cd css-apply
    ```
 
 2. **Install dependencies**
+
    ```bash
    npm install
    # or
@@ -58,35 +60,39 @@ CSSApply is a comprehensive recruitment management system designed specifically 
    ```
 
 3. **Environment Setup**
+
    ```bash
    cp .env.example .env.local
    ```
-   
+
    Configure the following environment variables:
+
    ```env
    # Database
    DATABASE_URL="postgresql://username:password@localhost:5432/css_apply"
-   
+
    # NextAuth
    NEXTAUTH_URL="http://localhost:3000"
    NEXTAUTH_SECRET="your-secret-key"
-   
+
    # Supabase
    NEXT_PUBLIC_SUPABASE_URL="your-supabase-url"
    NEXT_PUBLIC_SUPABASE_ANON_KEY="your-supabase-anon-key"
    SUPABASE_SERVICE_ROLE_KEY="your-service-role-key"
-   
+
    # Email (Brevo)
    BREVO_API_KEY="your-brevo-api-key"
    ```
 
 4. **Database Setup**
+
    ```bash
    npx prisma generate
    npx prisma db push
    ```
 
 5. **Start Development Server**
+
    ```bash
    npm run dev
    # or
@@ -125,28 +131,31 @@ css-apply/
 
 ## Available Scripts
 
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Start development server with Turbopack |
-| `npm run build` | Build the application for production |
-| `npm run start` | Start the production server |
-| `npm run lint` | Run ESLint for code quality |
+| Command         | Description                             |
+| --------------- | --------------------------------------- |
+| `npm run dev`   | Start development server with Turbopack |
+| `npm run build` | Build the application for production    |
+| `npm run start` | Start the production server             |
+| `npm run lint`  | Run ESLint for code quality             |
 
 ---
 
 ## Application Types
 
 ### Member Application
+
 - Basic membership application
 - Simple form with personal information
 - Automatic approval process
 
 ### Committee Staff Application
+
 - Apply for specific committee positions
 - Portfolio submission required
 - Interview scheduling with committee heads
 
 ### Executive Assistant Application
+
 - Apply to assist Executive Board members
 - CV submission required
 - Interview scheduling with EB members
@@ -174,6 +183,7 @@ CSSApply uses **Brevo** (formerly Sendinblue) for email communications:
 - **Admin Alerts**: System notifications
 
 ### Email Templates
+
 - Responsive HTML templates
 - Brand-consistent styling
 - Multi-language support ready
@@ -183,6 +193,7 @@ CSSApply uses **Brevo** (formerly Sendinblue) for email communications:
 ## Database Schema
 
 ### Core Models
+
 - **User**: User accounts and profiles
 - **EAApplication**: Executive Assistant applications
 - **CommitteeApplication**: Committee Staff applications
@@ -190,6 +201,7 @@ CSSApply uses **Brevo** (formerly Sendinblue) for email communications:
 - **AvailableEBInterviewTime**: Interview slot management
 
 ### Key Features
+
 - **Prisma ORM**: Type-safe database operations
 - **Migrations**: Version-controlled schema changes
 - **Relationships**: Proper foreign key constraints
@@ -200,17 +212,20 @@ CSSApply uses **Brevo** (formerly Sendinblue) for email communications:
 ## Deployment
 
 ### Vercel (Recommended)
+
 1. Connect your GitHub repository to Vercel
 2. Configure environment variables
 3. Deploy automatically on push to main branch
 
 ### Manual Deployment
+
 1. Build the application: `npm run build`
 2. Start the production server: `npm run start`
 3. Configure reverse proxy (nginx/Apache)
 4. Set up SSL certificates
 
 ### Environment Variables for Production
+
 ```env
 NEXTAUTH_URL="https://your-domain.com"
 DATABASE_URL="your-production-database-url"
@@ -224,6 +239,7 @@ NEXTAUTH_SECRET="your-production-secret"
 We welcome contributions to CSSApply! Here's how you can help:
 
 ### Development Workflow
+
 1. **Fork** the repository
 2. **Create** a feature branch: `git checkout -b feature/amazing-feature`
 3. **Commit** your changes: `git commit -m 'Add amazing feature'`
@@ -231,6 +247,7 @@ We welcome contributions to CSSApply! Here's how you can help:
 5. **Open** a Pull Request
 
 ### Code Standards
+
 - **TypeScript**: Strict type checking enabled
 - **ESLint**: Follow the configured rules
 - **Prettier**: Consistent code formatting
@@ -241,7 +258,8 @@ We welcome contributions to CSSApply! Here's how you can help:
 ## Support
 
 ### Getting Help
-- **Email**: css.cics@ust.edu.ph
+
+- **Email**: <css.cics@ust.edu.ph>
 - **Facebook**: [CSS Facebook Page](https://facebook.com/USTCSS)
 
 ---

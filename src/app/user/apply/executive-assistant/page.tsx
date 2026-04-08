@@ -1,53 +1,62 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
+import LoadingScreen from "@/components/LoadingScreen";
+import { useApplicationStatus } from "@/lib/useApplicationStatus";
+import { useApplicationsOpen } from "@/lib/useApplicationsOpen";
 import { roles } from "@/data/ebRoles";
 
 export default function AssistantApplication() {
   const [selectedRole, setSelectedRole] = useState<string | null>("president");
-  const [hasCheckedApplications, setHasCheckedApplications] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const { status } = useSession();
   const router = useRouter();
 
-  if (status === "authenticated" && !hasCheckedApplications) {
-    const checkApplications = async () => {
-      try {
-        const response = await fetch("/api/applications/check-existing");
-        if (response.ok) {
-          const data = await response.json();
+  // SWR hook — shared with user dashboard, no duplicate fetch
+  const { data: appStatus, isLoading: isAppLoading } = useApplicationStatus(
+    status === "authenticated",
+  );
 
-          // Redirect based on existing applications
-          if (data.hasMemberApplication) {
-            router.push("/user/apply/member/progress");
-          } else if (data.hasCommitteeApplication) {
-            const committeeId =
-              data.applications.committee?.firstOptionCommittee;
-            if (committeeId) {
-              router.push(
-                `/user/apply/committee-staff/${committeeId}/progress`
-              );
-            }
-          } else if (data.hasEAApplication) {
-            const ebRole = data.applications.ea?.firstOptionEb;
-            if (ebRole) {
-              router.push(`/user/apply/executive-assistant/${ebRole}/progress`);
-            }
-          }
-        }
-      } catch (error) {
-        console.error("Error checking applications:", error);
-      } finally {
-        setHasCheckedApplications(true);
-      }
-    };
+  // Gate: redirect to /user when applications are closed
+  const applicationsOpen = useApplicationsOpen("/user");
 
-    checkApplications();
+  // Redirect if user already has an application
+  useEffect(() => {
+    if (!appStatus || status !== "authenticated") return;
+
+    if (appStatus.hasMemberApplication) {
+      router.push("/user/apply/member/progress");
+    } else if (appStatus.hasCommitteeApplication && appStatus.committeeId) {
+      router.push(
+        `/user/apply/committee-staff/${appStatus.committeeId}/progress`,
+      );
+    } else if (appStatus.hasEAApplication && appStatus.ebRole) {
+      router.push(
+        `/user/apply/executive-assistant/${appStatus.ebRole}/progress`,
+      );
+    }
+  }, [appStatus, status, router]);
+
+  if (status === "loading" || isAppLoading) {
+    return <LoadingScreen />;
   }
+
+  // If user has any application, show loading while redirect fires
+  if (
+    appStatus &&
+    (appStatus.hasMemberApplication ||
+      appStatus.hasCommitteeApplication ||
+      appStatus.hasEAApplication)
+  ) {
+    return <LoadingScreen />;
+  }
+
+  // Block access when applications are closed
+  if (!applicationsOpen) return <LoadingScreen />;
 
   return (
     <div className="min-h-screen bg-white sm:bg-[rgb(243,243,253)] sm:bg-[url('https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/pictures/background.png')] sm:bg-cover  sm:bg-no-repeat flex flex-col justify-between">
@@ -55,7 +64,7 @@ export default function AssistantApplication() {
 
       <section className="flex flex-col items-center justify-center sm:my-12 lg:my-28">
         <div className="w-[80%] flex flex-col justify-center items-center">
-          <div className="rounded-[24px] sm:bg-white sm:shadow-[0_4px_4px_0_rgba(0,0,0,0.31)] p-10 md:p-16 lg:py-20 lg:px-24">
+          <div className="rounded-3xl sm:bg-white sm:shadow-[0_4px_4px_0_rgba(0,0,0,0.31)] p-10 md:p-16 lg:py-20 lg:px-24">
             <div className="text-3xl lg:text-4xl font-raleway font-semibold mb-2 lg:mb-4">
               <span className="text-black">Apply as </span>
               <span className="text-[#134687]">Executive Assistant</span>
@@ -68,7 +77,7 @@ export default function AssistantApplication() {
               communication skills.
             </div>
 
-            <hr className="my-5 lg:my-8 border-t-1 border-[#717171]" />
+            <hr className="my-5 lg:my-8 border-t border-[#717171]" />
 
             {/* Stepper */}
             <div className="w-full flex flex-col items-center justify-center">
@@ -79,7 +88,7 @@ export default function AssistantApplication() {
                   </span>
                 </div>
 
-                <div className="w-20 lg:w-24 h-[2px] lg:h-[3px] bg-[#D9D9D9]" />
+                <div className="w-20 lg:w-24 h-0.5 lg:h-0.75 bg-[#D9D9D9]" />
 
                 <div className="flex items-center justify-center rounded-full bg-[#D9D9D9] w-5 h-5 lg:w-10 lg:h-10">
                   <span className="text-[#696767] text-[9px] lg:text-xs lg:font-bold font-inter">
@@ -87,7 +96,7 @@ export default function AssistantApplication() {
                   </span>
                 </div>
 
-                <div className="w-20 lg:w-24 h-[2px] lg:h-[3px] bg-[#D9D9D9]" />
+                <div className="w-20 lg:w-24 h-0.5 lg:h-0.75 bg-[#D9D9D9]" />
 
                 <div className="flex items-center justify-center rounded-full bg-[#D9D9D9] w-5 h-5 lg:w-10 lg:h-10">
                   <span className="text-[#696767] text-[9px] lg:text-xs lg:font-bold font-inter">
@@ -204,11 +213,11 @@ export default function AssistantApplication() {
                       </div>
 
                       {/* Right side - EB picture */}
-                      <div className="hidden w-2/5 lg:flex lg:h-80 overflow-hidden border border-gray-200 bg-gradient-to-b from-blue-900 via-blue-90 to-[#2F7EE3] items-center justify-center">
+                      <div className="hidden w-2/5 lg:flex lg:h-80 overflow-hidden border border-gray-200 bg-linear-to-b from-blue-900 via-blue-90 to-[#2F7EE3] items-center justify-center">
                         <span className="text-white font-poppins text-lg font-semibold text-center px-4">
                           {(() => {
                             const role = roles.find(
-                              (r) => r.id === selectedRole
+                              (r) => r.id === selectedRole,
                             );
                             return role?.title || "EB Role";
                           })()}
@@ -231,7 +240,7 @@ export default function AssistantApplication() {
               </div>
             </div>
 
-            <hr className="my-8 border-t-1 border-[#717171]" />
+            <hr className="my-8 border-t border-[#717171]" />
 
             <div className="flex justify-center gap-4">
               <button
@@ -245,7 +254,7 @@ export default function AssistantApplication() {
                 <button
                   onClick={() =>
                     router.push(
-                      `/user/apply/executive-assistant/${selectedRole}/application`
+                      `/user/apply/executive-assistant/${selectedRole}/application`,
                     )
                   }
                   className="cursor-pointer bg-[#044FAF] text-white px-15 py-3 rounded-lg font-inter font-normal text-sm hover:bg-[#04387B] transition-colors"

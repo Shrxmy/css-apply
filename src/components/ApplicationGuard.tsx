@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import LoadingScreen from "@/components/LoadingScreen";
+import { useApplicationStatus } from "@/lib/useApplicationStatus";
 
 interface ApplicationGuardProps {
   children: React.ReactNode;
@@ -11,168 +12,103 @@ interface ApplicationGuardProps {
   redirectPath?: string;
 }
 
-export default function ApplicationGuard({ 
-  children, 
-  applicationType, 
-  redirectPath 
+const DEFAULT_REDIRECTS: Record<string, string> = {
+  member: "/user/apply/member",
+  committee: "/user/apply/committee-staff",
+  ea: "/user/apply/executive-assistant",
+};
+
+/**
+ * ApplicationGuard
+ *
+ * Enforces two rules:
+ *  1. The user must be authenticated (redirect to "/" if not).
+ *  2. On non-transition pages, the user must have the required application type.
+ *
+ * "Transition pages" (schedule, success) skip the application-type check entirely.
+ * These pages are reached immediately after submission, so SWR might still hold
+ * stale data. Checking on those pages causes race-condition redirects back to apply.
+ * Security for those pages is enforced at the API level, not the guard.
+ */
+export default function ApplicationGuard({
+  children,
+  applicationType,
+  redirectPath,
 }: ApplicationGuardProps) {
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const router = useRouter();
-  const [isChecking, setIsChecking] = useState(true);
-  const [hasApplication, setHasApplication] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const pathname = usePathname();
+
+  const {
+    data: appStatus,
+    isLoading,
+    error,
+  } = useApplicationStatus(status === "authenticated");
+
+  // Schedule and success pages are reached right after submission.
+  // SWR may still hold stale "no application" data — skip the application check.
+  const isTransitionPage =
+    pathname?.includes("/schedule") || pathname?.includes("/success");
+
+  const hasRequired = appStatus
+    ? applicationType === "member"
+      ? appStatus.hasMemberApplication
+      : applicationType === "committee"
+        ? appStatus.hasCommitteeApplication
+        : appStatus.hasEAApplication
+    : false;
 
   useEffect(() => {
-    if (status === "loading") return;
-
-    if (!session) {
+    // Rule 1: must be authenticated
+    if (status === "unauthenticated") {
       router.push("/");
       return;
     }
 
-    setIsLoading(false);
-  }, [session, status, router]);
+    if (status !== "authenticated") return;
 
-  const checkApplication = useCallback(async () => {
-    try {
-      // Add a small delay for success pages to allow database to sync
-      const isSuccessPage = window.location.pathname.includes('/success');
-      if (isSuccessPage) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-      
-      // Add timeout to prevent hanging
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000); // 6 second timeout
-      
-      const response = await fetch("/api/applications/check-existing", {
-        signal: controller.signal,
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache'
-        }
-      });
-      
-      clearTimeout(timeoutId);
-      
-      if (response.ok) {
-        const data = await response.json();
-        
-        let hasRequiredApplication = false;
-        let defaultRedirectPath = "";
+    // Rule 2 is skipped on transition pages
+    if (isTransitionPage) return;
 
-        switch (applicationType) {
-          case "member":
-            hasRequiredApplication = data.hasMemberApplication;
-            defaultRedirectPath = "/user/apply/member";
-            break;
-          case "committee":
-            hasRequiredApplication = data.hasCommitteeApplication;
-            defaultRedirectPath = "/user/apply/committee-staff";
-            break;
-          case "ea":
-            hasRequiredApplication = data.hasEAApplication;
-            defaultRedirectPath = "/user/apply/executive-assistant";
-            break;
-        }
+    // Wait until SWR has settled before potentially redirecting
+    if (isLoading || !appStatus) return;
 
-        if (!hasRequiredApplication) {
-          // Redirect to appropriate application page
-          const targetPath = redirectPath || defaultRedirectPath;
-          router.push(targetPath);
-          return;
-        }
-
-        setHasApplication(true);
-      } else {
-        console.error("ApplicationGuard: API response not ok:", response.status);
-        // Be more lenient on application flow pages (especially schedule) to avoid bounce redirects
-        const pathname = window.location.pathname;
-        const isSuccessPage = pathname.includes('/success');
-        const isSchedulePage = pathname.includes('/schedule');
-        const isApplicationFlow = pathname.startsWith('/user/apply');
-
-        if (isSuccessPage || isSchedulePage) {
-          // Allow rendering despite transient check failures
-          setHasApplication(true);
-        } else if (isApplicationFlow) {
-          // Redirect to appropriate application entry (not user dashboard)
-          let defaultRedirectPath = "";
-          switch (applicationType) {
-            case "member":
-              defaultRedirectPath = "/user/apply/member";
-              break;
-            case "committee":
-              defaultRedirectPath = "/user/apply/committee-staff";
-              break;
-            case "ea":
-              defaultRedirectPath = "/user/apply/executive-assistant";
-              break;
-          }
-          const targetPath = redirectPath || defaultRedirectPath || "/user";
-          router.push(targetPath);
-        } else {
-          router.push("/user");
-        }
-      }
-    } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        console.error("ApplicationGuard: Request timed out");
-      } else {
-        console.error("Error checking application:", error);
-      }
-      // Be more lenient on application flow pages (especially schedule) to avoid bounce redirects
-      const pathname = window.location.pathname;
-      const isSuccessPage = pathname.includes('/success');
-      const isSchedulePage = pathname.includes('/schedule');
-      const isApplicationFlow = pathname.startsWith('/user/apply');
-
-      if (isSuccessPage || isSchedulePage) {
-        setHasApplication(true);
-      } else if (isApplicationFlow) {
-        let defaultRedirectPath = "";
-        switch (applicationType) {
-          case "member":
-            defaultRedirectPath = "/user/apply/member";
-            break;
-          case "committee":
-            defaultRedirectPath = "/user/apply/committee-staff";
-            break;
-          case "ea":
-            defaultRedirectPath = "/user/apply/executive-assistant";
-            break;
-        }
-        const targetPath = redirectPath || defaultRedirectPath || "/user";
-        router.push(targetPath);
-      } else {
-        router.push("/user");
-      }
-    } finally {
-      setIsChecking(false);
+    if (!hasRequired) {
+      const target =
+        redirectPath || DEFAULT_REDIRECTS[applicationType] || "/user";
+      router.push(target);
     }
-  }, [applicationType, redirectPath, router]);
+  }, [
+    status,
+    appStatus,
+    isLoading,
+    hasRequired,
+    applicationType,
+    redirectPath,
+    router,
+    isTransitionPage,
+  ]);
 
-  useEffect(() => {
-    if (status === "authenticated" && !isLoading) {
-      checkApplication();
-    }
-  }, [status, isLoading, checkApplication]);
+  // ── Render decisions ────────────────────────────────────────────────────────
 
-  // Show loading screen while checking authentication or application
-  if (isLoading || status === "loading" || isChecking) {
-    return <LoadingScreen />;
-  }
+  // Session still loading
+  if (status === "loading") return <LoadingScreen />;
 
-  // If no session, don't render anything (redirect will happen)
-  if (!session) {
-    return null;
-  }
+  // Not logged in — render nothing while redirect fires
+  if (status === "unauthenticated") return null;
 
-  // If no application found, don't render anything (redirect will happen)
-  if (!hasApplication) {
-    return null;
-  }
+  // Transition pages (schedule / success): only require auth, skip application check
+  if (isTransitionPage) return <>{children}</>;
 
-  // Render the protected content
+  // SWR is still fetching on a guarded page — show spinner, don't redirect yet
+  if (isLoading || !appStatus) return <LoadingScreen />;
+
+  // SWR errored — let the page render and handle the failure itself
+  if (error) return <>{children}</>;
+
+  // No application found — show spinner while the redirect useEffect fires
+  // (avoids a jarring blank flash before navigation happens)
+  if (!hasRequired) return <LoadingScreen />;
+
   return <>{children}</>;
 }

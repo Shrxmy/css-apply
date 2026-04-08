@@ -1,146 +1,177 @@
 "use client";
 
-import styles from './quiz-styles.module.css';
-import React, { useMemo, useEffect, useRef } from 'react';
-import { Answers, CommitteeName } from './types/quiz';
-import { COMMITTEES, questions, SCORE_MAP } from './data/quizData';
-import ResultCard from './ResultCard';
-import BackgroundIcons from './BackgroundIcons';
-import Link from 'next/link';
+import styles from "./quiz-styles.module.css";
+import React, { useMemo, useEffect, useRef } from "react";
+import { Answers, CommitteeName } from "./types/quiz";
+import { COMMITTEES, questions, SCORE_MAP } from "./data/quizData";
+import ResultCard from "./ResultCard";
+import BackgroundIcons from "./BackgroundIcons";
+import Link from "next/link";
 
 interface ResultsPageProps {
-    answers: Answers;
-    onRetake: () => void;
+  answers: Answers;
+  onRetake: () => void;
 }
 
 const ResultsPage: React.FC<ResultsPageProps> = ({ answers, onRetake }) => {
-    useEffect(() => {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    }, []);
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
 
-    const quizData = useMemo(() => {
-        // This calculation logic is purely client-side and is safe to keep.
-        const rawScores: Record<CommitteeName, number> = COMMITTEES.reduce((acc, c) => ({...acc, [c]: 0}), {} as Record<CommitteeName, number>);
+  const quizData = useMemo(() => {
+    // This calculation logic is purely client-side and is safe to keep.
+    const rawScores: Record<CommitteeName, number> = COMMITTEES.reduce(
+      (acc, c) => ({ ...acc, [c]: 0 }),
+      {} as Record<CommitteeName, number>,
+    );
 
-        questions.forEach(q => {
-            const answerValue = answers[q.id];
-            if (answerValue && SCORE_MAP[answerValue as keyof typeof SCORE_MAP]) {
-                const points = SCORE_MAP[answerValue as keyof typeof SCORE_MAP];
-                
-                if (Array.isArray(q.dominant)) {
-                    q.dominant.forEach((c: string) => { rawScores[c as CommitteeName] += points.dominant; });
-                } else {
-                    rawScores[q.dominant as CommitteeName] += points.dominant;
-                }
+    questions.forEach((q) => {
+      const answerValue = answers[q.id];
+      if (answerValue && SCORE_MAP[answerValue as keyof typeof SCORE_MAP]) {
+        const points = SCORE_MAP[answerValue as keyof typeof SCORE_MAP];
 
-                (q.average || []).forEach((c: string) => { rawScores[c as CommitteeName] += points.average; });
-                (q.less || []).forEach((c: string) => { rawScores[c as CommitteeName] += points.less; });
-            }
+        if (Array.isArray(q.dominant)) {
+          q.dominant.forEach((c: string) => {
+            rawScores[c as CommitteeName] += points.dominant;
+          });
+        } else {
+          rawScores[q.dominant as CommitteeName] += points.dominant;
+        }
+
+        (q.average || []).forEach((c: string) => {
+          rawScores[c as CommitteeName] += points.average;
         });
-        
-        const sortedResults: { committee: CommitteeName; score: number }[] = Object.entries(rawScores)
-            .map(([committee, score]) => ({ committee: committee as CommitteeName, score: Number(score) }))
-            .sort((a, b) => (b.score as number) - (a.score as number));
-            
-        return { rawScores, sortedResults };
-    }, [answers]);
+        (q.less || []).forEach((c: string) => {
+          rawScores[c as CommitteeName] += points.less;
+        });
+      }
+    });
 
-    // Submit results to Supabase once when results are computed
-    const didSubmitRef = useRef(false);
-    useEffect(() => {
-        const submitResults = async () => {
-            const { rawScores, sortedResults } = quizData;
+    const sortedResults: { committee: CommitteeName; score: number }[] =
+      Object.entries(rawScores)
+        .map(([committee, score]) => ({
+          committee: committee as CommitteeName,
+          score: Number(score),
+        }))
+        .sort((a, b) => (b.score as number) - (a.score as number));
 
-            // Prevent duplicate inserts (Strict Mode double effect or re-renders)
-            if (didSubmitRef.current) return;
-            didSubmitRef.current = true; 
-            if (!sortedResults || sortedResults.length < 3) {
-                console.error('Not enough results to submit.');
-                return;
-            }
+    return { rawScores, sortedResults };
+  }, [answers]);
 
-            try {
+  // Submit results to Supabase once when results are computed
+  const didSubmitRef = useRef(false);
+  useEffect(() => {
+    const submitResults = async () => {
+      const { rawScores, sortedResults } = quizData;
 
-                const formatColumnName = (name: string) =>
-                    `score_${name.toLowerCase().replace(/ & /g, '_and_').replace(/ /g, '_')}`;
+      // Prevent duplicate inserts (Strict Mode double effect or re-renders)
+      if (didSubmitRef.current) return;
+      didSubmitRef.current = true;
+      if (!sortedResults || sortedResults.length < 3) {
+        console.error("Not enough results to submit.");
+        return;
+      }
 
-                const scoresForDb = Object.entries(rawScores).reduce((acc, [committee, score]) => {
-                    acc[formatColumnName(committee)] = score as number;
-                    return acc;
-                }, {} as Record<string, number>);
+      try {
+        const formatColumnName = (name: string) =>
+          `score_${name.toLowerCase().replace(/ & /g, "_and_").replace(/ /g, "_")}`;
 
-                const submissionData = {
-                    top_committee: sortedResults[0].committee,
-                    second_committee: sortedResults[1].committee,
-                    third_committee: sortedResults[2].committee,
-                    ...scoresForDb,
-                } as Record<string, unknown>;
+        const scoresForDb = Object.entries(rawScores).reduce(
+          (acc, [committee, score]) => {
+            acc[formatColumnName(committee)] = score as number;
+            return acc;
+          },
+          {} as Record<string, number>,
+        );
 
-                // Send to a server API that uses service role to bypass RLS safely
-                const resp = await fetch('/api/quiz-submissions', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ submission: submissionData }),
-                });
-                if (!resp.ok) {
-                    const payload = await resp.json().catch(() => ({}));
-                    throw new Error(payload?.error || `API error (${resp.status})`);
-                }
-                
-            } catch (error: unknown) {
-                const errObj = (error as { name?: string; message?: string }) || {};
-                const name = errObj.name ?? '';
-                const message: string = errObj.message ?? String(error);
-                const msgLower = message.toLowerCase();
-                // Treat typical dev-only interruptions as benign
-                const isBenign =
-                    name === 'TypeError' ||
-                    name === 'AbortError' ||
-                    msgLower.includes('failed to fetch') ||
-                    msgLower.includes('abort') ||
-                    msgLower.includes('network');
+        const submissionData = {
+          top_committee: sortedResults[0].committee,
+          second_committee: sortedResults[1].committee,
+          third_committee: sortedResults[2].committee,
+          ...scoresForDb,
+        } as Record<string, unknown>;
 
-                if (isBenign) {
-                    if (process.env.NODE_ENV !== 'production') {
-                        console.warn('Supabase request likely interrupted during dev (insert may have succeeded):', message);
-                    }
-                    return;
-                }
-                console.error('Error submitting quiz results to Supabase:', message);
-            }
-        };
+        // Send to a server API that uses service role to bypass RLS safely
+        const resp = await fetch("/api/quiz-submissions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ submission: submissionData }),
+        });
+        if (!resp.ok) {
+          const payload = await resp.json().catch(() => ({}));
+          throw new Error(payload?.error || `API error (${resp.status})`);
+        }
+      } catch (error: unknown) {
+        const errObj = (error as { name?: string; message?: string }) || {};
+        const name = errObj.name ?? "";
+        const message: string = errObj.message ?? String(error);
+        const msgLower = message.toLowerCase();
+        // Treat typical dev-only interruptions as benign
+        const isBenign =
+          name === "TypeError" ||
+          name === "AbortError" ||
+          msgLower.includes("failed to fetch") ||
+          msgLower.includes("abort") ||
+          msgLower.includes("network");
+
+        if (isBenign) {
+          if (process.env.NODE_ENV !== "production") {
+            console.warn(
+              "Supabase request likely interrupted during dev (insert may have succeeded):",
+              message,
+            );
+          }
+          return;
+        }
+        console.error("Error submitting quiz results to Supabase:", message);
+      }
+    };
 
     submitResults();
-    }, [quizData]);
+  }, [quizData]);
 
-    const { sortedResults } = quizData;
-    const [topResult, secondResult, thirdResult] = sortedResults;
-    
-    if (!topResult) {
-        return <div className={styles['results-container']}><h2>Calculating your results...</h2></div>; 
-    }
+  const { sortedResults } = quizData;
+  const [topResult, secondResult, thirdResult] = sortedResults;
 
+  if (!topResult) {
     return (
-        <>
-            <div className={styles['results-container']}>
-                <h2>Your Results Are In!</h2>
-                
-                <ResultCard committee={topResult} isPrimary={true} />
-
-                <h4>Other Committees You Might Enjoy</h4>
-                <div className={styles['other-results-grid']}>
-                    <ResultCard committee={secondResult} />
-                    <ResultCard committee={thirdResult} />
-                </div>
-
-                <div className={styles['results-actions']}>
-                    <Link href="/#join-section" className={`${styles.btn} ${styles['btn-primary']}`}>Join CSS</Link>
-                    <button className={`${styles.btn} ${styles['btn-secondary']}`} onClick={onRetake}>Retake the Test</button>
-                </div>
-            </div>
-            <BackgroundIcons />
-        </>
+      <div className={styles["results-container"]}>
+        <h2>Calculating your results...</h2>
+      </div>
     );
-}
+  }
+
+  return (
+    <>
+      <div className={styles["results-container"]}>
+        <h2>Your Results Are In!</h2>
+
+        <ResultCard committee={topResult} isPrimary={true} />
+
+        <h4>Other Committees You Might Enjoy</h4>
+        <div className={styles["other-results-grid"]}>
+          <ResultCard committee={secondResult} />
+          <ResultCard committee={thirdResult} />
+        </div>
+
+        <div className={styles["results-actions"]}>
+          <Link
+            href="/#join-section"
+            className={`${styles.btn} ${styles["btn-primary"]}`}
+          >
+            Join CSS
+          </Link>
+          <button
+            className={`${styles.btn} ${styles["btn-secondary"]}`}
+            onClick={onRetake}
+          >
+            Retake the Test
+          </button>
+        </div>
+      </div>
+      <BackgroundIcons />
+    </>
+  );
+};
 
 export default ResultsPage;

@@ -1,138 +1,156 @@
-import * as brevo from '@getbrevo/brevo';
-import { getEBEmailWithFallback, ADMIN_EMAILS, validateAllEmailMappings } from '@/data/emailMappings';
-import { truncateToLast7 } from '@/lib/truncate-utils';
+import * as brevo from "@getbrevo/brevo";
+import {
+  getEBEmailWithFallback,
+  ADMIN_EMAILS,
+  validateAllEmailMappings,
+} from "@/data/emailMappings";
+import { truncateToLast7 } from "@/lib/truncate-utils";
 
 // Initialize Brevo API client
 const apiInstance = new brevo.TransactionalEmailsApi();
-apiInstance.setApiKey(brevo.TransactionalEmailsApiApiKeys.apiKey, process.env.BREVO_API_KEY! || '');
+apiInstance.setApiKey(
+  brevo.TransactionalEmailsApiApiKeys.apiKey,
+  process.env.BREVO_API_KEY! || "",
+);
 
 export interface EmailTemplate {
-    subject: string;
-    html: string;
+  subject: string;
+  html: string;
 }
 
 // Capitalize the first letter of each word in a string
 const capitalizeWords = (input: string): string => {
-    if (!input) return input;
-    return input.replace(/\b\w/g, (ch) => ch.toUpperCase());
+  if (!input) return input;
+  return input.replace(/\b\w/g, (ch) => ch.toUpperCase());
 };
 
 // Map committee IDs to their proper full names
 const getCommitteeFullName = (committeeId: string): string => {
-    const committeeMap: { [key: string]: string } = {
-        'academics': 'Academics Committee',
-        'community': 'Community Development Committee',
-        'creatives': 'Creatives & Technical Committee',
-        'documentation': 'Documentation Committee',
-        'external': 'External Affairs Committee',
-        'finance': 'Finance Committee',
-        'logistics': 'Logistics Committee',
-        'publicity': 'Publicity Committee',
-        'sports': 'Sports & Talent Committee',
-        'technology': 'Technology Development Committee'
-    };
-    
-    return committeeMap[committeeId] || capitalizeWords(committeeId) + ' Committee';
+  const committeeMap: { [key: string]: string } = {
+    academics: "Academics Committee",
+    community: "Community Development Committee",
+    creatives: "Creatives & Technical Committee",
+    documentation: "Documentation Committee",
+    external: "External Affairs Committee",
+    finance: "Finance Committee",
+    logistics: "Logistics Committee",
+    publicity: "Publicity Committee",
+    sports: "Sports & Talent Committee",
+    technology: "Technology Development Committee",
+  };
+
+  return (
+    committeeMap[committeeId] || capitalizeWords(committeeId) + " Committee"
+  );
 };
 
 export const sendEmail = async (to: string, subject: string, html: string) => {
-    try {
-        const sendSmtpEmail = new brevo.SendSmtpEmail();
-        
-        sendSmtpEmail.subject = subject;
-        sendSmtpEmail.htmlContent = html;
-        sendSmtpEmail.sender = {
-            name: "CSSApply",
-            email: process.env.BREVO_FROM_EMAIL || "noreply@cssapply.com"
-        };
-        sendSmtpEmail.to = [{ email: to }];
+  try {
+    const sendSmtpEmail = new brevo.SendSmtpEmail();
 
-        const result = await apiInstance.sendTransacEmail(sendSmtpEmail);
-        console.log('Email sent successfully:', result);
-        // The Brevo API returns { response, body }, and the messageId is in body.messageId
-        return { success: true, messageId: result.body?.messageId };
-    } catch (error) {
-        console.error('Error sending email:', error);
-        return { success: false, error: error };
-    }
+    sendSmtpEmail.subject = subject;
+    sendSmtpEmail.htmlContent = html;
+    sendSmtpEmail.sender = {
+      name: "CSSApply",
+      email: process.env.BREVO_FROM_EMAIL || "noreply@cssapply.com",
+    };
+    sendSmtpEmail.to = [{ email: to }];
+
+    const result = await apiInstance.sendTransacEmail(sendSmtpEmail);
+    console.log("Email sent successfully:", result);
+    // The Brevo API returns { response, body }, and the messageId is in body.messageId
+    return { success: true, messageId: result.body?.messageId };
+  } catch (error) {
+    console.error("Error sending email:", error);
+    return { success: false, error: error };
+  }
 };
 
 // Get EB email address by EB role ID with comprehensive error handling
 export const getEBEmail = (ebRoleId: string, context?: string): string => {
-    try {
-        return getEBEmailWithFallback(ebRoleId, context);
-    } catch (error) {
-        console.error(`Failed to get email for role ID: ${ebRoleId}`, error);
-        console.error(`CRITICAL: Email lookup failed for ${ebRoleId}. Using fallback email.`);
-        
-        // For interview notifications, we need to ensure the email is sent
-        // Use President's email as fallback but log this as a critical issue
-        console.error(`FALLBACK: Using President's email for ${ebRoleId} due to lookup failure`);
-        return ADMIN_EMAILS.PRESIDENT;
-    }
+  try {
+    return getEBEmailWithFallback(ebRoleId, context);
+  } catch (error) {
+    console.error(`Failed to get email for role ID: ${ebRoleId}`, error);
+    console.error(
+      `CRITICAL: Email lookup failed for ${ebRoleId}. Using fallback email.`,
+    );
+
+    // For interview notifications, we need to ensure the email is sent
+    // Use President's email as fallback but log this as a critical issue
+    console.error(
+      `FALLBACK: Using President's email for ${ebRoleId} due to lookup failure`,
+    );
+    return ADMIN_EMAILS.PRESIDENT;
+  }
 };
 
 // Legacy function for backward compatibility - now uses new system
 export const getEBEmailLegacy = (ebRoleId: string): string => {
-    try {
-        return getEBEmailWithFallback(ebRoleId, 'legacy-compatibility');
-    } catch {
-        console.warn(`Legacy email lookup failed for ${ebRoleId}, using President as fallback`);
-        return ADMIN_EMAILS.PRESIDENT;
-    }
+  try {
+    return getEBEmailWithFallback(ebRoleId, "legacy-compatibility");
+  } catch {
+    console.warn(
+      `Legacy email lookup failed for ${ebRoleId}, using President as fallback`,
+    );
+    return ADMIN_EMAILS.PRESIDENT;
+  }
 };
 
 // Validate all email mappings on startup
 export const validateEmailMappings = (): boolean => {
-    try {
-        const validation = validateAllEmailMappings();
-        if (!validation.valid) {
-            console.error('Email mapping validation failed:', validation.errors);
-            return false;
-        }
-        console.log('✅ All email mappings validated successfully');
-        return true;
-    } catch (error) {
-        console.error('Error validating email mappings:', error);
-        return false;
+  try {
+    const validation = validateAllEmailMappings();
+    if (!validation.valid) {
+      console.error("Email mapping validation failed:", validation.errors);
+      return false;
     }
+    console.log("✅ All email mappings validated successfully");
+    return true;
+  } catch (error) {
+    console.error("Error validating email mappings:", error);
+    return false;
+  }
 };
 
 // Enhanced email sending with better error handling
 export const sendEmailWithValidation = async (
-    to: string, 
-    subject: string, 
-    html: string, 
-    context?: string
+  to: string,
+  subject: string,
+  html: string,
+  context?: string,
 ): Promise<{ success: boolean; messageId?: string; error?: unknown }> => {
-    try {
-        // Basic email validation
-        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-        if (!emailRegex.test(to)) {
-            throw new Error(`Invalid email address: ${to}`);
-        }
-
-        console.log(`Sending email to: ${to}${context ? ` (${context})` : ''}`);
-        const result = await sendEmail(to, subject, html);
-        
-        if (result.success) {
-            console.log(`✅ Email sent successfully to ${to}: ${result.messageId}`);
-        } else {
-            console.error(`❌ Failed to send email to ${to}:`, result.error);
-        }
-        
-        return result;
-    } catch (error) {
-        console.error(`❌ Email sending failed for ${to}:`, error);
-        return { success: false, error };
+  try {
+    // Basic email validation
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(to)) {
+      throw new Error(`Invalid email address: ${to}`);
     }
+
+    console.log(`Sending email to: ${to}${context ? ` (${context})` : ""}`);
+    const result = await sendEmail(to, subject, html);
+
+    if (result.success) {
+      console.log(`✅ Email sent successfully to ${to}: ${result.messageId}`);
+    } else {
+      console.error(`❌ Failed to send email to ${to}:`, result.error);
+    }
+
+    return result;
+  } catch (error) {
+    console.error(`❌ Email sending failed for ${to}:`, error);
+    return { success: false, error };
+  }
 };
 
 // Email templates for different application types
 export const emailTemplates = {
-    memberApplication: (userName: string, studentNumber: string): EmailTemplate => ({
-        subject: "CSSApply - Member Application Received",
-        html: `
+  memberApplication: (
+    userName: string,
+    studentNumber: string,
+  ): EmailTemplate => ({
+    subject: "CSSApply - Member Application Received",
+    html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
                 <div style="text-align: center; margin-bottom: 30px;">
                     <h1 style="color: #134687; font-size: 28px; font-weight: bold; margin: 0; letter-spacing: 1px;">CSSApply</h1>
@@ -166,12 +184,19 @@ export const emailTemplates = {
                     </p>
                 </div>
             </div>
-        `
-    }),
+        `,
+  }),
 
-    committeeApplication: (userName: string, studentNumber: string, firstOption: string, secondOption: string, meetingLink?: string, interviewer?: string): EmailTemplate => ({
-        subject: "CSSApply - Committee Staff Application Received",
-        html: `
+  committeeApplication: (
+    userName: string,
+    studentNumber: string,
+    firstOption: string,
+    secondOption: string,
+    meetingLink?: string,
+    interviewer?: string,
+  ): EmailTemplate => ({
+    subject: "CSSApply - Committee Staff Application Received",
+    html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
                 <div style="text-align: center; margin-bottom: 30px;">
                     <h1 style="color: #134687; font-size: 28px; font-weight: bold; margin: 0; letter-spacing: 1px;">CSSApply</h1>
@@ -192,7 +217,9 @@ export const emailTemplates = {
                     <p style="margin: 5px 0;"><strong>Status:</strong> Under Review</p>
                 </div>
                 
-                ${meetingLink ? `
+                ${
+                  meetingLink
+                    ? `
                 <div style="background-color: #e0f2fe; border: 2px solid #0284c7; padding: 20px; border-radius: 8px; margin: 20px 0;">
                     <h3 style="color: #0284c7; margin-top: 0;">📅 Interview Information:</h3>
                     <p style="margin: 5px 0; color: #0c4a6e;"><strong>Interviewer:</strong> ${interviewer ? capitalizeWords(interviewer) : `${getCommitteeFullName(firstOption)} Head`}</p>
@@ -206,11 +233,13 @@ export const emailTemplates = {
                         <em>Please schedule your interview time through the application dashboard, then use this link to join your interview.</em>
                     </p>
                 </div>
-                ` : `
+                `
+                    : `
                 <p style="color: #4b5563; line-height: 1.6;">
                     Please proceed to schedule your interview through the application dashboard. The meeting link will be provided once you select your interview time.
                 </p>
-                `}
+                `
+                }
                 
                 <p style="color: #4b5563; line-height: 1.6;">
                     If you have any questions, feel free to reach out to us.
@@ -223,12 +252,20 @@ export const emailTemplates = {
                     </p>
                 </div>
             </div>
-        `
-    }),
+        `,
+  }),
 
-    executiveAssistantApplication: (userName: string, studentNumber: string, ebRole: string, firstOption: string, secondOption: string, meetingLink?: string, interviewer?: string): EmailTemplate => ({
-        subject: "CSSApply - Executive Assistant Application Received",
-        html: `
+  executiveAssistantApplication: (
+    userName: string,
+    studentNumber: string,
+    ebRole: string,
+    firstOption: string,
+    secondOption: string,
+    meetingLink?: string,
+    interviewer?: string,
+  ): EmailTemplate => ({
+    subject: "CSSApply - Executive Assistant Application Received",
+    html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
                 <div style="text-align: center; margin-bottom: 30px;">
                     <h1 style="color: #134687; font-size: 28px; font-weight: bold; margin: 0; letter-spacing: 1px;">CSSApply</h1>
@@ -250,7 +287,9 @@ export const emailTemplates = {
                     <p style="margin: 5px 0;"><strong>Status:</strong> Under Review</p>
                 </div>
                 
-                ${meetingLink ? `
+                ${
+                  meetingLink
+                    ? `
                 <div style="background-color: #e0f2fe; border: 2px solid #0284c7; padding: 20px; border-radius: 8px; margin: 20px 0;">
                     <h3 style="color: #0284c7; margin-top: 0;">📅 Interview Information:</h3>
                     <p style="margin: 5px 0; color: #0c4a6e;"><strong>Interviewer:</strong> ${interviewer ? capitalizeWords(interviewer) : `${capitalizeWords(firstOption)} Executive Board Member`}</p>
@@ -264,11 +303,13 @@ export const emailTemplates = {
                         <em>Please schedule your interview time through the application dashboard, then use this link to join your interview.</em>
                     </p>
                 </div>
-                ` : `
+                `
+                    : `
                 <p style="color: #4b5563; line-height: 1.6;">
                     Please proceed to schedule your interview through the application dashboard. The meeting link will be provided once you select your interview time.
                 </p>
-                `}
+                `
+                }
                 
                 <p style="color: #4b5563; line-height: 1.6;">
                     If you have any questions, feel free to reach out to us.
@@ -281,14 +322,14 @@ export const emailTemplates = {
                     </p>
                 </div>
             </div>
-        `
-    }),
+        `,
+  }),
 
-
-    // Acceptance notification templates
-    memberAccepted: (userName: string, userId: string): EmailTemplate => ({
-        subject: "CSSApply - Congratulations! Your Member Application Has Been Accepted",
-        html: `
+  // Acceptance notification templates
+  memberAccepted: (userName: string, userId: string): EmailTemplate => ({
+    subject:
+      "CSSApply - Congratulations! Your Member Application Has Been Accepted",
+    html: `
             <div style="font-family: 'Inter', 'Raleway', 'Poppins', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #ffffff; color: #1f2937;">
                 <div style="text-align: center; margin-bottom: 30px; background: linear-gradient(135deg, #134687 0%, #0f3a6b 100%); padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(19, 70, 135, 0.3);">
                     <h1 style="color: white; font-size: 32px; font-weight: bold; margin: 0; letter-spacing: 2px; text-shadow: 0 2px 4px rgba(0,0,0,0.3);">CSSApply</h1>
@@ -377,12 +418,17 @@ export const emailTemplates = {
                     </p>
                 </div>
             </div>
-        `
-    }),
+        `,
+  }),
 
-    committeeAccepted: (userName: string, userId: string, committee: string): EmailTemplate => ({
-        subject: "CSSApply - Congratulations! Your Committee Staff Application Has Been Accepted",
-        html: `
+  committeeAccepted: (
+    userName: string,
+    userId: string,
+    committee: string,
+  ): EmailTemplate => ({
+    subject:
+      "CSSApply - Congratulations! Your Committee Staff Application Has Been Accepted",
+    html: `
             <div style="font-family: 'Inter', 'Raleway', 'Poppins', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #ffffff; color: #1f2937;">
                 <div style="text-align: center; margin-bottom: 30px; background: linear-gradient(135deg, #134687 0%, #0f3a6b 100%); padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(19, 70, 135, 0.3);">
                     <h1 style="color: white; font-size: 32px; font-weight: bold; margin: 0; letter-spacing: 2px; text-shadow: 0 2px 4px rgba(0,0,0,0.3);">CSSApply</h1>
@@ -473,12 +519,17 @@ export const emailTemplates = {
                     </p>
                 </div>
             </div>
-        `
-    }),
+        `,
+  }),
 
-    executiveAssistantAccepted: (userName: string, userId: string, ebRole: string): EmailTemplate => ({
-        subject: "CSSApply - Congratulations! Your Executive Assistant Application Has Been Accepted",
-        html: `
+  executiveAssistantAccepted: (
+    userName: string,
+    userId: string,
+    ebRole: string,
+  ): EmailTemplate => ({
+    subject:
+      "CSSApply - Congratulations! Your Executive Assistant Application Has Been Accepted",
+    html: `
             <div style="font-family: 'Inter', 'Raleway', 'Poppins', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #ffffff; color: #1f2937;">
                 <div style="text-align: center; margin-bottom: 30px; background: linear-gradient(135deg, #134687 0%, #0f3a6b 100%); padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(19, 70, 135, 0.3);">
                     <h1 style="color: white; font-size: 32px; font-weight: bold; margin: 0; letter-spacing: 2px; text-shadow: 0 2px 4px rgba(0,0,0,0.3);">CSSApply</h1>
@@ -569,13 +620,13 @@ export const emailTemplates = {
                     </p>
                 </div>
             </div>
-        `
-    }),
+        `,
+  }),
 
-    // Rejection notification templates
-    committeeRejected: (userName: string, committee: string): EmailTemplate => ({
-        subject: "CSSApply - Committee Staff Application Update",
-        html: `
+  // Rejection notification templates
+  committeeRejected: (userName: string, committee: string): EmailTemplate => ({
+    subject: "CSSApply - Committee Staff Application Update",
+    html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
                 <div style="text-align: center; margin-bottom: 30px;">
                     <h1 style="color: #134687; font-size: 28px; font-weight: bold; margin: 0; letter-spacing: 1px;">CSSApply</h1>
@@ -613,12 +664,15 @@ export const emailTemplates = {
                     </p>
                 </div>
             </div>
-        `
-    }),
+        `,
+  }),
 
-    executiveAssistantRejected: (userName: string, ebRole: string): EmailTemplate => ({
-        subject: "CSSApply - Executive Assistant Application Update",
-        html: `
+  executiveAssistantRejected: (
+    userName: string,
+    ebRole: string,
+  ): EmailTemplate => ({
+    subject: "CSSApply - Executive Assistant Application Update",
+    html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
                 <div style="text-align: center; margin-bottom: 30px;">
                     <h1 style="color: #134687; font-size: 28px; font-weight: bold; margin: 0; letter-spacing: 1px;">CSSApply</h1>
@@ -656,13 +710,18 @@ export const emailTemplates = {
                     </p>
                 </div>
             </div>
-        `
-    }),
+        `,
+  }),
 
-    // Redirection notification templates
-    committeeRedirected: (userName: string, userId: string, originalCommittee: string, redirectedCommittee: string): EmailTemplate => ({
-        subject: "CSSApply - Committee Staff Application Redirected",
-        html: `
+  // Redirection notification templates
+  committeeRedirected: (
+    userName: string,
+    userId: string,
+    originalCommittee: string,
+    redirectedCommittee: string,
+  ): EmailTemplate => ({
+    subject: "CSSApply - Committee Staff Application Redirected",
+    html: `
             <div style="font-family: 'Inter', 'Raleway', 'Poppins', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #ffffff; color: #1f2937;">
                 <div style="text-align: center; margin-bottom: 30px; background: linear-gradient(135deg, #134687 0%, #0f3a6b 100%); padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(19, 70, 135, 0.3);">
                     <h1 style="color: white; font-size: 32px; font-weight: bold; margin: 0; letter-spacing: 2px; text-shadow: 0 2px 4px rgba(0,0,0,0.3);">CSSApply</h1>
@@ -759,12 +818,17 @@ export const emailTemplates = {
                     </p>
                 </div>
             </div>
-        `
-    }),
+        `,
+  }),
 
-    executiveAssistantRedirected: (userName: string, userId: string, originalEbRole: string, redirectedEbRole: string): EmailTemplate => ({
-        subject: "CSSApply - Executive Assistant Application Redirected",
-        html: `
+  executiveAssistantRedirected: (
+    userName: string,
+    userId: string,
+    originalEbRole: string,
+    redirectedEbRole: string,
+  ): EmailTemplate => ({
+    subject: "CSSApply - Executive Assistant Application Redirected",
+    html: `
             <div style="font-family: 'Inter', 'Raleway', 'Poppins', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #ffffff; color: #1f2937;">
                 <div style="text-align: center; margin-bottom: 30px; background: linear-gradient(135deg, #134687 0%, #0f3a6b 100%); padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(19, 70, 135, 0.3);">
                     <h1 style="color: white; font-size: 32px; font-weight: bold; margin: 0; letter-spacing: 2px; text-shadow: 0 2px 4px rgba(0,0,0,0.3);">CSSApply</h1>
@@ -861,12 +925,18 @@ export const emailTemplates = {
                     </p>
                 </div>
             </div>
-        `
-    }),
+        `,
+  }),
 
-    executiveAssistantRedirectedToCommittee: (userName: string, userId: string, originalEbRole: string, committeeId: string): EmailTemplate => ({
-        subject: "CSSApply - Executive Assistant Application Redirected to Committee Staff",
-        html: `
+  executiveAssistantRedirectedToCommittee: (
+    userName: string,
+    userId: string,
+    originalEbRole: string,
+    committeeId: string,
+  ): EmailTemplate => ({
+    subject:
+      "CSSApply - Executive Assistant Application Redirected to Committee Staff",
+    html: `
             <div style="font-family: 'Inter', 'Raleway', 'Poppins', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #ffffff; color: #1f2937;">
                 <div style="text-align: center; margin-bottom: 30px; background: linear-gradient(135deg, #134687 0%, #0f3a6b 100%); padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(19, 70, 135, 0.3);">
                     <h1 style="color: white; font-size: 32px; font-weight: bold; margin: 0; letter-spacing: 2px; text-shadow: 0 2px 4px rgba(0,0,0,0.3);">CSSApply</h1>
@@ -969,13 +1039,16 @@ export const emailTemplates = {
                     </p>
                 </div>
             </div>
-        `
-    }),
+        `,
+  }),
 
-    // Evaluation notification templates
-    committeeEvaluating: (userName: string, committee: string): EmailTemplate => ({
-        subject: "CSSApply - Committee Staff Application Under Evaluation",
-        html: `
+  // Evaluation notification templates
+  committeeEvaluating: (
+    userName: string,
+    committee: string,
+  ): EmailTemplate => ({
+    subject: "CSSApply - Committee Staff Application Under Evaluation",
+    html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
                 <div style="text-align: center; margin-bottom: 30px;">
                     <h1 style="color: #134687; font-size: 28px; font-weight: bold; margin: 0; letter-spacing: 1px;">CSSApply</h1>
@@ -1014,12 +1087,15 @@ export const emailTemplates = {
                     </p>
                 </div>
             </div>
-        `
-    }),
+        `,
+  }),
 
-    executiveAssistantEvaluating: (userName: string, ebRole: string): EmailTemplate => ({
-        subject: "CSSApply - Executive Assistant Application Under Evaluation",
-        html: `
+  executiveAssistantEvaluating: (
+    userName: string,
+    ebRole: string,
+  ): EmailTemplate => ({
+    subject: "CSSApply - Executive Assistant Application Under Evaluation",
+    html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
                 <div style="text-align: center; margin-bottom: 30px;">
                     <h1 style="color: #134687; font-size: 28px; font-weight: bold; margin: 0; letter-spacing: 1px;">CSSApply</h1>
@@ -1058,13 +1134,21 @@ export const emailTemplates = {
                     </p>
                 </div>
             </div>
-        `
-    }),
+        `,
+  }),
 
-    // EB Interview Notification Templates
-    ebInterviewNotificationEA: (ebName: string, applicantName: string, studentNumber: string, ebRole: string, interviewDate: string, interviewTime: string, meetingLink?: string): EmailTemplate => ({
-        subject: `CSSApply - New Executive Assistant Interview Scheduled - ${applicantName}`,
-        html: `
+  // EB Interview Notification Templates
+  ebInterviewNotificationEA: (
+    ebName: string,
+    applicantName: string,
+    studentNumber: string,
+    ebRole: string,
+    interviewDate: string,
+    interviewTime: string,
+    meetingLink?: string,
+  ): EmailTemplate => ({
+    subject: `CSSApply - New Executive Assistant Interview Scheduled - ${applicantName}`,
+    html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
                 <div style="text-align: center; margin-bottom: 30px;">
                     <h1 style="color: #134687; font-size: 28px; font-weight: bold; margin: 0; letter-spacing: 1px;">CSSApply</h1>
@@ -1084,7 +1168,7 @@ export const emailTemplates = {
                     <p style="margin: 5px 0;"><strong>Position:</strong> ${capitalizeWords(ebRole)} Executive Assistant</p>
                     <p style="margin: 5px 0;"><strong>Interview Date:</strong> ${interviewDate}</p>
                     <p style="margin: 5px 0;"><strong>Interview Time:</strong> ${interviewTime}</p>
-                    ${meetingLink ? `<p style="margin: 5px 0;"><strong>Meeting Link:</strong> <a href="${meetingLink}" target="_blank" style="color: #0284c7;">${meetingLink}</a></p>` : ''}
+                    ${meetingLink ? `<p style="margin: 5px 0;"><strong>Meeting Link:</strong> <a href="${meetingLink}" target="_blank" style="color: #0284c7;">${meetingLink}</a></p>` : ""}
                 </div>
                 
                 <p style="color: #4b5563; line-height: 1.6;">
@@ -1103,12 +1187,20 @@ export const emailTemplates = {
                     </p>
                 </div>
             </div>
-        `
-    }),
+        `,
+  }),
 
-    ebInterviewNotificationCommittee: (ebName: string, applicantName: string, studentNumber: string, committee: string, interviewDate: string, interviewTime: string, meetingLink?: string): EmailTemplate => ({
-        subject: `CSSApply - New Committee Staff Interview Scheduled - ${applicantName}`,
-        html: `
+  ebInterviewNotificationCommittee: (
+    ebName: string,
+    applicantName: string,
+    studentNumber: string,
+    committee: string,
+    interviewDate: string,
+    interviewTime: string,
+    meetingLink?: string,
+  ): EmailTemplate => ({
+    subject: `CSSApply - New Committee Staff Interview Scheduled - ${applicantName}`,
+    html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
                 <div style="text-align: center; margin-bottom: 30px;">
                     <h1 style="color: #134687; font-size: 28px; font-weight: bold; margin: 0; letter-spacing: 1px;">CSSApply</h1>
@@ -1128,7 +1220,7 @@ export const emailTemplates = {
                     <p style="margin: 5px 0;"><strong>Committee:</strong> ${getCommitteeFullName(committee)}</p>
                     <p style="margin: 5px 0;"><strong>Interview Date:</strong> ${interviewDate}</p>
                     <p style="margin: 5px 0;"><strong>Interview Time:</strong> ${interviewTime}</p>
-                    ${meetingLink ? `<p style="margin: 5px 0;"><strong>Meeting Link:</strong> <a href="${meetingLink}" target="_blank" style="color: #0284c7;">${meetingLink}</a></p>` : ''}
+                    ${meetingLink ? `<p style="margin: 5px 0;"><strong>Meeting Link:</strong> <a href="${meetingLink}" target="_blank" style="color: #0284c7;">${meetingLink}</a></p>` : ""}
                 </div>
                 
                 <p style="color: #4b5563; line-height: 1.6;">
@@ -1147,13 +1239,17 @@ export const emailTemplates = {
                     </p>
                 </div>
             </div>
-        `
-    }),
+        `,
+  }),
 
-    // Member redirection templates
-    committeeRedirectedToMember: (userName: string, userId: string, originalCommittee: string): EmailTemplate => ({
-        subject: "CSSApply - Committee Staff Application Redirected to Member",
-        html: `
+  // Member redirection templates
+  committeeRedirectedToMember: (
+    userName: string,
+    userId: string,
+    originalCommittee: string,
+  ): EmailTemplate => ({
+    subject: "CSSApply - Committee Staff Application Redirected to Member",
+    html: `
             <div style="font-family: 'Inter', 'Raleway', 'Poppins', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #ffffff; color: #1f2937;">
                 <div style="text-align: center; margin-bottom: 30px; background: linear-gradient(135deg, #134687 0%, #0f3a6b 100%); padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(19, 70, 135, 0.3);">
                     <h1 style="color: white; font-size: 32px; font-weight: bold; margin: 0; letter-spacing: 2px; text-shadow: 0 2px 4px rgba(0,0,0,0.3);">CSSApply</h1>
@@ -1254,12 +1350,16 @@ export const emailTemplates = {
                     </p>
                 </div>
             </div>
-        `
-    }),
+        `,
+  }),
 
-    executiveAssistantRedirectedToMember: (userName: string, userId: string, originalEbRole: string): EmailTemplate => ({
-        subject: "CSSApply - Executive Assistant Application Redirected to Member",
-        html: `
+  executiveAssistantRedirectedToMember: (
+    userName: string,
+    userId: string,
+    originalEbRole: string,
+  ): EmailTemplate => ({
+    subject: "CSSApply - Executive Assistant Application Redirected to Member",
+    html: `
             <div style="font-family: 'Inter', 'Raleway', 'Poppins', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #ffffff; color: #1f2937;">
                 <div style="text-align: center; margin-bottom: 30px; background: linear-gradient(135deg, #134687 0%, #0f3a6b 100%); padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(19, 70, 135, 0.3);">
                     <h1 style="color: white; font-size: 32px; font-weight: bold; margin: 0; letter-spacing: 2px; text-shadow: 0 2px 4px rgba(0,0,0,0.3);">CSSApply</h1>
@@ -1360,6 +1460,6 @@ export const emailTemplates = {
                     </p>
                 </div>
             </div>
-        `
-    })
+        `,
+  }),
 };

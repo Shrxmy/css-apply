@@ -1,4 +1,3 @@
 {
-  "installCommand": "rm -f package-lock.json && npm install --force",
   "buildCommand": "npm run build"
 }
