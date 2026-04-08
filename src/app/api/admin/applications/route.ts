@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
         totalCount = Number(countResult[0].count);
 
         // Batch fetch users to avoid N+1 queries
-        const studentNumbers = applications.map((app) => app.studentNumber);
+        const studentNumbers = applications.map((app: MemberApplicationRaw) => app.studentNumber);
         const users = await prisma.user.findMany({
           where: { studentNumber: { in: studentNumbers } },
           select: {
@@ -105,8 +105,8 @@ export async function GET(request: NextRequest) {
             section: true,
           },
         });
-        const userMap = new Map(users.map((u) => [u.studentNumber, u]));
-        memberApplications = applications.map((app) => ({
+        const userMap = new Map(users.map((u: typeof users[number]) => [u.studentNumber, u]));
+        memberApplications = applications.map((app: MemberApplicationRaw) => ({
           ...app,
           user: userMap.get(app.studentNumber) ?? null,
         }));
@@ -130,7 +130,7 @@ export async function GET(request: NextRequest) {
         totalCount = Number(countResult[0].count);
 
         // Batch fetch users to avoid N+1 queries
-        const studentNumbers = applications.map((app) => app.studentNumber);
+        const studentNumbers = applications.map((app: MemberApplicationRaw) => app.studentNumber);
         const users = await prisma.user.findMany({
           where: { studentNumber: { in: studentNumbers } },
           select: {
@@ -141,8 +141,8 @@ export async function GET(request: NextRequest) {
             section: true,
           },
         });
-        const userMap = new Map(users.map((u) => [u.studentNumber, u]));
-        memberApplications = applications.map((app) => ({
+        const userMap = new Map(users.map((u: typeof users[number]) => [u.studentNumber, u]));
+        memberApplications = applications.map((app: MemberApplicationRaw) => ({
           ...app,
           user: userMap.get(app.studentNumber) ?? null,
         }));
@@ -237,7 +237,7 @@ export async function GET(request: NextRequest) {
       });
 
       // Add CV download links for EA applications (sync operation — no need for Promise.all)
-      const eaApplicationsWithCvLinks = eaApplications.map((app) => ({
+      const eaApplicationsWithCvLinks = eaApplications.map((app: typeof eaApplications[number]) => ({
         ...app,
         cvDownloadUrl: app.supabaseFilePath
           ? `/api/admin/cv-download?applicationId=${app.id}&type=ea`
@@ -343,7 +343,7 @@ export async function GET(request: NextRequest) {
 
       // Add CV and Portfolio download links for Committee applications (sync — no need for Promise.all)
       const committeeApplicationsWithCvLinks = committeeApplications.map(
-        (app) => ({
+        (app: typeof committeeApplications[number]) => ({
           ...app,
           cvDownloadUrl: app.supabaseFilePath
             ? `/api/admin/cv-download?applicationId=${app.id}&type=committee`

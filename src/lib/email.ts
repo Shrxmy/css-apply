@@ -1,4 +1,4 @@
-import * as brevo from "@getbrevo/brevo";
+import { BrevoClient } from "@getbrevo/brevo";
 import {
   getEBEmailWithFallback,
   ADMIN_EMAILS,
@@ -6,12 +6,9 @@ import {
 } from "@/data/emailMappings";
 import { truncateToLast7 } from "@/lib/truncate-utils";
 
-// Initialize Brevo API client
-const apiInstance = new brevo.TransactionalEmailsApi();
-apiInstance.setApiKey(
-  brevo.TransactionalEmailsApiApiKeys.apiKey,
-  process.env.BREVO_API_KEY! || "",
-);
+const brevo = new BrevoClient({
+  apiKey: process.env.BREVO_API_KEY || "",
+});
 
 export interface EmailTemplate {
   subject: string;
@@ -46,20 +43,18 @@ const getCommitteeFullName = (committeeId: string): string => {
 
 export const sendEmail = async (to: string, subject: string, html: string) => {
   try {
-    const sendSmtpEmail = new brevo.SendSmtpEmail();
+    const result = await brevo.transactionalEmails.sendTransacEmail({
+      subject,
+      htmlContent: html,
+      sender: {
+        name: "CSSApply",
+        email: process.env.BREVO_FROM_EMAIL || "noreply@cssapply.com",
+      },
+      to: [{ email: to }],
+    });
 
-    sendSmtpEmail.subject = subject;
-    sendSmtpEmail.htmlContent = html;
-    sendSmtpEmail.sender = {
-      name: "CSSApply",
-      email: process.env.BREVO_FROM_EMAIL || "noreply@cssapply.com",
-    };
-    sendSmtpEmail.to = [{ email: to }];
-
-    const result = await apiInstance.sendTransacEmail(sendSmtpEmail);
     console.log("Email sent successfully:", result);
-    // The Brevo API returns { response, body }, and the messageId is in body.messageId
-    return { success: true, messageId: result.body?.messageId };
+    return { success: true, messageId: result.messageId };
   } catch (error) {
     console.error("Error sending email:", error);
     return { success: false, error: error };

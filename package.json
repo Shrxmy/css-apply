@@ -16,7 +16,7 @@
     "@fullcalendar/interaction": "^6.1.20",
     "@fullcalendar/react": "^6.1.20",
     "@fullcalendar/timegrid": "^6.1.20",
-    "@getbrevo/brevo": "^3.0.1",
+    "@getbrevo/brevo": "^5.0.3",
     "@hookform/resolvers": "^5.2.2",
     "@iconify/react": "^6.0.2",
     "@next-auth/prisma-adapter": "^1.0.7",

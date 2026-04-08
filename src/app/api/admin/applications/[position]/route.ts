@@ -95,13 +95,13 @@ export async function GET(
     console.log(
       `Found ${allCommApplications.length} total committee applications for position: ${position}`,
     );
-    allCommApplications.forEach((app) => {
+    allCommApplications.forEach((app: typeof allCommApplications[number]) => {
       console.log(
         `Committee App ${app.id}: hasAccepted=${app.hasAccepted}, status=${app.status}, user=${app.user?.name}`,
       );
     });
 
-    const commApplications = allCommApplications.filter((app) => {
+    const commApplications = allCommApplications.filter((app: typeof allCommApplications[number]) => {
       // Include applications that are NOT truly processed
       const isAccepted = app.hasAccepted && app.status === "passed";
       const isRejected = app.status === "failed";
@@ -141,13 +141,13 @@ export async function GET(
     console.log(
       `Found ${allEAApplications.length} total EA applications for position: ${position}`,
     );
-    allEAApplications.forEach((app) => {
+    allEAApplications.forEach((app: typeof allEAApplications[number]) => {
       console.log(
         `EA App ${app.id}: hasAccepted=${app.hasAccepted}, status=${app.status}, user=${app.user?.name}`,
       );
     });
 
-    const eAApplications = allEAApplications.filter((app) => {
+    const eAApplications = allEAApplications.filter((app: typeof allEAApplications[number]) => {
       // Include applications that are NOT truly processed
       const isAccepted = app.hasAccepted && app.status === "passed";
       const isRejected = app.status === "failed";
@@ -186,7 +186,7 @@ export async function GET(
 
     // Add CV and Portfolio download links for Committee applications
     applications.committee = await Promise.all(
-      commApplications.map(async (application) => {
+      commApplications.map(async (application: typeof commApplications[number]) => {
         const cvDownloadUrl = application.supabaseFilePath
           ? `/api/admin/cv-download?applicationId=${application.id}&type=committee`
           : null;
@@ -210,7 +210,7 @@ export async function GET(
 
     // Add CV download links for EA applications
     applications.ea = await Promise.all(
-      eAApplications.map(async (application) => {
+      eAApplications.map(async (application: typeof eAApplications[number]) => {
         const cvDownloadUrl = application.supabaseFilePath
           ? `/api/admin/cv-download?applicationId=${application.id}&type=ea`
           : null;
@@ -227,7 +227,7 @@ export async function GET(
       }),
     );
 
-    applications.member = memberApplications.map((application) => ({
+    applications.member = memberApplications.map((application: typeof memberApplications[number]) => ({
       ...application,
       type: "member",
       isAssigned: true,
