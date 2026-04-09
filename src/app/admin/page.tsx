@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import MobileSidebar from "@/components/AdminMobileSB";
 import SidebarContent from "@/components/AdminSidebar";
+import useSWR from "swr";
 
 // import {
 //   addUnavailableSlot,
@@ -22,18 +23,7 @@ import FullCalendar from "@fullcalendar/react";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 
-// Cache for EB data to prevent unnecessary API calls
-const ebDataCache = new Map<
-  string,
-  {
-    userId: string;
-    position: string;
-    committees: string[];
-    isActive: boolean;
-    timestamp: number;
-  }
->();
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const swrFetcher = (url: string) => fetch(url).then((r) => r.json());
 
 const Schedule = () => {
   const { data: session, status } = useSession();
@@ -79,8 +69,6 @@ const Schedule = () => {
     committees: string[];
     isActive: boolean;
   } | null>(null);
-  const [scheduleIsLoading, setScheduleIsLoading] = useState(false);
-  const [isInitialized, setIsInitialized] = useState(false);
   const [calendarRange, setCalendarRange] = useState({
     start: new Date().toISOString().split("T")[0],
     end: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)
@@ -145,48 +133,66 @@ const Schedule = () => {
     };
   }, []);
 
-  // Memoized EB data fetching with caching
-  const getEBData = useCallback(async (id: string) => {
-    if (!id) return;
+  // SWR for EB profile data - caches for 5 minutes
+  const { data: ebData } = useSWR(
+    session?.user?.dbId ? `/api/admin/eb-profiles/${session.user.dbId}` : null,
+    swrFetcher,
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 30000,
+    }
+  );
 
-    // Check cache first
-    const cached = ebDataCache.get(id);
-    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+  // Update ebProfile when EB data changes
+  useEffect(() => {
+    if (ebData?.ebProfile) {
       setEbProfile({
-        userId: cached.userId,
-        position: cached.position,
-        committees: cached.committees,
-        isActive: cached.isActive,
+        userId: ebData.ebProfile.userId,
+        position: ebData.ebProfile.position,
+        committees: ebData.ebProfile.committees,
+        isActive: ebData.ebProfile.isActive,
       });
-      return cached;
     }
+  }, [ebData]);
 
-    try {
-      const ebData = await fetch(`/api/admin/eb-profiles/${id}`, {
-        method: "GET",
-      });
-      const parsedEBData = await ebData.json();
-
-      if (!ebData.ok || !parsedEBData.ebProfile) {
-        return null;
-      }
-
-      const ebProfileData = {
-        userId: parsedEBData.ebProfile.userId,
-        position: parsedEBData.ebProfile.position,
-        committees: parsedEBData.ebProfile.committees,
-        isActive: parsedEBData.ebProfile.isActive,
-      };
-
-      // Cache the result
-      ebDataCache.set(id, { ...ebProfileData, timestamp: Date.now() });
-      setEbProfile(ebProfileData);
-      return ebProfileData;
-    } catch (error) {
-      console.error("Error getting EB data:", error);
-      return null;
+  // SWR for unavailable slots - uses ebData position to avoid circular dependency
+  const { data: unavailableData, isLoading: isUnavailableLoading } = useSWR(
+    ebData?.ebProfile?.position ? `/api/admin/unavailable-slots/${ebData.ebProfile.position}` : null,
+    swrFetcher,
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 30000,
     }
-  }, []);
+  );
+
+  // SWR for interview slots - uses ebData position to avoid circular dependency
+  const { data: interviewData, isLoading: isInterviewLoading } = useSWR(
+    ebData?.ebProfile?.position ? `/api/admin/interview-slots/${ebData.ebProfile.position}` : null,
+    swrFetcher,
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 30000,
+    }
+  );
+
+  // Update slots when SWR data changes
+  useEffect(() => {
+    if (unavailableData) {
+      setUnavailableTimeSlots(unavailableData.unavailableSlotsData || []);
+    }
+    if (interviewData?.success && interviewData.slots) {
+      setInterviewSlots(interviewData.slots);
+    } else if (interviewData) {
+      setInterviewSlots([]);
+    }
+    // Show calendar if we have data (either empty or with slots)
+    if (!isUnavailableLoading && !isInterviewLoading) {
+      setShowCalendar(true);
+    }
+  }, [unavailableData, interviewData, isUnavailableLoading, isInterviewLoading]);
+
+  // Combined loading state
+  const isSlotsLoading = isUnavailableLoading || isInterviewLoading;
 
   // FullCalendar event handlers
   const handleDateSelect = (selectInfo: { start: Date; end: Date }) => {
@@ -400,67 +406,22 @@ const Schedule = () => {
     }
   }, [unavailableTimeSlots, interviewSlots, generateCalendarEvents]);
 
-  const fetchSlots = useCallback(async (position: string) => {
-    if (!position) return;
-
-    try {
-      setScheduleIsLoading(true);
-
-      // Fetch both unavailable slots and interview slots in parallel
-      const [unavailableResponse, interviewResponse] = await Promise.all([
-        fetch(`/api/admin/unavailable-slots/${position}`, {
-          method: "GET",
-        }),
-        fetch(`/api/admin/interview-slots/${position}`, {
-          method: "GET",
-        }),
-      ]);
-
-      const [unavailableRes, interviewRes] = await Promise.all([
-        unavailableResponse.json(),
-        interviewResponse.json(),
-      ]);
-
-      // Update states with the fetched data
-      setUnavailableTimeSlots(unavailableRes.unavailableSlotsData || []);
-
-      if (interviewRes.success && interviewRes.slots) {
-        setInterviewSlots(interviewRes.slots);
-      } else {
-        setInterviewSlots([]);
-      }
-
-      setShowCalendar(true);
-    } catch (error) {
-      console.error("Error fetching slots:", error);
-      // Set empty arrays on error to prevent stale data
-      setUnavailableTimeSlots([]);
-      setInterviewSlots([]);
-    } finally {
-      setScheduleIsLoading(false);
-    }
-  }, []);
-
-  // Refresh function for manual updates
-  const refreshSchedule = useCallback(async () => {
-    if (ebProfile?.position) {
-      await fetchSlots(ebProfile.position);
-    }
-  }, [ebProfile?.position, fetchSlots]);
-
-  // Initialize data on mount
-  useEffect(() => {
-    if (status === "loading") return;
-
-    if (!isInitialized && session?.user?.dbId) {
-      setIsInitialized(true);
-      getEBData(session.user.dbId).then((ebProfile) => {
-        if (ebProfile?.position) {
-          fetchSlots(ebProfile.position);
-        }
+  // Refresh function - use SWR mutate to trigger revalidation
+  const refreshSchedule = useCallback(() => {
+    if (ebData?.ebProfile?.position) {
+      const pos = ebData.ebProfile.position;
+      // Trigger revalidation of both endpoints
+      Promise.all([
+        fetch(`/api/admin/unavailable-slots/${pos}`),
+        fetch(`/api/admin/interview-slots/${pos}`),
+      ]).then(() => {
+        // After manual fetch, SWR will pick up fresh data on next render
       });
     }
-  }, [status, session?.user?.dbId, isInitialized, getEBData, fetchSlots]);
+  }, [ebData]);
+
+  // SWR automatically loads data, no need for manual fetch
+  // The useEffect above updates slots when SWR data changes
 
   const handleCreateSlot = async () => {
     if (unavailableTimeSlots.length === 0) {
@@ -498,11 +459,14 @@ const Schedule = () => {
 
       // Reset form and close calendar
       setShowCalendar(false);
-      // setUnavailableTimeSlots([]);
-      // setCalendarEvents([]);
       setShowConfirmModal(false);
-      if (ebProfile?.position) {
-        await fetchSlots(ebProfile.position);
+      // Trigger refresh to reload data
+      if (ebData?.ebProfile?.position) {
+        const pos = ebData.ebProfile.position;
+        Promise.all([
+          fetch(`/api/admin/unavailable-slots/${pos}`),
+          fetch(`/api/admin/interview-slots/${pos}`),
+        ]);
       }
       toast.success("Unavailable time slots saved successfully!");
     } catch (error) {
@@ -561,7 +525,7 @@ const Schedule = () => {
             {/* Refresh button */}
             <button
               onClick={refreshSchedule}
-              disabled={scheduleIsLoading}
+              disabled={isSlotsLoading}
               className="flex items-center space-x-1 px-3 py-1.5 text-xs font-medium text-[#134687] bg-white border-2 border-[#005FD9] rounded-md hover:bg-[#F3F3FD] hover:text-[#044FAF] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
             >
               <svg
@@ -586,7 +550,14 @@ const Schedule = () => {
             className="bg-[#F3F3FD] border border-[#005FD9]/10 rounded-lg p-4 md:p-8"
             style={{ minHeight: "calc(100vh - 400px)" }}
           >
-            {!showCalendar && !scheduleIsLoading ? (
+            {isSlotsLoading ? (
+              <div className="flex flex-col items-center justify-center h-full px-2">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#044FAF] mb-4"></div>
+                <p className="text-sm text-[#134687]">
+                  Loading schedule data...
+                </p>
+              </div>
+            ) : !showCalendar ? (
               <div className="flex flex-col items-center justify-center h-full px-2">
                 {/* big calendar icon */}
                 <div className="w-16 h-16 md:w-24 md:h-24 mb-4 md:mb-6">
@@ -608,13 +579,6 @@ const Schedule = () => {
                 >
                   Set Unavailable Times
                 </button>
-              </div>
-            ) : scheduleIsLoading ? (
-              <div className="flex flex-col items-center justify-center h-full px-2">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#044FAF] mb-4"></div>
-                <p className="text-sm text-[#134687]">
-                  Loading schedule data...
-                </p>
               </div>
             ) : (
               <div className="space-y-4 md:space-y-6">
