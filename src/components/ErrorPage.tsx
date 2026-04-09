@@ -28,7 +28,7 @@ interface ErrorPageProps {
 
 export default function ErrorPage({
   title = "Oops! Something went wrong",
-  message = "We encountered an unexpected error. Don&apos;t worry, our team has been notified and we&apos;re working to fix it.",
+  message = "We encountered an unexpected error. Don't worry, our team has been notified and we're working to fix it.",
   showRetry = true,
   showGoHome = true,
   customActions,
@@ -50,10 +50,10 @@ export default function ErrorPage({
   };
 
   return (
-    <div className="min-h-screen bg-[rgb(243,243,253)] bg-[url('https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/pictures/background.png')] bg-cover bg-no-repeat">
+    <div className="min-h-screen flex flex-col bg-[rgb(243,243,253)] bg-[url('https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/pictures/background.png')] bg-cover bg-no-repeat">
       <Header />
 
-      <section className="flex flex-col items-center justify-center py-8 sm:py-12 lg:py-20 px-4 sm:px-6 lg:px-8">
+      <section className="flex flex-col items-center justify-center py-8 sm:py-12 lg:py-20 px-4 sm:px-6 lg:px-8 grow">
         <div className="text-center max-w-2xl mx-auto">
           {/* Error Icon/Image */}
           <div className="mb-8">

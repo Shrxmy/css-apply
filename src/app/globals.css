@@ -1,7 +1,8 @@
 @import "tailwindcss";
 
 /* Prevent horizontal scrolling */
-html, body {
+html,
+body {
   overflow-x: hidden;
   max-width: 100vw;
 }
@@ -563,4 +564,68 @@ html, body {
 /* Hide the center title area completely */
 .fc-toolbar-chunk:nth-child(2) {
   display: none !important;
+}
+
+/* Sonner toast theming — CSS Apply blue palette */
+[data-sonner-toaster] {
+  --normal-bg: #ffffff;
+  --normal-text: #134687;
+  --normal-border: #005fd920;
+}
+
+/* Success toasts — blue theme */
+[data-sonner-toast][data-type="success"] {
+  background: #e8f2ff !important;
+  border-color: #005fd930 !important;
+  color: #044faf !important;
+}
+[data-sonner-toast][data-type="success"] [data-icon] {
+  color: #044faf !important;
+}
+[data-sonner-toast][data-type="success"] [data-title] {
+  color: #044faf !important;
+  font-weight: 600;
+}
+[data-sonner-toast][data-type="success"] [data-description] {
+  color: #13468780 !important;
+}
+
+/* Error toasts — muted red */
+[data-sonner-toast][data-type="error"] {
+  background: #fef2f2 !important;
+  border-color: #dc262620 !important;
+  color: #991b1b !important;
+}
+[data-sonner-toast][data-type="error"] [data-icon] {
+  color: #dc2626 !important;
+}
+[data-sonner-toast][data-type="error"] [data-title] {
+  color: #991b1b !important;
+  font-weight: 600;
+}
+[data-sonner-toast][data-type="error"] [data-description] {
+  color: #991b1b80 !important;
+}
+
+/* Info toasts */
+[data-sonner-toast][data-type="info"] {
+  background: #f3f3fd !important;
+  border-color: #005fd920 !important;
+  color: #134687 !important;
+}
+[data-sonner-toast][data-type="info"] [data-icon] {
+  color: #134687 !important;
+}
+
+/* Close button styling */
+[data-sonner-toast] button[data-close-button] {
+  color: #13468780 !important;
+}
+[data-sonner-toast] button[data-close-button]:hover {
+  color: #044faf !important;
+}
+
+/* Toast description text (subtle) */
+.css-apply-toast [data-description] {
+  font-size: 0.75rem !important;
 }

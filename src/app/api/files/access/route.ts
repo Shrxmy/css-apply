@@ -14,85 +14,90 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const fileType = searchParams.get('fileType'); // 'cv' or 'portfolio'
-    const applicationType = searchParams.get('applicationType'); // 'ea' or 'committee'
+    const fileType = searchParams.get("fileType"); // 'cv' or 'portfolio'
+    const applicationType = searchParams.get("applicationType"); // 'ea' or 'committee'
 
     if (!fileType || !applicationType) {
       return NextResponse.json(
         { error: "Missing fileType or applicationType parameter" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     // Get user from database
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
-      select: { 
-        id: true, 
-        email: true, 
+      select: {
+        id: true,
+        email: true,
         studentNumber: true,
-        name: true
-      }
+        name: true,
+      },
     });
 
     if (!user || !user.studentNumber) {
       return NextResponse.json(
         { error: "User not found or student number not set" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
     let application;
     let supabaseFilePath: string | null = null;
 
-    if (applicationType === 'ea') {
+    if (applicationType === "ea") {
       application = await prisma.eAApplication.findUnique({
         where: { studentNumber: user.studentNumber },
-        select: { 
+        select: {
           supabaseFilePath: true,
-          cv: true
-        }
+          cv: true,
+        },
       });
       supabaseFilePath = application?.supabaseFilePath || null;
-    } else if (applicationType === 'committee') {
+    } else if (applicationType === "committee") {
       application = await prisma.committeeApplication.findUnique({
         where: { studentNumber: user.studentNumber },
-        select: { 
-          supabaseFilePath: true, 
+        select: {
+          supabaseFilePath: true,
           cv: true,
-          portfolioLink: true 
-        }
+          portfolioLink: true,
+        },
       });
-      
-      if (fileType === 'cv') {
+
+      if (fileType === "cv") {
         supabaseFilePath = application?.supabaseFilePath || null;
-      } else if (fileType === 'portfolio') {
+      } else if (fileType === "portfolio") {
         supabaseFilePath = application?.portfolioLink || null;
       }
     } else {
       return NextResponse.json(
-        { error: "Invalid applicationType parameter. Must be 'ea' or 'committee'" },
-        { status: 400 }
+        {
+          error:
+            "Invalid applicationType parameter. Must be 'ea' or 'committee'",
+        },
+        { status: 400 },
       );
     }
 
     if (!application || !supabaseFilePath) {
       return NextResponse.json(
         { error: "File not found for this application" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
     try {
       // Check if supabaseFilePath is a full URL or just a path
-      if (supabaseFilePath.startsWith('http')) {
+      if (supabaseFilePath.startsWith("http")) {
         // It's a full URL, extract bucket and file path (handle both public and signed URLs)
-        const urlMatch = supabaseFilePath.match(/\/storage\/v1\/object\/(?:public|sign)\/([^\/]+)\/(.+?)(?:\?|$)/);
-        
+        const urlMatch = supabaseFilePath.match(
+          /\/storage\/v1\/object\/(?:public|sign)\/([^\/]+)\/(.+?)(?:\?|$)/,
+        );
+
         if (urlMatch) {
           const bucketName = urlMatch[1];
           const filePath = urlMatch[2];
-          
+
           // Generate a signed URL for secure access (24 hours expiration)
           const { data, error } = await supabase.storage
             .from(bucketName)
@@ -102,7 +107,7 @@ export async function GET(request: NextRequest) {
             console.error("Supabase error:", error);
             return NextResponse.json(
               { error: "Failed to generate access link" },
-              { status: 500 }
+              { status: 500 },
             );
           }
 
@@ -110,7 +115,7 @@ export async function GET(request: NextRequest) {
             success: true,
             accessUrl: data.signedUrl,
             fileName: `${user.name}_${user.studentNumber}_${fileType.toUpperCase()}.pdf`,
-            expiresIn: 86400
+            expiresIn: 86400,
           });
         } else {
           // If we can't parse the URL, return the original URL
@@ -118,13 +123,16 @@ export async function GET(request: NextRequest) {
             success: true,
             accessUrl: supabaseFilePath,
             fileName: `${user.name}_${user.studentNumber}_${fileType.toUpperCase()}.pdf`,
-            expiresIn: 86400
+            expiresIn: 86400,
           });
         }
       } else {
         // It's just a file path, use the bucket name
-        const bucketName = applicationType === 'ea' ? 'ea-applications' : 'committee-applications';
-        
+        const bucketName =
+          applicationType === "ea"
+            ? "ea-applications"
+            : "committee-applications";
+
         const { data, error } = await supabase.storage
           .from(bucketName)
           .createSignedUrl(supabaseFilePath, 86400);
@@ -133,7 +141,7 @@ export async function GET(request: NextRequest) {
           console.error("Supabase error:", error);
           return NextResponse.json(
             { error: "Failed to generate access link" },
-            { status: 500 }
+            { status: 500 },
           );
         }
 
@@ -141,22 +149,21 @@ export async function GET(request: NextRequest) {
           success: true,
           accessUrl: data.signedUrl,
           fileName: `${user.name}_${user.studentNumber}_${fileType.toUpperCase()}.pdf`,
-          expiresIn: 86400
+          expiresIn: 86400,
         });
       }
     } catch (supabaseError) {
       console.error("Supabase storage error:", supabaseError);
       return NextResponse.json(
         { error: "Failed to access file" },
-        { status: 500 }
+        { status: 500 },
       );
     }
-
   } catch (error) {
     console.error("Error generating file access link:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

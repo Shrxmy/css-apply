@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -18,25 +18,36 @@ export async function GET(
     if (!isAdmin) {
       return NextResponse.json(
         { error: "Forbidden — Admin access required" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
     const { id } = await params;
 
     if (!id) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Missing required fields" },
+        { status: 400 },
+      );
     }
 
-    const ebProfile = await prisma.eBProfile.findUnique({ where: { userId: id } });
+    const ebProfile = await prisma.eBProfile.findUnique({
+      where: { userId: id },
+    });
 
     if (!ebProfile) {
-      return NextResponse.json({ error: "EB profile not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "EB profile not found" },
+        { status: 404 },
+      );
     }
 
     return NextResponse.json({ success: true, ebProfile });
   } catch (error) {
     console.error("Error getting EB profile:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }

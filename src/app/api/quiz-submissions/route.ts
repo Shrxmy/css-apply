@@ -1,23 +1,26 @@
-import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { NextResponse } from "next/server";
+import { supabase } from "@/lib/supabase";
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
     const submission = body?.submission ?? body;
 
-    if (!submission || typeof submission !== 'object') {
-      return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+    if (!submission || typeof submission !== "object") {
+      return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
     }
 
     // Minimal shape validation
-    const hasTop = typeof submission.top_committee === 'string';
+    const hasTop = typeof submission.top_committee === "string";
     if (!hasTop) {
-      return NextResponse.json({ error: 'Missing top_committee' }, { status: 400 });
+      return NextResponse.json(
+        { error: "Missing top_committee" },
+        { status: 400 },
+      );
     }
 
     const { data, error } = await supabase
-      .from('quiz_submissions')
+      .from("quiz_submissions")
       .insert([submission])
       .select();
 

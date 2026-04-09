@@ -2,26 +2,31 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
 import MobileSidebar from "@/components/AdminMobileSB";
 import SidebarContent from "@/components/AdminSidebar";
+import useSWR from "swr";
 
 // import {
 //   addUnavailableSlot,
 //   removeUnavailableSlot,
 // } from "@/data/unavailableSlots";
-import { CalendarPlus, Calendar, Clock, X, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  CalendarPlus,
+  Calendar,
+  Clock,
+  X,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
+import { toast } from "sonner";
 import FullCalendar from "@fullcalendar/react";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 
-// Cache for EB data to prevent unnecessary API calls
-const ebDataCache = new Map<string, {userId: string; position: string; committees: string[]; isActive: boolean; timestamp: number}>();
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const swrFetcher = (url: string) => fetch(url).then((r) => r.json());
 
 const Schedule = () => {
   const { data: session, status } = useSession();
-  const router = useRouter();
   const [showCalendar, setShowCalendar] = useState(false);
   const [showUnavailableBlocks, setShowUnavailableBlocks] = useState(false);
   const [unavailableTimeSlots, setUnavailableTimeSlots] = useState<
@@ -43,7 +48,19 @@ const Schedule = () => {
       meetingLink: string;
     }>
   >([]);
-  const [calendarEvents, setCalendarEvents] = useState<Array<{id: string; title: string; start: Date; end: Date; backgroundColor: string; borderColor: string; textColor: string; display: string; classNames: string}>>([]);
+  const [calendarEvents, setCalendarEvents] = useState<
+    Array<{
+      id: string;
+      title: string;
+      start: Date;
+      end: Date;
+      backgroundColor: string;
+      borderColor: string;
+      textColor: string;
+      display: string;
+      classNames: string;
+    }>
+  >([]);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [ebProfile, setEbProfile] = useState<{
@@ -52,9 +69,40 @@ const Schedule = () => {
     committees: string[];
     isActive: boolean;
   } | null>(null);
-  const [scheduleIsLoading, setScheduleIsLoading] = useState(false);
-  const [isInitialized, setIsInitialized] = useState(false);
+  const [calendarRange, setCalendarRange] = useState({
+    start: new Date().toISOString().split("T")[0],
+    end: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .split("T")[0],
+  });
   const calendarRef = useRef<FullCalendar>(null);
+
+  // Fetch recruitment cycle dates for calendar range
+  useEffect(() => {
+    const fetchCycle = async () => {
+      try {
+        const res = await fetch("/api/admin/recruitment-cycle");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.activeCycle) {
+            setCalendarRange({
+              start:
+                data.activeCycle.interviewStart?.split("T")[0] ??
+                new Date().toISOString().split("T")[0],
+              end:
+                data.activeCycle.interviewEnd?.split("T")[0] ??
+                new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)
+                  .toISOString()
+                  .split("T")[0],
+            });
+          }
+        }
+      } catch {
+        // Keep defaults
+      }
+    };
+    fetchCycle();
+  }, []);
 
   // Memoized helper function to format date and time for display
   const formatDateTime = useCallback((dateStr: string, timeSlot: string) => {
@@ -85,46 +133,69 @@ const Schedule = () => {
     };
   }, []);
 
-  // Memoized EB data fetching with caching
-  const getEBData = useCallback(async (id: string) => {
-    if (!id) return;
-    
-    // Check cache first
-    const cached = ebDataCache.get(id);
-    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+  // SWR for EB profile data - caches for 5 minutes
+  const { data: ebData } = useSWR(
+    session?.user?.dbId ? `/api/admin/eb-profiles/${session.user.dbId}` : null,
+    swrFetcher,
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 30000,
+    }
+  );
+
+  // Update ebProfile when EB data changes
+  useEffect(() => {
+    if (ebData?.ebProfile) {
       setEbProfile({
-        userId: cached.userId,
-        position: cached.position,
-        committees: cached.committees,
-        isActive: cached.isActive,
+        userId: ebData.ebProfile.userId,
+        position: ebData.ebProfile.position,
+        committees: ebData.ebProfile.committees,
+        isActive: ebData.ebProfile.isActive,
       });
-      return cached;
     }
-    
-    try{
-      const ebData = await fetch(`/api/admin/eb-profiles/${id}`, {
-        method: "GET",
-      });
-      const parsedEBData = await ebData.json();      
-      const ebProfileData = {
-        userId: parsedEBData.ebProfile.userId,
-        position: parsedEBData.ebProfile.position,
-        committees: parsedEBData.ebProfile.committees,
-        isActive: parsedEBData.ebProfile.isActive,
-      };
-      
-      // Cache the result
-      ebDataCache.set(id, { ...ebProfileData, timestamp: Date.now() });
-      setEbProfile(ebProfileData);
-      return ebProfileData;
-    }catch(error){
-      console.error("Error getting EB data:", error);
-      return null;
+  }, [ebData]);
+
+  // SWR for unavailable slots - uses ebData position to avoid circular dependency
+  const { data: unavailableData, isLoading: isUnavailableLoading } = useSWR(
+    ebData?.ebProfile?.position ? `/api/admin/unavailable-slots/${ebData.ebProfile.position}` : null,
+    swrFetcher,
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 30000,
     }
-  }, []);
+  );
+
+  // SWR for interview slots - uses ebData position to avoid circular dependency
+  const { data: interviewData, isLoading: isInterviewLoading } = useSWR(
+    ebData?.ebProfile?.position ? `/api/admin/interview-slots/${ebData.ebProfile.position}` : null,
+    swrFetcher,
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 30000,
+    }
+  );
+
+  // Update slots when SWR data changes
+  useEffect(() => {
+    if (unavailableData) {
+      setUnavailableTimeSlots(unavailableData.unavailableSlotsData || []);
+    }
+    if (interviewData?.success && interviewData.slots) {
+      setInterviewSlots(interviewData.slots);
+    } else if (interviewData) {
+      setInterviewSlots([]);
+    }
+    // Show calendar if we have data (either empty or with slots)
+    if (!isUnavailableLoading && !isInterviewLoading) {
+      setShowCalendar(true);
+    }
+  }, [unavailableData, interviewData, isUnavailableLoading, isInterviewLoading]);
+
+  // Combined loading state
+  const isSlotsLoading = isUnavailableLoading || isInterviewLoading;
 
   // FullCalendar event handlers
-  const handleDateSelect = (selectInfo: {start: Date; end: Date}) => {
+  const handleDateSelect = (selectInfo: { start: Date; end: Date }) => {
     const start = selectInfo.start;
     const end = selectInfo.end;
 
@@ -204,7 +275,12 @@ const Schedule = () => {
     }
   };
 
-  const handleEventClick = (clickInfo: {event: {id: string; extendedProps?: {fullName?: string; timeSlot?: string}}}) => {
+  const handleEventClick = (clickInfo: {
+    event: {
+      id: string;
+      extendedProps?: { fullName?: string; timeSlot?: string };
+    };
+  }) => {
     // Only allow removal of unavailable slots, not interview slots
     const eventId = clickInfo.event.id;
 
@@ -213,9 +289,11 @@ const Schedule = () => {
       const fullName = clickInfo.event.extendedProps?.fullName;
       const timeSlot = clickInfo.event.extendedProps?.timeSlot;
       if (fullName) {
-        alert(`Interview: ${timeSlot}\nApplicant: ${fullName}`);
+        toast.info(`Interview: ${timeSlot}\nApplicant: ${fullName}`);
       } else {
-        alert("Interview slots cannot be removed directly. They are managed through applications.");
+        toast.info(
+          "Interview slots cannot be removed directly. They are managed through applications.",
+        );
       }
       return;
     }
@@ -224,7 +302,7 @@ const Schedule = () => {
     const actualSlotId = eventId.replace("unavailable-", "");
     setCalendarEvents((prev) => prev.filter((event) => event.id !== eventId));
     setUnavailableTimeSlots((prev) =>
-      prev.filter((slot) => slot.id !== actualSlotId)
+      prev.filter((slot) => slot.id !== actualSlotId),
     );
   };
 
@@ -250,57 +328,69 @@ const Schedule = () => {
     });
 
     // Convert interview slots to FullCalendar events
-    const interviewEvents = interviewSlots.map((slot: { id: string; day: string; name: string; timeStart: string; timeEnd: string; meetingLink?: string }) => {
-      // Ensure we have valid date and time data
-      if (!slot.day || !slot.timeStart || !slot.timeEnd) {
-        console.warn(`Invalid slot data for ${slot.name}:`, slot);
-        return null;
-      }
+    const interviewEvents = interviewSlots
+      .map(
+        (slot: {
+          id: string;
+          day: string;
+          name: string;
+          timeStart: string;
+          timeEnd: string;
+          meetingLink?: string;
+        }) => {
+          // Ensure we have valid date and time data
+          if (!slot.day || !slot.timeStart || !slot.timeEnd) {
+            console.warn(`Invalid slot data for ${slot.name}:`, slot);
+            return null;
+          }
 
-      // Parse dates more carefully to avoid timezone issues
-      const startDateTime = new Date(`${slot.day}T${slot.timeStart}:00`);
-      const endDateTime = new Date(`${slot.day}T${slot.timeEnd}:00`);
+          // Parse dates more carefully to avoid timezone issues
+          const startDateTime = new Date(`${slot.day}T${slot.timeStart}:00`);
+          const endDateTime = new Date(`${slot.day}T${slot.timeEnd}:00`);
 
-      // Validate the parsed dates
-      if (isNaN(startDateTime.getTime()) || isNaN(endDateTime.getTime())) {
-        console.warn(`Invalid date parsing for ${slot.name}:`, {
-          day: slot.day,
-          timeStart: slot.timeStart,
-          timeEnd: slot.timeEnd,
-          startDateTime,
-          endDateTime
-        });
-        return null;
-      }
+          // Validate the parsed dates
+          if (isNaN(startDateTime.getTime()) || isNaN(endDateTime.getTime())) {
+            console.warn(`Invalid date parsing for ${slot.name}:`, {
+              day: slot.day,
+              timeStart: slot.timeStart,
+              timeEnd: slot.timeEnd,
+              startDateTime,
+              endDateTime,
+            });
+            return null;
+          }
 
-      // Create a shorter title to prevent overflow
-      const shortName = slot.name.length > 15 ? `${slot.name.substring(0, 12)}...` : slot.name;
-      const timeSlot = `${slot.timeStart}-${slot.timeEnd}`;
-      const title = shortName; // Just show the name, FullCalendar handles the time display
+          // Create a shorter title to prevent overflow
+          const shortName =
+            slot.name.length > 15
+              ? `${slot.name.substring(0, 12)}...`
+              : slot.name;
+          const timeSlot = `${slot.timeStart}-${slot.timeEnd}`;
+          const title = shortName; // Just show the name, FullCalendar handles the time display
 
-
-      return {
-        id: `interview-${slot.id}`,
-        title: title,
-        start: startDateTime,
-        end: endDateTime,
-        backgroundColor: "#dc2626", // Red color for interviews
-        borderColor: "#b91c1c",
-        textColor: "white",
-        display: "block",
-        classNames: "interview-event", // Add custom class
-        extendedProps: {
-          fullName: slot.name, // Store full name for tooltip
-          timeSlot: timeSlot
-        }
-      };
-    }).filter((event): event is NonNullable<typeof event> => event !== null); // Remove any null events
-
+          return {
+            id: `interview-${slot.id}`,
+            title: title,
+            start: startDateTime,
+            end: endDateTime,
+            backgroundColor: "#dc2626", // Red color for interviews
+            borderColor: "#b91c1c",
+            textColor: "white",
+            display: "block",
+            classNames: "interview-event", // Add custom class
+            extendedProps: {
+              fullName: slot.name, // Store full name for tooltip
+              timeSlot: timeSlot,
+            },
+          };
+        },
+      )
+      .filter((event): event is NonNullable<typeof event> => event !== null); // Remove any null events
 
     events.push(...unavailableEvents, ...interviewEvents);
-    
+
     // Debug: Log all events being passed to calendar
-    
+
     setCalendarEvents(events);
   }, [unavailableTimeSlots, interviewSlots]);
 
@@ -316,100 +406,26 @@ const Schedule = () => {
     }
   }, [unavailableTimeSlots, interviewSlots, generateCalendarEvents]);
 
-  const fetchSlots = useCallback(async (position: string) => {
-    if (!position) return;
-    
-    try {
-      setScheduleIsLoading(true);
-      
-      // Fetch both unavailable slots and interview slots in parallel
-      const [unavailableResponse, interviewResponse] = await Promise.all([
-        fetch(`/api/admin/unavailable-slots/${position}`, {
-          method: "GET",
-        }),
-        fetch(`/api/admin/interview-slots/${position}`, {
-          method: "GET",
-        })
-      ]);
-
-      const [unavailableRes, interviewRes] = await Promise.all([
-        unavailableResponse.json(),
-        interviewResponse.json()
-      ]);
-
-      // Update states with the fetched data
-      setUnavailableTimeSlots(unavailableRes.unavailableSlotsData || []);
-      
-      if (interviewRes.success && interviewRes.slots) {
-        
-        // Check specifically for EA applicants
-        const eaSlots = interviewRes.slots.filter((slot: { name: string }) => 
-          slot.name.includes('KED MORENO') || slot.name.includes('MATTHEW BENEDICT AQUINO')
-        );
-        eaSlots.forEach((slot: { name: string; day: string; timeStart: string; timeEnd: string }) => {
-        });
-        
-        setInterviewSlots(interviewRes.slots);
-      } else {
-        setInterviewSlots([]);
-      }
-      
-      setShowCalendar(true);
-    } catch (error) {
-      console.error("Error fetching slots:", error);
-      // Set empty arrays on error to prevent stale data
-      setUnavailableTimeSlots([]);
-      setInterviewSlots([]);
-    } finally {
-      setScheduleIsLoading(false);
-    }
-  }, []);
-
-  // Refresh function for manual updates
-  const refreshSchedule = useCallback(async () => {
-    if (ebProfile?.position) {
-      await fetchSlots(ebProfile.position);
-    }
-  }, [ebProfile?.position, fetchSlots]);
-
-  // Optimized initialization effect
-  useEffect(() => {
-    if (status === "loading") return;
-
-    if (status === "unauthenticated") {
-      router.push("/auth/signin");
-      return;
-    }
-
-    if (
-      session?.user?.role !== "admin" &&
-      session?.user?.role !== "super_admin"
-    ) {
-      router.push("/user");
-      return;
-    }
-
-    // Initialize only once
-    if (!isInitialized && session?.user?.dbId) {
-      setIsInitialized(true);
-      getEBData(session.user.dbId).then((ebProfile) => {
-        if (ebProfile?.position) {
-          fetchSlots(ebProfile.position);
-        }
+  // Refresh function - use SWR mutate to trigger revalidation
+  const refreshSchedule = useCallback(() => {
+    if (ebData?.ebProfile?.position) {
+      const pos = ebData.ebProfile.position;
+      // Trigger revalidation of both endpoints
+      Promise.all([
+        fetch(`/api/admin/unavailable-slots/${pos}`),
+        fetch(`/api/admin/interview-slots/${pos}`),
+      ]).then(() => {
+        // After manual fetch, SWR will pick up fresh data on next render
       });
     }
-  }, [status, session?.user?.role, session?.user?.dbId, isInitialized, getEBData, fetchSlots, router]);
+  }, [ebData]);
 
-  // Auto-show calendar when data is loaded
-  useEffect(() => {
-    if (!scheduleIsLoading && (interviewSlots.length > 0 || unavailableTimeSlots.length > 0)) {
-      setShowCalendar(true);
-    }
-  }, [scheduleIsLoading, interviewSlots.length, unavailableTimeSlots.length]);
+  // SWR automatically loads data, no need for manual fetch
+  // The useEffect above updates slots when SWR data changes
 
   const handleCreateSlot = async () => {
     if (unavailableTimeSlots.length === 0) {
-      alert("Please select time slots to mark as unavailable");
+      toast.error("Please select time slots to mark as unavailable");
       return;
     }
 
@@ -418,7 +434,7 @@ const Schedule = () => {
 
   const handleConfirmSave = async () => {
     if (!ebProfile) return;
-    
+
     try {
       setIsSaving(true);
 
@@ -433,47 +449,48 @@ const Schedule = () => {
         method: "POST",
         body: JSON.stringify(unavailableSlots),
       });
-      
+
       const res = await response.json();
-      if (!res.success){
+      if (!res.success) {
         console.error("Error creating unavailable slots:", res.error);
-        alert(res.message);
+        toast.error(res.message);
         throw new Error(res.message);
       }
-  
+
       // Reset form and close calendar
       setShowCalendar(false);
-      // setUnavailableTimeSlots([]);
-      // setCalendarEvents([]);
       setShowConfirmModal(false);
-      if (ebProfile?.position) {
-        await fetchSlots(ebProfile.position);
+      // Trigger refresh to reload data
+      if (ebData?.ebProfile?.position) {
+        const pos = ebData.ebProfile.position;
+        Promise.all([
+          fetch(`/api/admin/unavailable-slots/${pos}`),
+          fetch(`/api/admin/interview-slots/${pos}`),
+        ]);
       }
-      alert("Unavailable time slots saved successfully!");
+      toast.success("Unavailable time slots saved successfully!");
     } catch (error) {
       console.error("Error creating unavailable slots:", error);
-      alert("Failed to save unavailable time slots");
+      toast.error("Failed to save unavailable time slots");
     } finally {
       setIsSaving(false);
     }
   };
 
-  // Show loading for initial load or when data is being fetched
-  if (status === "loading" || scheduleIsLoading) {
+  // Show loading for session only
+  if (status === "loading") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F3F3FD] bg-[url('https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/pictures/background.png')] bg-cover bg-repeat">
         <div className="flex flex-col items-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#044FAF]"></div>
-          <p className="mt-4 text-[#134687]">Loading schedule...</p>
+          <p className="mt-4 text-[#134687]">Loading session...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div
-      className="min-h-screen flex bg-[#F3F3FD] bg-[url('https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/pictures/background.png')] bg-cover bg-repeat overflow-x-hidden"
-    >
+    <div className="min-h-screen flex bg-[#F3F3FD] bg-[url('https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/pictures/background.png')] bg-cover bg-repeat overflow-x-hidden">
       {/* Sidebar Navigation */}
       <MobileSidebar>
         <SidebarContent activePage="schedule" />
@@ -487,13 +504,14 @@ const Schedule = () => {
             Welcome, {ebProfile?.position} 👋
           </div>
           <p className="text-black text-xs lg:text-lg font-Inter font-light leading-5 mb-4 md:mb-6">
-            Stay organized and guide applicants through their journey with CSS Apply.
+            Stay organized and guide applicants through their journey with CSS
+            Apply.
           </p>
           <hr className="border-[#005FD9]" />
         </div>
 
         {/* MAIN SHAPE */}
-        <div className="bg-white rounded-xl shadow-sm border-2 border-[#005FD9] p-4 md:p-6 mb-6 min-h-[calc(100vh-200px)] md:min-h-[calc(100vh-280px)]">
+        <div className="bg-white rounded-xl border border-[#005FD9]/10 p-4 md:p-6 mb-6 min-h-[calc(100vh-200px)] md:min-h-[calc(100vh-280px)]">
           {/* schedule header */}
           <div className="flex items-center justify-between mb-4 md:mb-6">
             <div className="flex items-center space-x-2">
@@ -503,15 +521,25 @@ const Schedule = () => {
                 Your Schedule
               </h2>
             </div>
-            
+
             {/* Refresh button */}
             <button
               onClick={refreshSchedule}
-              disabled={scheduleIsLoading}
+              disabled={isSlotsLoading}
               className="flex items-center space-x-1 px-3 py-1.5 text-xs font-medium text-[#134687] bg-white border-2 border-[#005FD9] rounded-md hover:bg-[#F3F3FD] hover:text-[#044FAF] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
             >
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              <svg
+                className="w-3 h-3"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
               </svg>
               <span>Refresh</span>
             </button>
@@ -519,10 +547,17 @@ const Schedule = () => {
 
           {/* INNER SHAPE */}
           <div
-            className="bg-gradient-to-r from-[#F3F3FD] to-[#E8F2FF] rounded-lg p-4 md:p-8"
+            className="bg-[#F3F3FD] border border-[#005FD9]/10 rounded-lg p-4 md:p-8"
             style={{ minHeight: "calc(100vh - 400px)" }}
           >
-            {!showCalendar && !scheduleIsLoading ? (
+            {isSlotsLoading ? (
+              <div className="flex flex-col items-center justify-center h-full px-2">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#044FAF] mb-4"></div>
+                <p className="text-sm text-[#134687]">
+                  Loading schedule data...
+                </p>
+              </div>
+            ) : !showCalendar ? (
               <div className="flex flex-col items-center justify-center h-full px-2">
                 {/* big calendar icon */}
                 <div className="w-16 h-16 md:w-24 md:h-24 mb-4 md:mb-6">
@@ -540,28 +575,25 @@ const Schedule = () => {
 
                 <button
                   onClick={() => setShowCalendar(true)}
-                  className="text-xs md:text-sm font-medium py-2 px-6 md:py-3 md:px-10 rounded-full bg-gradient-to-r from-[#044FAF] to-[#134687] text-white hover:from-[#04387B] hover:to-[#0f3a6b] transition-all duration-300 transform hover:scale-[1.02] hover:shadow-md"
+                  className="text-xs md:text-sm font-medium py-2 px-6 md:py-3 md:px-10 rounded-full bg-[#044FAF] text-white hover:bg-[#0349A2] transition-colors"
                 >
                   Set Unavailable Times
                 </button>
               </div>
-            ) : scheduleIsLoading ? (
-              <div className="flex flex-col items-center justify-center h-full px-2">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#044FAF] mb-4"></div>
-                <p className="text-sm text-[#134687]">Loading schedule data...</p>
-              </div>
             ) : (
               <div className="space-y-4 md:space-y-6">
-                {interviewSlots.length > 0 && <div className="flex">
-                  <h4 className="text-xs md:text-sm font-semibold text-[#134687] mb-1">
-                    Meeting Link: {interviewSlots[0].meetingLink}
-                  </h4>
-                </div>}
+                {interviewSlots.length > 0 && (
+                  <div className="flex">
+                    <h4 className="text-xs md:text-sm font-semibold text-[#134687] mb-1">
+                      Meeting Link: {interviewSlots[0].meetingLink}
+                    </h4>
+                  </div>
+                )}
                 {/* Guide Message */}
                 <div className="bg-white rounded-lg p-3 md:p-4">
                   <div className="flex items-start gap-2 md:gap-3">
                     <div className="flex-shrink-0">
-                      <div className="w-5 h-5 md:w-6 md:h-6 bg-gradient-to-r from-[#044FAF] to-[#134687] rounded-full flex items-center justify-center">
+                      <div className="w-5 h-5 md:w-6 md:h-6 bg-[#044FAF] rounded-full flex items-center justify-center">
                         <span className="text-white text-xs md:text-sm font-semibold">
                           i
                         </span>
@@ -573,7 +605,8 @@ const Schedule = () => {
                       </h4>
                       <ul className="text-xs text-[#134687] space-y-1">
                         <li>
-                          • <strong>View:</strong> Blue blocks show unavailable times, red blocks show scheduled interviews
+                          • <strong>View:</strong> Blue blocks show unavailable
+                          times, red blocks show scheduled interviews
                         </li>
                         <li>
                           • <strong>Single day:</strong> Click and drag to
@@ -584,7 +617,8 @@ const Schedule = () => {
                           another to mark entire days as unavailable
                         </li>
                         <li>
-                          • <strong>Remove unavailable times:</strong> Click on blue blocks to remove them
+                          • <strong>Remove unavailable times:</strong> Click on
+                          blue blocks to remove them
                         </li>
                         <li>
                           • <strong>Save:</strong> Click &quot;Save Unavailable
@@ -603,11 +637,15 @@ const Schedule = () => {
                   <div className="flex flex-wrap gap-4">
                     <div className="flex items-center gap-2">
                       <div className="w-4 h-4 bg-[#134687] rounded border border-[#0f3a6b]"></div>
-                      <span className="text-xs text-[#134687]">Unavailable Times</span>
+                      <span className="text-xs text-[#134687]">
+                        Unavailable Times
+                      </span>
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="w-4 h-4 bg-[#dc2626] rounded border border-[#b91c1c]"></div>
-                      <span className="text-xs text-[#134687]">Scheduled Interviews</span>
+                      <span className="text-xs text-[#134687]">
+                        Scheduled Interviews
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -693,17 +731,17 @@ const Schedule = () => {
                     selectOverlap={false}
                     eventDisplay="block"
                     eventTimeFormat={{
-                      hour: '2-digit',
-                      minute: '2-digit',
-                      hour12: false
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      hour12: false,
                     }}
                     selectConstraint={{
-                      start: "2025-09-16",
-                      end: "2025-10-05",
+                      start: calendarRange.start,
+                      end: calendarRange.end,
                     }}
                     validRange={{
-                      start: "2025-09-16",
-                      end: "2025-10-05",
+                      start: calendarRange.start,
+                      end: calendarRange.end,
                     }}
                     eventOverlap={false}
                     nowIndicator={true}
@@ -738,11 +776,14 @@ const Schedule = () => {
                 {unavailableTimeSlots.length > 0 && (
                   <div>
                     <button
-                      onClick={() => setShowUnavailableBlocks(!showUnavailableBlocks)}
+                      onClick={() =>
+                        setShowUnavailableBlocks(!showUnavailableBlocks)
+                      }
                       className="flex items-center justify-between w-full text-left mb-2 hover:bg-gray-50 rounded-md p-2 -m-2 transition-colors"
                     >
                       <h4 className="text-xs md:text-sm font-medium text-gray-700">
-                        Selected Unavailable Time Blocks ({unavailableTimeSlots.length})
+                        Selected Unavailable Time Blocks (
+                        {unavailableTimeSlots.length})
                       </h4>
                       {showUnavailableBlocks ? (
                         <ChevronUp className="w-4 h-4 text-gray-500" />
@@ -750,13 +791,13 @@ const Schedule = () => {
                         <ChevronDown className="w-4 h-4 text-gray-500" />
                       )}
                     </button>
-                    
+
                     {showUnavailableBlocks && (
                       <div className="flex flex-wrap gap-1.5 md:gap-2 overflow-hidden">
                         {unavailableTimeSlots.map((slot) => {
                           const formatted = formatDateTime(
                             slot.date,
-                            slot.timeSlot
+                            slot.timeSlot,
                           );
                           return (
                             <div
@@ -775,7 +816,7 @@ const Schedule = () => {
                               <button
                                 onClick={() =>
                                   setUnavailableTimeSlots((prev) =>
-                                    prev.filter((s) => s.id !== slot.id)
+                                    prev.filter((s) => s.id !== slot.id),
                                   )
                                 }
                                 className="ml-1 hover:bg-[#0f3a6b] rounded-full p-0.5 md:p-1 transition-colors flex-shrink-0"

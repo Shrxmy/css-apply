@@ -1,31 +1,92 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import Image from "next/image";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import LoadingScreen from "@/components/LoadingScreen";
 import { committeeRolesRequirements } from "@/data/committeeRoles";
+import { useApplicationStatus } from "@/lib/useApplicationStatus";
+import { useApplicationsOpen } from "@/lib/useApplicationsOpen";
 
 export default function StaffApplication() {
   const [selectedRole, setSelectedRole] = useState<string | null>("academics");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const { status } = useSession();
   const router = useRouter();
+
+  // SWR hook — shared with user dashboard, no duplicate fetch
+  const { data: appStatus, isLoading: isAppLoading } = useApplicationStatus(
+    status === "authenticated",
+  );
+
+  // Gate: redirect to /user when applications are closed
+  const applicationsOpen = useApplicationsOpen("/user");
+
+  // Redirect if user already has an application
+  useEffect(() => {
+    if (!appStatus || status !== "authenticated") return;
+
+    if (appStatus.hasMemberApplication) {
+      router.push("/user/apply/member/progress");
+    } else if (appStatus.hasCommitteeApplication && appStatus.committeeId) {
+      router.push(
+        `/user/apply/committee-staff/${appStatus.committeeId}/progress`,
+      );
+    } else if (appStatus.hasEAApplication && appStatus.ebRole) {
+      router.push(
+        `/user/apply/executive-assistant/${appStatus.ebRole}/progress`,
+      );
+    }
+  }, [appStatus, status, router]);
+
+  // Show loading while session or app check is pending
+  if (status === "loading" || isAppLoading) {
+    return <LoadingScreen />;
+  }
+
+  // Block access when applications are closed
+  if (!applicationsOpen) return <LoadingScreen />;
+
+  // If user has any application, show loading while redirect fires
+  if (
+    appStatus &&
+    (appStatus.hasMemberApplication ||
+      appStatus.hasCommitteeApplication ||
+      appStatus.hasEAApplication)
+  ) {
+    return <LoadingScreen />;
+  }
 
   const getCommitteeImage = (committeeId: string) => {
     const imageMap: { [key: string]: string } = {
-      academics: "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_ACADEMICS.png",
-      community: "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_COMMDEV.png",
-      creatives: "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_CREATIVES.png",
-      documentation: "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_DOCU.png",
-      external: "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_EXTERNALS.png",
-      finance: "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_FINANCE.png",
-      logistics: "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_LOGISTICS.png",
-      publicity: "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_PUBLICITY.png",
-      sports: "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_SPOTA.png",
-      technology: "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_TECHDEV.png",
+      academics:
+        "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_ACADEMICS.png",
+      community:
+        "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_COMMDEV.png",
+      creatives:
+        "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_CREATIVES.png",
+      documentation:
+        "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_DOCU.png",
+      external:
+        "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_EXTERNALS.png",
+      finance:
+        "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_FINANCE.png",
+      logistics:
+        "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_LOGISTICS.png",
+      publicity:
+        "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_PUBLICITY.png",
+      sports:
+        "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_SPOTA.png",
+      technology:
+        "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_TECHDEV.png",
     };
-    return imageMap[committeeId] || "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/Questions CSAR.png";
+    return (
+      imageMap[committeeId] ||
+      "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/Questions CSAR.png"
+    );
   };
 
   return (
@@ -34,7 +95,7 @@ export default function StaffApplication() {
 
       <section className="flex flex-col items-center justify-center sm:my-12 lg:my-28">
         <div className="w-[80%] flex flex-col justify-center items-center">
-          <div className="rounded-[24px] sm:bg-white sm:shadow-[0_4px_4px_0_rgba(0,0,0,0.31)] p-10 md:p-16 lg:py-20 lg:px-24">
+          <div className="rounded-3xl sm:bg-white sm:shadow-[0_4px_4px_0_rgba(0,0,0,0.31)] p-10 md:p-16 lg:py-20 lg:px-24">
             <div className="text-3xl lg:text-4xl font-raleway font-semibold mb-2 lg:mb-4">
               <span className="text-black">Apply as </span>
               <span className="text-[#134687]">Committee Staff</span>
@@ -48,7 +109,7 @@ export default function StaffApplication() {
               runs smoothly and every idea has the chance to shine.
             </div>
 
-            <hr className="my-5 lg:my-8 border-t-1 border-[#717171]" />
+            <hr className="my-5 lg:my-8 border-t border-[#717171]" />
 
             {/* Stepper */}
             <div className="w-full flex flex-col items-center justify-center">
@@ -58,13 +119,13 @@ export default function StaffApplication() {
                     1
                   </span>
                 </div>
-                <div className="w-20 lg:w-24 h-[2px] lg:h-[3px] bg-[#D9D9D9]" />
+                <div className="w-20 lg:w-24 h-0.5 lg:h-0.75 bg-[#D9D9D9]" />
                 <div className="flex items-center justify-center rounded-full bg-[#D9D9D9] w-5 h-5 lg:w-10 lg:h-10">
                   <span className="text-[#696767] text-[9px] lg:text-xs lg:font-bold font-inter">
                     2
                   </span>
                 </div>
-                <div className="w-20 lg:w-24 h-[2px] lg:h-[3px] bg-[#D9D9D9]" />
+                <div className="w-20 lg:w-24 h-0.5 lg:h-0.75 bg-[#D9D9D9]" />
                 <div className="flex items-center justify-center rounded-full bg-[#D9D9D9] w-5 h-5 lg:w-10 lg:h-10">
                   <span className="text-[#696767] text-[9px] lg:text-xs lg:font-bold font-inter">
                     3
@@ -98,7 +159,7 @@ export default function StaffApplication() {
                     <span className="font-inter text-xs text-[#7a7a7a]">
                       {selectedRole
                         ? committeeRolesRequirements.find(
-                            (role) => role.id === selectedRole
+                            (role) => role.id === selectedRole,
                           )?.title
                         : "Select an EB role"}
                     </span>
@@ -164,7 +225,7 @@ export default function StaffApplication() {
                       <div className="w-full lg:w-3/5 p-6">
                         {(() => {
                           const role = committeeRolesRequirements.find(
-                            (r) => r.id === selectedRole
+                            (r) => r.id === selectedRole,
                           );
                           return role ? (
                             <>
@@ -179,12 +240,12 @@ export default function StaffApplication() {
                         })()}
                       </div>
                       {/* Right side - Committee picture */}
-                      <div className="hidden w-2/5 lg:block lg:h-80 overflow-hidden border-1 border-gray-200 bg-gradient-to-b from-blue-900 via-blue-90 to-[#2F7EE3] relative">
+                      <div className="hidden w-2/5 lg:block lg:h-80 overflow-hidden border border-gray-200 bg-linear-to-b from-blue-900 via-blue-90 to-[#2F7EE3] relative">
                         <Image
                           src={getCommitteeImage(selectedRole)}
                           alt={
                             committeeRolesRequirements.find(
-                              (r) => r.id === selectedRole
+                              (r) => r.id === selectedRole,
                             )?.title || "Committee"
                           }
                           fill
@@ -217,7 +278,7 @@ export default function StaffApplication() {
               </div>
             </div>
 
-            <hr className="my-8 border-t-1 border-[#717171]" />
+            <hr className="my-8 border-t border-[#717171]" />
 
             <div className="flex justify-center gap-4">
               <button
@@ -232,7 +293,7 @@ export default function StaffApplication() {
                 <button
                   onClick={() =>
                     router.push(
-                      `/user/apply/committee-staff/${selectedRole}/application`
+                      `/user/apply/committee-staff/${selectedRole}/application`,
                     )
                   }
                   className="cursor-pointer whitespace-nowrap font-inter text-sm font-semibold text-[#134687] px-15 py-3 rounded-lg border-2 border-[#134687] bg-white hover:bg-[#B1CDF0] transition-all duration-150 active:scale-95"

@@ -20,18 +20,18 @@ export async function GET(request: NextRequest) {
     if (!hasAdminAccess) {
       return NextResponse.json(
         { error: "Forbidden - Admin access required" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
     const { searchParams } = new URL(request.url);
-    const query = searchParams.get('q');
-    const position = searchParams.get('position');
+    const query = searchParams.get("q");
+    const position = searchParams.get("position");
 
     if (!query || !position) {
       return NextResponse.json(
         { error: "Missing query or position parameter" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -58,6 +58,7 @@ export async function GET(request: NextRequest) {
         type: string;
         cvDownloadUrl: string | null;
         portfolioDownloadUrl: string | null;
+        isAssigned: boolean;
       }>;
       ea: Array<{
         id: string;
@@ -79,6 +80,7 @@ export async function GET(request: NextRequest) {
         };
         type: string;
         cvDownloadUrl: string | null;
+        isAssigned: boolean;
       }>;
       member: Array<{
         id: string;
@@ -94,6 +96,7 @@ export async function GET(request: NextRequest) {
           section: string | null;
         };
         type: string;
+        isAssigned: boolean;
       }>;
     } = {
       committee: [],
@@ -101,136 +104,115 @@ export async function GET(request: NextRequest) {
       member: [],
     };
 
+    const positionTitle = getPositionTitle(position);
+    const roleId = getRoleId(position);
+    const assignmentValues = [position, positionTitle, roleId]
+      .filter(Boolean)
+      .map((value) => value.toLowerCase());
+
     // Search committee applications
     const allCommApplications = await prisma.committeeApplication.findMany({
       where: {
-        AND: [
+        OR: [
           {
-            interviewBy: {
-              equals: position,
-              mode: 'insensitive'
-            }
+            user: {
+              name: {
+                contains: query,
+                mode: "insensitive",
+              },
+            },
           },
           {
-            OR: [
-              {
-                user: {
-                  name: {
-                    contains: query,
-                    mode: 'insensitive'
-                  }
-                }
+            user: {
+              studentNumber: {
+                contains: query,
+                mode: "insensitive",
               },
-              {
-                user: {
-                  studentNumber: {
-                    contains: query,
-                    mode: 'insensitive'
-                  }
-                }
+            },
+          },
+          {
+            user: {
+              email: {
+                contains: query,
+                mode: "insensitive",
               },
-              {
-                user: {
-                  email: {
-                    contains: query,
-                    mode: 'insensitive'
-                  }
-                }
-              }
-            ]
-          }
-        ]
+            },
+          },
+        ],
       },
       orderBy: { createdAt: "desc" },
       include: {
         user: {
-          select: { id: true, name: true, email: true, studentNumber: true, section: true },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            studentNumber: true,
+            section: true,
+          },
         },
       },
     });
 
     // Filter committee applications (exclude truly processed ones)
-    const commApplications = allCommApplications.filter(app => {
-      const isAccepted = app.hasAccepted && app.status === 'passed';
-      const isRejected = app.status === 'failed';
-      const isRedirected = app.status === 'redirected';
-      
+    const commApplications = allCommApplications.filter((app: typeof allCommApplications[number]) => {
+      const isAccepted = app.hasAccepted && app.status === "passed";
+      const isRejected = app.status === "failed";
+      const isRedirected = app.status === "redirected";
+
       return !isAccepted && !isRejected && !isRedirected;
     });
 
     // Search EA applications
-    const positionTitle = getPositionTitle(position);
-    const roleId = getRoleId(position);
-    
     const allEAApplications = await prisma.eAApplication.findMany({
       where: {
-        AND: [
+        OR: [
           {
-            OR: [
-              {
-                interviewBy: {
-                  equals: position,
-                  mode: 'insensitive'
-                }
+            user: {
+              name: {
+                contains: query,
+                mode: "insensitive",
               },
-              {
-                interviewBy: {
-                  equals: positionTitle,
-                  mode: 'insensitive'
-                }
-              },
-              {
-                interviewBy: {
-                  equals: roleId,
-                  mode: 'insensitive'
-                }
-              }
-            ]
+            },
           },
           {
-            OR: [
-              {
-                user: {
-                  name: {
-                    contains: query,
-                    mode: 'insensitive'
-                  }
-                }
+            user: {
+              studentNumber: {
+                contains: query,
+                mode: "insensitive",
               },
-              {
-                user: {
-                  studentNumber: {
-                    contains: query,
-                    mode: 'insensitive'
-                  }
-                }
+            },
+          },
+          {
+            user: {
+              email: {
+                contains: query,
+                mode: "insensitive",
               },
-              {
-                user: {
-                  email: {
-                    contains: query,
-                    mode: 'insensitive'
-                  }
-                }
-              }
-            ]
-          }
-        ]
+            },
+          },
+        ],
       },
       orderBy: { createdAt: "desc" },
       include: {
         user: {
-          select: { id: true, name: true, email: true, studentNumber: true, section: true },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            studentNumber: true,
+            section: true,
+          },
         },
       },
     });
 
     // Filter EA applications (exclude truly processed ones)
-    const eAApplications = allEAApplications.filter(app => {
-      const isAccepted = app.hasAccepted && app.status === 'passed';
-      const isRejected = app.status === 'failed';
-      const isRedirected = app.status === 'redirected';
-      
+    const eAApplications = allEAApplications.filter((app: typeof allEAApplications[number]) => {
+      const isAccepted = app.hasAccepted && app.status === "passed";
+      const isRejected = app.status === "failed";
+      const isRedirected = app.status === "redirected";
+
       return !isAccepted && !isRejected && !isRedirected;
     });
 
@@ -242,87 +224,105 @@ export async function GET(request: NextRequest) {
             user: {
               name: {
                 contains: query,
-                mode: 'insensitive'
-              }
-            }
+                mode: "insensitive",
+              },
+            },
           },
           {
             user: {
               studentNumber: {
                 contains: query,
-                mode: 'insensitive'
-              }
-            }
+                mode: "insensitive",
+              },
+            },
           },
           {
             user: {
               email: {
                 contains: query,
-                mode: 'insensitive'
-              }
-            }
-          }
-        ]
+                mode: "insensitive",
+              },
+            },
+          },
+        ],
       },
       orderBy: { createdAt: "desc" },
       include: {
         user: {
-          select: { id: true, name: true, email: true, studentNumber: true, section: true },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            studentNumber: true,
+            section: true,
+          },
         },
       },
     });
 
     // Add CV and Portfolio download links for Committee applications
     applications.committee = await Promise.all(
-      commApplications.map(async (application) => {
-        const cvDownloadUrl = application.supabaseFilePath 
+      commApplications.map(async (application: typeof commApplications[number]) => {
+        const cvDownloadUrl = application.supabaseFilePath
           ? `/api/admin/cv-download?applicationId=${application.id}&type=committee`
           : null;
-        
-        const portfolioDownloadUrl = application.portfolioLink 
+
+        const portfolioDownloadUrl = application.portfolioLink
           ? `/api/admin/portfolio-download?applicationId=${application.id}`
           : null;
-        
+
         return {
           ...application,
-          type: 'committee',
+          type: "committee",
+          isAssigned: Boolean(
+            application.interviewBy &&
+              assignmentValues.includes(application.interviewBy.toLowerCase()),
+          ),
           cvDownloadUrl,
           portfolioDownloadUrl,
         };
-      })
+      }),
     );
 
     // Add CV download links for EA applications
     applications.ea = await Promise.all(
-      eAApplications.map(async (application) => {
-        const cvDownloadUrl = application.supabaseFilePath 
+      eAApplications.map(async (application: typeof eAApplications[number]) => {
+        const cvDownloadUrl = application.supabaseFilePath
           ? `/api/admin/cv-download?applicationId=${application.id}&type=ea`
           : null;
-        
+
         return {
           ...application,
-          type: 'ea',
+          type: "ea",
+          isAssigned: Boolean(
+            application.interviewBy &&
+              assignmentValues.includes(application.interviewBy.toLowerCase()),
+          ),
           cvDownloadUrl,
         };
-      })
+      }),
     );
 
-    applications.member = memberApplications.map(application => ({
+    applications.member = memberApplications.map((application: typeof memberApplications[number]) => ({
       ...application,
-      type: 'member',
+      type: "member",
+      isAssigned: true,
     }));
 
     return NextResponse.json({
       success: true,
       applications,
       searchQuery: query,
-      totalResults: applications.committee.length + applications.ea.length + applications.member.length
+      totalResults:
+        applications.committee.length +
+        applications.ea.length +
+        applications.member.length,
     });
   } catch (error) {
     console.error("Error searching applications:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

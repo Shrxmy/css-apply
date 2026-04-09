@@ -1,12 +1,12 @@
 // Mapping between EB role IDs (used in URLs and assignments) and position titles (stored in database)
 export const EB_ROLE_TO_POSITION_MAP: Record<string, string> = {
-  "president": "President",
+  president: "President",
   "internal-vice-president": "Internal Vice President",
   "external-vice-president": "External Vice President",
-  "secretary": "Secretary",
+  secretary: "Secretary",
   "assistant-secretary": "Assistant Secretary",
-  "treasurer": "Treasurer",
-  "auditor": "Auditor",
+  treasurer: "Treasurer",
+  auditor: "Auditor",
   "public-relations-officer": "Public Relations Officer (PRO)",
   "representative-4th-year": "4th Year Representative",
   "representative-3rd-year": "3rd Year Representative",
@@ -33,7 +33,9 @@ export function getPositionTitle(roleId: string): string {
  * @returns The EB role ID (e.g., "president", "internal-vice-president") or the original title if not found
  */
 export function getRoleId(positionTitle: string): string {
-  const entry = Object.entries(EB_ROLE_TO_POSITION_MAP).find(([, title]) => title === positionTitle);
+  const entry = Object.entries(EB_ROLE_TO_POSITION_MAP).find(
+    ([, title]) => title === positionTitle,
+  );
   return entry ? entry[0] : positionTitle;
 }
 
@@ -43,6 +45,8 @@ export function getRoleId(positionTitle: string): string {
  * @returns The position title (e.g., "President", "Internal Vice President") or the original roleId if not found
  */
 export function getPositionFromRoleId(roleId: string): string {
-  const entry = Object.entries(EB_ROLE_TO_POSITION_MAP).find(([id]) => id === roleId);
+  const entry = Object.entries(EB_ROLE_TO_POSITION_MAP).find(
+    ([id]) => id === roleId,
+  );
   return entry ? entry[1] : roleId;
 }

@@ -8,24 +8,32 @@ import Footer from "@/components/Footer";
 import Header from "@/components/Header";
 import { parseFullName } from "@/lib/name-parsing";
 import { useFormPersistence } from "@/lib/useFormPersistence";
-import { usePageReload } from "@/lib/usePageReload";
+import { useApplicationStatus } from "@/lib/useApplicationStatus";
+import { useApplicationsOpen } from "@/lib/useApplicationsOpen";
+import LoadingScreen from "@/components/LoadingScreen";
 
 export default function ExecutiveAssistantApplication() {
   const router = useRouter();
   const { "eb-role": ebId } = useParams<{ "eb-role": string }>();
 
-  // Disable auto-reload on application pages to prevent data loss
-  usePageReload({ disableReload: true });
-
   const { data: session, status } = useSession();
   const dropdownRef = useRef<HTMLDivElement>(null);
   const selectedRole = roles.find((r) => r.id === ebId);
 
+  // SWR hook — shared cache with user dashboard, no duplicate fetch
+  const {
+    data: appStatus,
+    isLoading: isAppLoading,
+  } = useApplicationStatus(status === "authenticated");
+
+  // Gate: redirect to /user when applications are closed
+  const applicationsOpen = useApplicationsOpen("/user");
+
   const [isChecked, setIsChecked] = useState(false);
-  const [hasCheckedApplications, setHasCheckedApplications] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [hasFetchedData, setHasFetchedData] = useState(false);
+  const [selectedCvFile, setSelectedCvFile] = useState<File | null>(null);
 
   const [uploading, setUploading] = useState({ cv: false });
   const [uploadError, setUploadError] = useState({ cv: "" });
@@ -49,18 +57,6 @@ export default function ExecutiveAssistantApplication() {
     [ebId], // Clear when EB role changes
     initialUIState
   );
-
-  // Helper function to check if a string is a valid Supabase URL
-  const isValidSupabaseUrl = (url: string) => {
-    if (!url) return false;
-    // Check if it's a valid URL and contains supabase.co
-    try {
-      const urlObj = new URL(url);
-      return urlObj.hostname.includes('supabase.co') || urlObj.hostname.includes('supabase.com');
-    } catch {
-      return false;
-    }
-  };
 
   useEffect(() => {
     const fetchApplicationData = async () => {
@@ -94,10 +90,6 @@ export default function ExecutiveAssistantApplication() {
             updates.section = data.user.section;
           }
           
-          if (!formData.cv && data.application?.cv) {
-            updates.cv = data.application.cv;
-          }
-          
           if (!formData.secondOptionEb && data.application?.secondOptionEb) {
             updates.secondOptionEb = data.application.secondOptionEb;
           }
@@ -117,41 +109,20 @@ export default function ExecutiveAssistantApplication() {
     fetchApplicationData();
   }, [session, status, isLoaded, updateFormData, hasFetchedData, formData.studentNumber, formData.section, formData.cv, formData.secondOptionEb]);
 
-  // Check for if there are applications present
-  if (status === "authenticated" && !hasCheckedApplications) {
-    const checkApplications = async () => {
-      try {
-        const response = await fetch("/api/applications/check-existing");
-        if (response.ok) {
-          const data = await response.json();
-
-          // Redirect based on existing applications
-          if (data.hasMemberApplication) {
-            router.push("/user/apply/member/progress");
-          } else if (data.hasCommitteeApplication) {
-            const committeeId =
-              data.applications.committee?.firstOptionCommittee;
-            if (committeeId) {
-              router.push(
-                `/user/apply/committee-staff/${committeeId}/progress`
-              );
-            }
-          } else if (data.hasEAApplication) {
-            const ebRole = data.applications.ea?.firstOptionEb;
-            if (ebRole) {
-              router.push(`/user/apply/executive-assistant/${ebRole}/progress`);
-            }
-          }
-        }
-      } catch (error) {
-        console.error("Error checking applications:", error);
-      } finally {
-        setHasCheckedApplications(true);
-      }
-    };
-
-    checkApplications();
-  }
+  // Redirect if user already has an application
+  useEffect(() => {
+    if (!appStatus || status !== "authenticated") return;
+    if (appStatus.hasMemberApplication)
+      router.push("/user/apply/member/progress");
+    else if (appStatus.hasCommitteeApplication && appStatus.committeeId)
+      router.push(
+        `/user/apply/committee-staff/${appStatus.committeeId}/progress`,
+      );
+    else if (appStatus.hasEAApplication && appStatus.ebRole)
+      router.push(
+        `/user/apply/executive-assistant/${appStatus.ebRole}/progress`,
+      );
+  }, [appStatus, status, router]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -169,6 +140,17 @@ export default function ExecutiveAssistantApplication() {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [uiState.isOpen, updateUIState]);
+
+  // Early returns AFTER all hooks
+  if (status === "loading" || isAppLoading) return <LoadingScreen />;
+  if (
+    appStatus &&
+    (appStatus.hasMemberApplication ||
+      appStatus.hasCommitteeApplication ||
+      appStatus.hasEAApplication)
+  )
+    return <LoadingScreen />;
+  if (!applicationsOpen) return <LoadingScreen />;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -215,20 +197,36 @@ export default function ExecutiveAssistantApplication() {
       return;
     }
 
-    if (!formData.cv) {
-      setError("Please upload or wait for your CV to finish uploading");
-      setLoading(false);
-      return;
-    }
-
-    // Validate that CV is a valid Supabase URL (not a filename)
-    if (!isValidSupabaseUrl(formData.cv)) {
-      setError("CV upload failed. Please re-upload your CV file.");
+    if (!selectedCvFile) {
+      setError("Please attach your CV file before submitting");
       setLoading(false);
       return;
     }
 
     try {
+      setUploading({ cv: true });
+      const uploadFormData = new FormData();
+      uploadFormData.append("file", selectedCvFile);
+      uploadFormData.append("studentNumber", formData.studentNumber);
+      uploadFormData.append("section", formData.section);
+      uploadFormData.append("fileType", "cv");
+      uploadFormData.append("applicationType", "ea");
+
+      const uploadResponse = await fetch("/api/files/upload", {
+        method: "POST",
+        body: uploadFormData,
+      });
+
+      const uploadResult = await uploadResponse.json();
+      if (!uploadResponse.ok) {
+        setError(uploadResult.error || "Failed to upload CV");
+        setLoading(false);
+        setUploading({ cv: false });
+        return;
+      }
+
+      setUploading({ cv: false });
+
       const response = await fetch("/api/applications/executive-assistant", {
         method: "POST",
         headers: {
@@ -242,7 +240,7 @@ export default function ExecutiveAssistantApplication() {
           ebRole: ebId,
           firstOptionEb: ebId,
           secondOptionEb: formData.secondOptionEb,
-          cv: formData.cv,
+          cv: uploadResult.filePath,
         }),
       });
 
@@ -266,14 +264,8 @@ export default function ExecutiveAssistantApplication() {
     }
   };
 
-  const handleFileUpload = async (file: File, type: "cv") => {
-    if (!file || !formData.studentNumber || !formData.section) {
-      setUploadError((prev) => ({
-        ...prev,
-        [type]: "Student number and section are required",
-      }));
-      return;
-    }
+  const handleFileUpload = (file: File, type: "cv") => {
+    if (!file) return;
 
     if (file.type !== "application/pdf") {
       setUploadError((prev) => ({
@@ -293,43 +285,9 @@ export default function ExecutiveAssistantApplication() {
       return;
     }
 
-    setUploading((prev) => ({ ...prev, [type]: true }));
     setUploadError((prev) => ({ ...prev, [type]: "" }));
 
-    try {
-      const uploadFormData = new FormData();
-      uploadFormData.append("file", file);
-      uploadFormData.append("studentNumber", formData.studentNumber);
-      uploadFormData.append("section", formData.section);
-      uploadFormData.append("fileType", type);
-      uploadFormData.append("applicationType", "ea");
-
-      const response = await fetch("/api/files/upload", {
-        method: "POST",
-        body: uploadFormData,
-      });
-
-      const result = await response.json();
-
-      if (response.ok) {
-        updateFormData({ cv: result.url });
-      } else {
-        setUploadError((prev) => ({
-          ...prev,
-          [type]: result.error || "Upload failed",
-        }));
-      }
-    } catch (error) {
-      console.error("Upload error:", error);
-      setUploadError((prev) => ({
-        ...prev,
-        [type]: "Upload failed. Please try again.",
-      }));
-      // Don't store filename - leave the field empty so user must retry upload
-      updateFormData({ cv: "" });
-    } finally {
-      setUploading((prev) => ({ ...prev, [type]: false }));
-    }
+    setSelectedCvFile(file);
   };
 
   if (!selectedRole) {
@@ -362,7 +320,7 @@ export default function ExecutiveAssistantApplication() {
         <div className="w-[80%] flex flex-col justify-center items-center">
           <form
             onSubmit={handleSubmit}
-            className="rounded-[24px] sm:bg-white sm:shadow-[0_4px_4px_0_rgba(0,0,0,0.31)] p-10 md:p-16 lg:py-20 lg:px-24"
+            className="rounded-3xl sm:bg-white sm:shadow-[0_4px_4px_0_rgba(0,0,0,0.31)] p-10 md:p-16 lg:py-20 lg:px-24"
           >
             <div className="text-3xl lg:text-4xl font-raleway font-semibold mb-2 lg:mb-4">
               <span className="text-black">Apply as EA to the </span>
@@ -376,7 +334,7 @@ export default function ExecutiveAssistantApplication() {
               communication skills.
             </div>
 
-            <hr className="my-5 lg:my-8 border-t-1 border-[#717171]" />
+            <hr className="my-5 lg:my-8 border-t border-[#717171]" />
 
             {/* Stepper */}
             <div className="w-full flex flex-col items-center justify-center">
@@ -389,13 +347,13 @@ export default function ExecutiveAssistantApplication() {
                     1
                   </span>
                 </div>
-                <div className="w-20 lg:w-24 h-[2px] lg:h-[3px] bg-[#D9D9D9]" />
+                <div className="w-20 lg:w-24 h-0.5 lg:h-0.75 bg-[#D9D9D9]" />
                 <div className="flex items-center justify-center rounded-full bg-[#2F7EE3] w-5 h-5 lg:w-10 lg:h-10">
                   <span className="text-white text-[9px] lg:text-xs lg:font-bold font-inter">
                     2
                   </span>
                 </div>
-                <div className="w-20 lg:w-24 h-[2px] lg:h-[3px] bg-[#D9D9D9]" />
+                <div className="w-20 lg:w-24 h-0.5 lg:h-0.75 bg-[#D9D9D9]" />
                 <div className="flex items-center justify-center rounded-full bg-[#D9D9D9] w-5 h-5 lg:w-10 lg:h-10">
                   <span className="text-[#696767] text-[9px] lg:text-xs lg:font-bold font-inter">
                     3
@@ -429,13 +387,13 @@ export default function ExecutiveAssistantApplication() {
                   <div className="text-black text-xs lg:text-sm font-Inter font-normal">
                     Student Number *
                   </div>
-                  <div className="text-black text-xs lg:text-sm font-Inter w-full lg:w-[400px]">
+                  <div className="text-black text-xs lg:text-sm font-Inter w-full lg:w-100">
                     <input
                       type="text"
                       name="studentNumber"
                       value={formData.studentNumber}
                       onChange={handleInputChange}
-                      className="w-full h-9 lg:h-12 rounded-md border border-[#A8A8A8] focus:border-1 focus:border-[#044FAF] focus:outline-none bg-white px-4 py-3 text-sm lg:text-base"
+                      className="w-full h-9 lg:h-12 rounded-md border border-[#A8A8A8] focus:border focus:border-[#044FAF] focus:outline-none bg-white px-4 py-3 text-sm lg:text-base"
                       placeholder="e.g. 2019131907"
                       required
                     />
@@ -446,7 +404,7 @@ export default function ExecutiveAssistantApplication() {
                   <div className="text-black text-xs lg:text-sm font-Inter font-normal">
                     First Name *
                   </div>
-                  <div className="text-black text-sm font-Inter w-full lg:w-[400px]">
+                  <div className="text-black text-sm font-Inter w-full lg:w-100">
                     <input
                       type="text"
                       name="firstName"
@@ -466,7 +424,7 @@ export default function ExecutiveAssistantApplication() {
                   <div className="text-black text-xs lg:text-sm font-Inter font-normal">
                     Last Name *
                   </div>
-                  <div className="text-black lg:text-sm font-Inter lg:w-[400px]">
+                  <div className="text-black lg:text-sm font-Inter lg:w-100">
                     <input
                       type="text"
                       name="lastName"
@@ -487,7 +445,7 @@ export default function ExecutiveAssistantApplication() {
                     <div className="text-black text-xs lg:text-sm font-Inter font-normal">
                       Section *
                     </div>
-                    <div className="text-black lg:text-sm font-Inter w-28 lg:w-[150px]">
+                    <div className="text-black lg:text-sm font-Inter w-28 lg:w-37.5">
                       <input
                         type="text"
                         name="section"
@@ -504,13 +462,13 @@ export default function ExecutiveAssistantApplication() {
                       Second Choice *
                     </div>
                     <div
-                      className="relative w-44 lg:w-[240px]"
+                      className="relative w-44 lg:w-60"
                       ref={dropdownRef}
                     >
                       <button
                         type="button"
                         onClick={() => updateUIState({ isOpen: !uiState.isOpen })}
-                        className={`w-full h-9 lg:h-12 rounded-md border-2 focus:outline-none bg-white px-2 lg:px-4 lg:py-3 text-sm lg:text-base text-left appearance-none bg-no-repeat bg-right bg-[length:16px] lg:pr-10 truncate ${
+                        className={`w-full h-9 lg:h-12 rounded-md border-2 focus:outline-none bg-white px-2 lg:px-4 lg:py-3 text-sm lg:text-base text-left appearance-none bg-no-repeat bg-right bg-size-[16px] lg:pr-10 truncate ${
                           uiState.isOpen ? "border-[#044FAF]" : "border-[#CDCECF]"
                         } ${
                           formData.secondOptionEb
@@ -559,17 +517,15 @@ export default function ExecutiveAssistantApplication() {
                   <div className="text-black text-xs lg:text-sm font-Inter font-normal">
                     Curriculum Vitae (in pdf):
                   </div>
-                  <div className="text-black lg:text-xs font-Inter lg:w-[200px]">
-                    {formData.cv ? (
+                  <div className="text-black lg:text-xs font-Inter lg:w-50">
+                    {selectedCvFile ? (
                       <div className="flex items-center justify-between bg-gray-100 p-2 lg:px-3 lg:py-2 rounded-md">
                         <span className="lg:text-sm text-black truncate">
-                          {formData.cv.includes("http")
-                            ? "CV Uploaded ✓"
-                            : formData.cv}
+                          {selectedCvFile.name}
                         </span>
                         <button
                           type="button"
-                          onClick={() => updateFormData({ cv: "" })}
+                          onClick={() => setSelectedCvFile(null)}
                           className="text-black hover:text-[#044FAF] lg:ml-2 lg:text-lg"
                         >
                           ×
@@ -611,7 +567,7 @@ export default function ExecutiveAssistantApplication() {
                 </div>
 
                 <div className="flex items-start gap-3">
-                  <div className="relative flex-shrink-0">
+                  <div className="relative shrink-0">
                     <input
                       type="checkbox"
                       id="agreement-checkbox"
@@ -651,7 +607,7 @@ export default function ExecutiveAssistantApplication() {
               </div>
 
               <div className="hidden lg:flex justify-center">
-                <div className="w-80 h-96 rounded-lg overflow-hidden border border-gray-200 bg-gradient-to-b from-blue-900 via-blue-90 to-[#2F7EE3] flex items-center justify-center">
+                <div className="w-80 h-96 rounded-lg overflow-hidden border border-gray-200 bg-linear-to-b from-blue-900 via-blue-90 to-[#2F7EE3] flex items-center justify-center">
                   <span className="text-white text-lg font-semibold text-center px-4">
                     {selectedRole?.title || "EB Role"}
                   </span>
@@ -659,7 +615,7 @@ export default function ExecutiveAssistantApplication() {
               </div>
             </div>
 
-            <hr className="my-8 border-t-1 border-[#717171]" />
+            <hr className="my-8 border border-[#717171]" />
             <div className="flex justify-center gap-4">
               <button
                 type="button"
@@ -673,7 +629,11 @@ export default function ExecutiveAssistantApplication() {
                 disabled={loading}
                 className="whitespace-nowrap font-inter text-sm font-semibold text-[#134687] px-15 py-3 rounded-lg border-2 border-[#134687] bg-white hover:bg-[#B1CDF0] transition-all duration-150 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? "Submitting..." : "Next"}
+                {loading
+                  ? uploading.cv
+                    ? "Uploading CV..."
+                    : "Submitting..."
+                  : "Next"}
               </button>
             </div>
           </form>

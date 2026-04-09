@@ -20,25 +20,25 @@ export async function GET(request: NextRequest) {
     if (!hasAdminAccess) {
       return NextResponse.json(
         { error: "Forbidden - Admin access required" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
     const { searchParams } = new URL(request.url);
-    const applicationId = searchParams.get('applicationId');
-    const type = searchParams.get('type'); // 'ea' or 'committee'
+    const applicationId = searchParams.get("applicationId");
+    const type = searchParams.get("type"); // 'ea' or 'committee'
 
     if (!applicationId || !type) {
       return NextResponse.json(
         { error: "Missing applicationId or type parameter" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     let application;
     let supabaseFilePath: string | null = null;
 
-    if (type === 'ea') {
+    if (type === "ea") {
       application = await prisma.eAApplication.findUnique({
         where: { id: applicationId },
         include: {
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
         },
       });
       supabaseFilePath = application?.supabaseFilePath || null;
-    } else if (type === 'committee') {
+    } else if (type === "committee") {
       application = await prisma.committeeApplication.findUnique({
         where: { id: applicationId },
         include: {
@@ -71,35 +71,37 @@ export async function GET(request: NextRequest) {
     } else {
       return NextResponse.json(
         { error: "Invalid type parameter. Must be 'ea' or 'committee'" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!application) {
       return NextResponse.json(
         { error: "Application not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
     if (!supabaseFilePath) {
       return NextResponse.json(
         { error: "CV file not found for this application" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
-    try {      
+    try {
       // Check if supabaseFilePath is a full URL or just a path
-      if (supabaseFilePath.startsWith('http')) {
+      if (supabaseFilePath.startsWith("http")) {
         // It's a full URL, we can use it directly or generate a signed URL
         // Extract bucket and file path from the URL (handle both public and signed URLs)
-        const urlMatch = supabaseFilePath.match(/\/storage\/v1\/object\/(?:public|sign)\/([^\/]+)\/(.+?)(?:\?|$)/);
-        
+        const urlMatch = supabaseFilePath.match(
+          /\/storage\/v1\/object\/(?:public|sign)\/([^\/]+)\/(.+?)(?:\?|$)/,
+        );
+
         if (urlMatch) {
           const bucketName = urlMatch[1];
           const filePath = urlMatch[2];
-          
+
           // Generate a signed URL for better security (24 hours expiration)
           const { data, error } = await supabase.storage
             .from(bucketName)
@@ -109,7 +111,7 @@ export async function GET(request: NextRequest) {
             console.error("Supabase error:", error);
             return NextResponse.json(
               { error: "Failed to generate download link" },
-              { status: 500 }
+              { status: 500 },
             );
           }
 
@@ -140,8 +142,9 @@ export async function GET(request: NextRequest) {
         }
       } else {
         // It's just a file path, use the old method
-        const bucketName = type === 'ea' ? 'ea-applications' : 'committee-applications';
-        
+        const bucketName =
+          type === "ea" ? "ea-applications" : "committee-applications";
+
         const { data, error } = await supabase.storage
           .from(bucketName)
           .createSignedUrl(supabaseFilePath, 86400);
@@ -150,7 +153,7 @@ export async function GET(request: NextRequest) {
           console.error("Supabase error:", error);
           return NextResponse.json(
             { error: "Failed to generate download link" },
-            { status: 500 }
+            { status: 500 },
           );
         }
 
@@ -170,15 +173,14 @@ export async function GET(request: NextRequest) {
       console.error("Supabase storage error:", supabaseError);
       return NextResponse.json(
         { error: "Failed to access CV file" },
-        { status: 500 }
+        { status: 500 },
       );
     }
-
   } catch (error) {
     console.error("Error generating CV download link:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

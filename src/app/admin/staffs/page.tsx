@@ -2,67 +2,36 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
-import MobileSidebar from '@/components/AdminMobileSB';
-import SidebarContent from '@/components/AdminSidebar';
-import { committeeRoles, committeeRolesSubmitted } from '@/data/committeeRoles';
-import { roles } from '@/data/ebRoles';
-import { Download } from "lucide-react";
+import MobileSidebar from "@/components/AdminMobileSB";
+import SidebarContent from "@/components/AdminSidebar";
+import { committeeRoles, committeeRolesSubmitted } from "@/data/committeeRoles";
+import { roles } from "@/data/ebRoles";
+import { toast } from "sonner";
 
-// Helper function to convert redirection value to proper committee name
 const getRedirectionDisplayName = (redirection: string): string => {
-  if (!redirection) return '';
-  
-  // Handle committee-{id} format (from EA to Committee Staff redirection)
-  if (redirection.startsWith('committee-')) {
-    const committeeId = redirection.replace('committee-', '');
-    const committee = committeeRolesSubmitted.find(c => c.id === committeeId);
+  if (!redirection) return "";
+  if (redirection.startsWith("committee-")) {
+    const committeeId = redirection.replace("committee-", "");
+    const committee = committeeRolesSubmitted.find((c) => c.id === committeeId);
     return committee ? `${committee.title} Staff` : redirection;
   }
-  
-  // Handle direct committee ID
-  const committee = committeeRolesSubmitted.find(c => c.id === redirection);
-  if (committee) {
-    return committee.title;
-  }
-  
-  // Handle EB role
-  const ebRole = roles.find(r => r.id === redirection);
-  if (ebRole) {
-    return ebRole.title;
-  }
-  
-  // Handle member redirection
-  if (redirection === 'member') {
-    return 'Member';
-  }
-  
-  // Fallback to original value
+  const committee = committeeRolesSubmitted.find((c) => c.id === redirection);
+  if (committee) return committee.title;
+  const ebRole = roles.find((r) => r.id === redirection);
+  if (ebRole) return ebRole.title;
+  if (redirection === "member") return "Member";
   return redirection;
 };
 
-// Helper function to get the correct redirection message
 const getRedirectionMessage = (redirection: string): string => {
-  if (!redirection) return '';
-  
-  // Check if redirected to EA role
-  const ebRole = roles.find(r => r.id === redirection);
-  if (ebRole) {
-    return 'Committee Applicant Redirected to EA';
-  }
-  
-  // Check if redirected to committee (from EA)
-  if (redirection.startsWith('committee-')) {
-    return 'EA Applicant Redirected to Staff';
-  }
-  
-  // Check if redirected to member
-  if (redirection === 'member') {
-    return 'Committee Applicant Redirected to Member';
-  }
-  
-  // Default case (committee to committee)
-  return 'Committee Applicant Redirected';
+  if (!redirection) return "";
+  const ebRole = roles.find((r) => r.id === redirection);
+  if (ebRole) return "Committee Applicant Redirected to EA";
+  if (redirection.startsWith("committee-"))
+    return "EA Applicant Redirected to Staff";
+  if (redirection === "member")
+    return "Committee Applicant Redirected to Member";
+  return "Committee Applicant Redirected";
 };
 
 interface CommitteeStaff {
@@ -90,12 +59,19 @@ interface CommitteeStaff {
 }
 
 const Staffs = () => {
-  const { data: session, status } = useSession();
-  const router = useRouter();
+  const { status } = useSession();
   const [staffs, setStaffs] = useState<CommitteeStaff[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedStatus, setSelectedStatus] = useState<'all' | 'accepted' | 'pending' | 'rejected' | 'no-schedule' | 'redirected'>('all');
-  const [selectedCommittee, setSelectedCommittee] = useState<string>('all');
+  const [processingId, setProcessingId] = useState<string | null>(null);
+  const [showRedirectModal, setShowRedirectModal] = useState(false);
+  const [selectedStaff, setSelectedStaff] = useState<CommitteeStaff | null>(
+    null,
+  );
+  const [redirectTo, setRedirectTo] = useState("");
+  const [selectedStatus, setSelectedStatus] = useState<
+    "all" | "accepted" | "pending" | "rejected" | "no-schedule" | "redirected"
+  >("all");
+  const [selectedCommittee, setSelectedCommittee] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState({
     currentPage: 1,
@@ -103,18 +79,18 @@ const Staffs = () => {
     totalCount: 0,
     limit: 10,
     hasNextPage: false,
-    hasPreviousPage: false
+    hasPreviousPage: false,
   });
 
   const fetchStaffs = useCallback(async () => {
     try {
       setLoading(true);
       const params = new URLSearchParams({
-        type: 'committee',
+        type: "committee",
         page: currentPage.toString(),
-        limit: '10',
-        ...(selectedStatus !== 'all' && { status: selectedStatus }),
-        ...(selectedCommittee !== 'all' && { committee: selectedCommittee })
+        limit: "10",
+        ...(selectedStatus !== "all" && { status: selectedStatus }),
+        ...(selectedCommittee !== "all" && { committee: selectedCommittee }),
       });
 
       const response = await fetch(`/api/admin/applications?${params}`);
@@ -124,29 +100,17 @@ const Staffs = () => {
         setPagination(data.pagination);
       }
     } catch (error) {
-      console.error('Error fetching staffs:', error);
+      console.error("Error fetching staffs:", error);
     } finally {
       setLoading(false);
     }
   }, [selectedStatus, selectedCommittee, currentPage]);
 
   useEffect(() => {
-    if (status === 'loading') return;
-
-    if (status === 'unauthenticated') {
-      router.push('/auth/signin');
-      return;
-    }
-
-    if (session?.user?.role !== 'admin' && session?.user?.role !== 'super_admin') {
-      router.push('/user');
-      return;
-    }
-
+    if (status === "loading") return;
     fetchStaffs();
-  }, [status, session, router, selectedStatus, fetchStaffs]);
+  }, [status, fetchStaffs]);
 
-  // Reset to page 1 when status or committee changes
   useEffect(() => {
     setCurrentPage(1);
   }, [selectedStatus, selectedCommittee]);
@@ -157,103 +121,151 @@ const Staffs = () => {
 
   const handleCSVExport = async (committee?: string) => {
     try {
-      const params = new URLSearchParams({
-        type: 'committee',
-        ...(committee && committee !== 'all' && { committee }),
-        ...(selectedCommittee !== 'all' && !committee && { committee: selectedCommittee })
-        // Note: We don't pass status since we only export accepted applications
-      });
-      
+      const params = new URLSearchParams({ type: "committee" });
+      if (committee) params.set("committee", committee);
       const response = await fetch(`/api/admin/export/csv?${params}`);
-      
       if (response.ok) {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
+        const link = document.createElement("a");
         link.href = url;
-        
-        // Get filename from response headers
-        const contentDisposition = response.headers.get('Content-Disposition');
-        const filename = contentDisposition 
-          ? contentDisposition.split('filename=')[1]?.replace(/"/g, '')
-          : `committee-staff-applications-${new Date().toISOString().split('T')[0]}.csv`;
-        
-        link.download = filename;
+        const contentDisposition = response.headers.get("Content-Disposition");
+        link.download = contentDisposition
+          ? contentDisposition.split("filename=")[1]?.replace(/"/g, "")
+          : `committee-staff-applications-${new Date().toISOString().split("T")[0]}.csv`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         window.URL.revokeObjectURL(url);
-      } else {
-        alert('Failed to export CSV');
       }
     } catch (error) {
-      console.error('CSV export error:', error);
-      alert('Error exporting CSV');
+      console.error("CSV export error:", error);
     }
   };
 
   const getStatusBadge = (staff: CommitteeStaff) => {
-    // Priority 1: Check for redirection first (overrides hasAccepted)
-    if (staff.redirection) {
-      return <span className="px-2 py-1 text-xs font-semibold text-white bg-gradient-to-r from-[#044FAF] to-[#134687] rounded-full">Redirected</span>;
-    }
-    
-    // Priority 2: Check status field
-    if (staff.status === 'redirected') {
-      return <span className="px-2 py-1 text-xs font-semibold text-white bg-gradient-to-r from-[#044FAF] to-[#134687] rounded-full">Redirected</span>;
-    } else if (staff.status === 'failed') {
-      return <span className="px-2 py-1 text-xs font-semibold text-white bg-gradient-to-r from-[#FFBC2B] to-[#CE9823] rounded-full">Rejected</span>;
+    if (staff.redirection || staff.status === "redirected") {
+      return (
+        <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-[#044FAF]/10 text-[#044FAF]">
+          Redirected
+        </span>
+      );
+    } else if (staff.status === "failed") {
+      return (
+        <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-[#FFE7B4]/40 text-[#5B4515]">
+          Rejected
+        </span>
+      );
     } else if (staff.hasAccepted && staff.status !== null) {
-      return <span className="px-2 py-1 text-xs font-semibold text-white bg-gradient-to-r from-[#044FAF] to-[#134687] rounded-full">Accepted</span>;
+      return (
+        <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-[#044FAF]/10 text-[#044FAF]">
+          Accepted
+        </span>
+      );
+    } else if (staff.status === "evaluating") {
+      return (
+        <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-[#044FAF]/10 text-[#044FAF]">
+          Evaluating
+        </span>
+      );
     } else if (!staff.interviewSlotDay || !staff.interviewSlotTimeStart) {
-      return <span className="px-2 py-1 text-xs font-semibold text-orange-800 bg-orange-100 rounded-full">No Schedule</span>;
+      return (
+        <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-orange-50 text-orange-600">
+          No Schedule
+        </span>
+      );
     } else {
-      return <span className="px-2 py-1 text-xs font-semibold text-[#5B4515] bg-gradient-to-r from-[#FFE7B4] to-[#FFF3D6] rounded-full">Pending</span>;
+      return (
+        <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-[#FFE7B4]/40 text-[#5B4515]">
+          Pending
+        </span>
+      );
     }
   };
 
   const handleDownloadCV = async (staff: CommitteeStaff) => {
     try {
-      // Use the new download endpoint that forces download
-      const downloadUrl = `/api/admin/download-pdf?applicationId=${staff.id}&type=cv&applicationType=committee`;
-      
-      // Create a temporary link to download the file
-      const link = document.createElement('a');
-      link.href = downloadUrl;
+      const link = document.createElement("a");
+      link.href = `/api/admin/download-pdf?applicationId=${staff.id}&type=cv&applicationType=committee`;
       link.download = `${staff.user.name}_CV.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
     } catch (error) {
-      console.error('Error downloading CV:', error);
-      alert('Error downloading CV');
+      console.error("Error downloading CV:", error);
     }
   };
 
   const handleDownloadPortfolio = async (staff: CommitteeStaff) => {
     try {
-      // Use the new download endpoint that forces download
-      const downloadUrl = `/api/admin/download-pdf?applicationId=${staff.id}&type=portfolio&applicationType=committee`;
-      
-      // Create a temporary link to download the file
-      const link = document.createElement('a');
-      link.href = downloadUrl;
+      const link = document.createElement("a");
+      link.href = `/api/admin/download-pdf?applicationId=${staff.id}&type=portfolio&applicationType=committee`;
       link.download = `${staff.user.name}_Portfolio.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
     } catch (error) {
-      console.error('Error downloading Portfolio:', error);
-      alert('Error downloading Portfolio');
+      console.error("Error downloading Portfolio:", error);
     }
   };
 
-  if (status === 'loading' || loading) {
+  const handleStaffAction = useCallback(
+    async (
+      applicationId: string,
+      action: "evaluate" | "accept" | "reject" | "redirect",
+    ) => {
+      try {
+        setProcessingId(applicationId);
+
+        const body: {
+          applicationId: string;
+          type: "committee";
+          action: "evaluate" | "accept" | "reject" | "redirect";
+          redirection?: string;
+        } = {
+          applicationId,
+          type: "committee",
+          action,
+        };
+
+        if (action === "redirect") {
+          body.redirection = redirectTo;
+        }
+
+        const response = await fetch("/api/admin/applications", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+
+        if (response.ok) {
+          if (action === "evaluate") toast.success("Application set to evaluating");
+          if (action === "accept") toast.success("Application accepted");
+          if (action === "reject") toast.success("Application rejected");
+          if (action === "redirect") toast.success("Application redirected");
+          setShowRedirectModal(false);
+          setSelectedStaff(null);
+          setRedirectTo("");
+          await fetchStaffs();
+        } else {
+          const err = await response.json();
+          toast.error(err.error || "Failed to update application");
+        }
+      } catch {
+        toast.error("Failed to update application");
+      } finally {
+        setProcessingId(null);
+      }
+    },
+    [fetchStaffs, redirectTo],
+  );
+
+  if (status === "loading") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F3F3FD] bg-[url('https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/pictures/background.png')] bg-cover bg-repeat">
         <div className="flex flex-col items-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#044FAF]"></div>
-          <p className="mt-4 text-[#134687]">Loading committee staff...</p>
+          <p className="mt-4 text-[#134687]">Loading session...</p>
         </div>
       </div>
     );
@@ -261,34 +273,37 @@ const Staffs = () => {
 
   return (
     <div className="min-h-screen flex bg-[#F3F3FD] bg-[url('https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/pictures/background.png')] bg-cover bg-repeat overflow-x-hidden">
-      {/* Sidebar Navigation */}
       <MobileSidebar>
         <SidebarContent activePage="staffs" />
       </MobileSidebar>
 
-      {/* MAIN CONTENT */}
       <div className="flex-1 p-6 md:p-8 pt-16 md:pt-12 overflow-y-auto h-screen">
-        {/* PAGE HEADER */}
+        {/* Header */}
         <div className="mb-8 mt-12 md:mt-8 text-center md:text-left">
-          <div className="rounded-[45px] text-white text-lg lg:text-4xl font-poppins font-medium px-6 py-2 lg:py-4 text-center [background:linear-gradient(90deg,_#2F7EE3_0%,_#0349A2_100%)] w-fit mb-4">
+          <div className="rounded-[45px] text-white text-lg lg:text-4xl font-poppins font-medium px-6 py-2 lg:py-4 text-center [background:linear-gradient(90deg,#2F7EE3_0%,#0349A2_100%)] w-fit mb-4">
             Committee Staff
           </div>
           <p className="text-black text-xs lg:text-lg font-Inter font-light leading-5 mb-4 md:mb-6">
-            View and manage all committee staff applications and members for CSS Apply.
+            View and manage all committee staff applications and members for CSS
+            Apply.
           </p>
           <hr className="border-[#005FD9]" />
         </div>
 
-        {/* FILTERS */}
-        <div className="bg-white rounded-xl shadow-sm border-2 border-[#005FD9] p-6 mb-6">
+        {/* Filters */}
+        <div className="bg-white rounded-xl border border-[#005FD9]/10 p-5 mb-5">
           <div className="flex flex-wrap gap-4 items-center justify-between">
             <div className="flex flex-wrap gap-4 items-center">
               <div>
-                <label className="block text-sm font-medium text-[#134687] mb-2">Status</label>
+                <label className="block text-xs font-medium text-[#134687]/50 uppercase tracking-wider font-mono mb-1">
+                  Status
+                </label>
                 <select
                   value={selectedStatus}
-                  onChange={(e) => setSelectedStatus(e.target.value as 'all' | 'accepted' | 'pending' | 'rejected' | 'no-schedule' | 'redirected')}
-                  className="px-3 py-2 border-2 border-[#005FD9] rounded-md focus:outline-none focus:ring-2 focus:ring-[#044FAF]"
+                  onChange={(e) =>
+                    setSelectedStatus(e.target.value as typeof selectedStatus)
+                  }
+                  className="px-3 py-2 border border-[#005FD9]/15 rounded-lg text-sm text-[#134687] focus:outline-none focus:ring-2 focus:ring-[#044FAF]/20"
                 >
                   <option value="all">All Applications</option>
                   <option value="accepted">Accepted</option>
@@ -298,13 +313,14 @@ const Staffs = () => {
                   <option value="redirected">Redirected</option>
                 </select>
               </div>
-              
               <div>
-                <label className="block text-sm font-medium text-[#134687] mb-2">Committee</label>
+                <label className="block text-xs font-medium text-[#134687]/50 uppercase tracking-wider font-mono mb-1">
+                  Committee
+                </label>
                 <select
                   value={selectedCommittee}
                   onChange={(e) => setSelectedCommittee(e.target.value)}
-                  className="px-3 py-2 border-2 border-[#005FD9] rounded-md focus:outline-none focus:ring-2 focus:ring-[#044FAF]"
+                  className="px-3 py-2 border border-[#005FD9]/15 rounded-lg text-sm text-[#134687] focus:outline-none focus:ring-2 focus:ring-[#044FAF]/20"
                 >
                   <option value="all">All Committees</option>
                   {committeeRoles.map((committee) => (
@@ -315,92 +331,152 @@ const Staffs = () => {
                 </select>
               </div>
             </div>
-            
-            {/* CSV Export Buttons */}
-            <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
-              <button 
+            <div className="flex gap-2">
+              <button
                 onClick={() => handleCSVExport()}
-                className="px-4 py-2 bg-gradient-to-r from-[#10B981] to-[#059669] text-white text-sm rounded-md hover:from-[#059669] hover:to-[#047857] transition-all duration-200 flex items-center gap-2 w-full sm:w-auto"
-                title="Export All Accepted Committee Staff Applications to CSV"
+                className="px-4 py-2 text-sm text-[#134687] border border-[#005FD9]/15 rounded-lg hover:bg-[#F3F3FD] transition-colors font-medium"
               >
-                📊 Export Accepted CSV
+                Export CSV
               </button>
-              
-              {/* Committee-specific export buttons */}
-              <div className="flex flex-wrap gap-1 w-full sm:w-auto">
-                {committeeRoles.map((committee) => (
-                  <button
-                    key={committee.id}
-                    onClick={() => handleCSVExport(committee.id)}
-                    className="px-3 py-2 bg-gradient-to-r from-[#3B82F6] to-[#2563EB] text-white text-xs rounded-md hover:from-[#2563EB] hover:to-[#1D4ED8] transition-all duration-200 flex-shrink-0"
-                    title={`Export Accepted ${committee.title} Applications to CSV`}
-                  >
-                    {committee.title.split(' ')[0]}
-                  </button>
-                ))}
-              </div>
+              {selectedCommittee !== "all" && (
+                <button
+                  onClick={() => handleCSVExport(selectedCommittee)}
+                  className="px-4 py-2 text-sm text-[#134687] border border-[#005FD9]/15 rounded-lg hover:bg-[#F3F3FD] transition-colors font-medium"
+                >
+                  Export Committee
+                </button>
+              )}
             </div>
           </div>
         </div>
 
-        {/* STAFFS LIST */}
-        <div className="bg-white rounded-xl shadow-sm border-2 border-[#005FD9] p-6 mb-6 min-h-[calc(100vh-180px)] md:min-h-[calc(100vh-280px)]">
-          {staffs.length === 0 ? (
+        {/* Staffs List */}
+        <div className="bg-white rounded-xl border border-[#005FD9]/10 p-5 mb-5 min-h-[calc(100vh-180px)] md:min-h-[calc(100vh-280px)]">
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#044FAF]"></div>
+              <p className="mt-3 text-sm text-[#134687]/60">
+                Loading applications...
+              </p>
+            </div>
+          ) : staffs.length === 0 ? (
             <div className="text-center py-12">
-              <p className="text-gray-500 text-lg">No committee staff applications found</p>
+              <p className="text-[#134687]/40 text-sm">
+                No committee staff applications found
+              </p>
             </div>
           ) : (
             <div className="space-y-3">
               {staffs.map((staff) => {
-                const firstCommittee = committeeRoles.find(c => c.id === staff.firstOptionCommittee);
-                const secondCommittee = committeeRoles.find(c => c.id === staff.secondOptionCommittee);
-                
+                const firstCommittee = committeeRoles.find(
+                  (c) => c.id === staff.firstOptionCommittee,
+                );
+                const secondCommittee = committeeRolesSubmitted.find(
+                  (c) => c.id === staff.secondOptionCommittee,
+                );
                 return (
-                  <div key={staff.id} className="border-2 border-[#005FD9] rounded-lg p-3 hover:shadow-sm transition-shadow bg-white">
+                  <div
+                    key={staff.id}
+                    className="border border-[#005FD9]/10 rounded-lg p-4 hover:bg-[#F3F3FD]/50 transition-colors"
+                  >
                     <div className="flex justify-between items-start">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <h3 className="text-base font-semibold text-[#134687] truncate">{staff.user.name}</h3>
+                          <h3 className="text-sm font-semibold text-[#134687] truncate">
+                            {staff.user.name}
+                          </h3>
                           {getStatusBadge(staff)}
                         </div>
-                        <div className="text-xs text-[#134687] space-y-0.5">
-                          <div>Student #: {staff.studentNumber} | Section: {staff.user.section}</div>
-                          <div>Email: {staff.user.email}</div>
-                          {staff.redirection ? (
-                            <>
-                              <div className="text-blue-600 font-semibold">{getRedirectionMessage(staff.redirection)}</div>
-                              <div className="text-blue-600 font-semibold">Redirected to: {getRedirectionDisplayName(staff.redirection)}</div>
-                            </>
-                          ) : (
-                            <>
-                              <div>First Choice: {firstCommittee?.title}</div>
-                              <div>Second Choice: {secondCommittee?.title}</div>
-                            </>
-                          )}
+                        <div className="text-xs text-[#134687]/60 font-mono space-y-0.5">
+                          <div>
+                            {staff.studentNumber} &middot; {staff.user.section}{" "}
+                            &middot; {staff.user.email}
+                          </div>
+                          <div>
+                            1st: {firstCommittee?.title} / 2nd:{" "}
+                            {secondCommittee?.title}
+                          </div>
                           {staff.interviewSlotDay && (
-                            <div>Interview: {staff.interviewSlotDay} at {staff.interviewSlotTimeStart}</div>
+                            <div>
+                              Interview: {staff.interviewSlotDay} at{" "}
+                              {staff.interviewSlotTimeStart}
+                              {staff.interviewSlotTimeEnd
+                                ? ` - ${staff.interviewSlotTimeEnd}`
+                                : ""}
+                            </div>
                           )}
-                          <div>Applied: {new Date(staff.createdAt).toLocaleDateString()}</div>
+                          {staff.interviewBy && (
+                            <div>Interviewer: {staff.interviewBy}</div>
+                          )}
+                          {staff.redirection && (
+                            <div className="text-[#044FAF]/70">
+                              {getRedirectionMessage(staff.redirection)}:{" "}
+                              {getRedirectionDisplayName(staff.redirection)}
+                            </div>
+                          )}
+                          <div>
+                            Applied:{" "}
+                            {new Date(staff.createdAt).toLocaleDateString()}
+                          </div>
                         </div>
                       </div>
-                      <div className="flex flex-col gap-1 ml-3">
-                        {staff.cvDownloadUrl && (
+                      <div className="flex flex-col gap-2 ml-3 shrink-0 items-end">
+                        <div className="flex gap-1">
+                          {staff.cvDownloadUrl && (
+                            <button
+                              onClick={() => handleDownloadCV(staff)}
+                              className="px-2.5 py-1 text-xs text-[#134687] border border-[#005FD9]/15 rounded hover:bg-[#F3F3FD] transition-colors"
+                            >
+                              CV
+                            </button>
+                          )}
+                          {staff.portfolioDownloadUrl && (
+                            <button
+                              onClick={() => handleDownloadPortfolio(staff)}
+                              className="px-2.5 py-1 text-xs text-[#134687] border border-[#005FD9]/15 rounded hover:bg-[#F3F3FD] transition-colors"
+                            >
+                              Portfolio
+                            </button>
+                          )}
+                        </div>
+
+                        {(!staff.status || staff.status === "pending") && !staff.hasAccepted && !staff.redirection && (
                           <button
-                            onClick={() => handleDownloadCV(staff)}
-                            className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-[#044FAF] to-[#134687] text-white text-xs rounded hover:from-[#04387B] hover:to-[#0f3a6b] transition-all duration-200"
+                            onClick={() => handleStaffAction(staff.id, "evaluate")}
+                            disabled={processingId === staff.id}
+                            className="px-2.5 py-1 text-xs text-[#134687] border border-[#005FD9]/15 rounded hover:bg-[#F3F3FD] disabled:opacity-50 transition-all duration-200"
                           >
-                            <Download size={12} />
-                            CV
+                            {processingId === staff.id ? "Processing..." : "Evaluate"}
                           </button>
                         )}
-                        {staff.portfolioDownloadUrl && (
-                          <button
-                            onClick={() => handleDownloadPortfolio(staff)}
-                            className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-[#FFBC2B] to-[#CE9823] text-white text-xs rounded hover:from-[#CE9823] hover:to-[#B8860B] transition-all duration-200"
-                          >
-                            <Download size={12} />
-                            Portfolio
-                          </button>
+
+                        {staff.status === "evaluating" && !staff.hasAccepted && !staff.redirection && (
+                          <div className="flex gap-1">
+                            <button
+                              onClick={() => handleStaffAction(staff.id, "accept")}
+                              disabled={processingId === staff.id}
+                              className="px-2.5 py-1 text-xs text-[#134687] border border-[#005FD9]/15 rounded hover:bg-[#F3F3FD] disabled:opacity-50 transition-all duration-200"
+                            >
+                              Accept
+                            </button>
+                            <button
+                              onClick={() => handleStaffAction(staff.id, "reject")}
+                              disabled={processingId === staff.id}
+                              className="px-2.5 py-1 text-xs text-[#134687]/60 border border-[#005FD9]/10 rounded hover:bg-[#F3F3FD]/50 disabled:opacity-50 transition-all duration-200"
+                            >
+                              Reject
+                            </button>
+                            <button
+                              onClick={() => {
+                                setShowRedirectModal(true);
+                                setSelectedStaff(staff);
+                              }}
+                              disabled={processingId === staff.id}
+                              className="px-2.5 py-1 text-xs text-[#134687]/60 border border-[#005FD9]/10 rounded hover:bg-[#F3F3FD]/50 disabled:opacity-50 transition-all duration-200"
+                            >
+                              Redirect
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -411,63 +487,115 @@ const Staffs = () => {
           )}
         </div>
 
-        {/* PAGINATION */}
+        {/* Pagination */}
         {staffs.length > 0 && pagination.totalPages > 1 && (
-          <div className="bg-white rounded-xl shadow-sm border-2 border-[#005FD9] p-6">
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-600">
-                Showing {((pagination.currentPage - 1) * pagination.limit) + 1} to {Math.min(pagination.currentPage * pagination.limit, pagination.totalCount)} of {pagination.totalCount} applications
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handlePageChange(currentPage - 1)}
-                  disabled={!pagination.hasPreviousPage}
-                  className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Previous
-                </button>
-                
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
-                    let pageNum;
-                    if (pagination.totalPages <= 5) {
-                      pageNum = i + 1;
-                    } else if (currentPage <= 3) {
-                      pageNum = i + 1;
-                    } else if (currentPage >= pagination.totalPages - 2) {
-                      pageNum = pagination.totalPages - 4 + i;
-                    } else {
-                      pageNum = currentPage - 2 + i;
-                    }
-                    
-                    return (
-                      <button
-                        key={pageNum}
-                        onClick={() => handlePageChange(pageNum)}
-                        className={`px-3 py-1 text-sm rounded-md ${
-                          currentPage === pageNum
-                            ? 'bg-[#044FAF] text-white'
-                            : 'border border-gray-300 hover:bg-gray-50'
-                        }`}
-                      >
-                        {pageNum}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <button
-                  onClick={() => handlePageChange(currentPage + 1)}
-                  disabled={!pagination.hasNextPage}
-                  className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Next
-                </button>
-              </div>
+          <div className="bg-white rounded-xl border border-[#005FD9]/10 p-4 flex items-center justify-between">
+            <div className="text-xs text-[#134687]/40 font-mono">
+              {(pagination.currentPage - 1) * pagination.limit + 1}&ndash;
+              {Math.min(
+                pagination.currentPage * pagination.limit,
+                pagination.totalCount,
+              )}{" "}
+              / {pagination.totalCount}
+            </div>
+            <div className="flex gap-1">
+              <button
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={!pagination.hasPreviousPage}
+                className="px-2.5 py-1 text-xs font-mono border border-[#005FD9]/15 rounded hover:bg-[#F3F3FD] disabled:opacity-30 text-[#134687]"
+              >
+                prev
+              </button>
+              {Array.from(
+                { length: Math.min(5, pagination.totalPages) },
+                (_, i) => {
+                  let pageNum;
+                  if (pagination.totalPages <= 5) pageNum = i + 1;
+                  else if (currentPage <= 3) pageNum = i + 1;
+                  else if (currentPage >= pagination.totalPages - 2)
+                    pageNum = pagination.totalPages - 4 + i;
+                  else pageNum = currentPage - 2 + i;
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => handlePageChange(pageNum)}
+                      className={`px-2.5 py-1 text-xs font-mono rounded ${currentPage === pageNum ? "bg-[#044FAF] text-white" : "border border-[#005FD9]/15 hover:bg-[#F3F3FD] text-[#134687]"}`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                },
+              )}
+              <button
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={!pagination.hasNextPage}
+                className="px-2.5 py-1 text-xs font-mono border border-[#005FD9]/15 rounded hover:bg-[#F3F3FD] disabled:opacity-30 text-[#134687]"
+              >
+                next
+              </button>
             </div>
           </div>
         )}
       </div>
+
+      {showRedirectModal && selectedStaff && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#134687]/35 backdrop-blur-sm px-4">
+          <div className="w-full max-w-md rounded-2xl border border-[#005FD9]/15 bg-white p-6 shadow-[0_20px_60px_-15px_rgba(4,79,175,0.35)]">
+            <h3 className="text-lg font-semibold text-[#134687] mb-1">Redirect Application</h3>
+            <p className="text-sm text-[#134687]/70 mb-4">
+              Redirect {selectedStaff.user.name}&apos;s application to:
+            </p>
+            <select
+              value={redirectTo}
+              onChange={(e) => setRedirectTo(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg border border-[#005FD9]/15 bg-white text-sm text-[#134687] focus:outline-none focus:ring-2 focus:ring-[#044FAF]/20 mb-4"
+            >
+              <option value="">Select committee/role</option>
+              <optgroup label="Member">
+                <option value="member">Member</option>
+              </optgroup>
+              <optgroup label="Executive Assistant Roles">
+                {roles.map((role) => (
+                  <option key={role.id} value={role.id}>
+                    {role.title}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Committee Staff Roles">
+                {committeeRolesSubmitted
+                  .filter((role) => role.id !== selectedStaff.firstOptionCommittee)
+                  .map((role) => (
+                  <option
+                    key={`committee-${role.id}`}
+                    value={`committee-${role.id}`}
+                  >
+                    {role.title} Staff
+                  </option>
+                  ))}
+              </optgroup>
+            </select>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowRedirectModal(false);
+                  setSelectedStaff(null);
+                  setRedirectTo("");
+                }}
+                className="flex-1 px-4 py-2 text-sm text-[#134687] border border-[#005FD9]/15 rounded-lg hover:bg-[#F3F3FD] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleStaffAction(selectedStaff.id, "redirect")}
+                disabled={!redirectTo || processingId === selectedStaff.id}
+                className="flex-1 px-4 py-2 text-sm bg-[#044FAF] text-white rounded-lg hover:bg-[#033c87] disabled:opacity-50 transition-colors"
+              >
+                {processingId === selectedStaff.id ? "Processing..." : "Redirect"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

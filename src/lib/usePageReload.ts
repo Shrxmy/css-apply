@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { useUserActivityContext } from '@/contexts/UserActivityContext';
+import { useEffect } from "react";
+import { useUserActivityContext } from "@/contexts/UserActivityContext";
 
 // Extend Window interface to include our custom property
 declare global {
@@ -26,7 +26,7 @@ export function usePageReload(options: UsePageReloadOptions = {}) {
     if (disableReload) {
       // Mark as active to prevent idle detection and reload
       markActive();
-      
+
       // Set a flag to prevent auto-reload on this page
       // This is a safer approach than trying to override window.location.reload
       window.__DISABLE_AUTO_RELOAD__ = true;
@@ -42,6 +42,6 @@ export function usePageReload(options: UsePageReloadOptions = {}) {
 
   return {
     disableReload,
-    markActive
+    markActive,
   };
 }

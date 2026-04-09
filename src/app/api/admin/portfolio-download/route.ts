@@ -20,17 +20,17 @@ export async function GET(request: NextRequest) {
     if (!hasAdminAccess) {
       return NextResponse.json(
         { error: "Forbidden - Admin access required" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
     const { searchParams } = new URL(request.url);
-    const applicationId = searchParams.get('applicationId');
+    const applicationId = searchParams.get("applicationId");
 
     if (!applicationId) {
       return NextResponse.json(
         { error: "Missing applicationId parameter" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
     if (!application) {
       return NextResponse.json(
         { error: "Application not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -61,20 +61,22 @@ export async function GET(request: NextRequest) {
     if (!portfolioLink) {
       return NextResponse.json(
         { error: "Portfolio file not found for this application" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
     try {
       // Check if portfolioLink is a full URL or just a path
-      if (portfolioLink.startsWith('http')) {
+      if (portfolioLink.startsWith("http")) {
         // It's a full URL, extract bucket and file path (handle both public and signed URLs)
-        const urlMatch = portfolioLink.match(/\/storage\/v1\/object\/(?:public|sign)\/([^\/]+)\/(.+?)(?:\?|$)/);
-        
+        const urlMatch = portfolioLink.match(
+          /\/storage\/v1\/object\/(?:public|sign)\/([^\/]+)\/(.+?)(?:\?|$)/,
+        );
+
         if (urlMatch) {
           const bucketName = urlMatch[1];
           const filePath = urlMatch[2];
-          
+
           // Generate a signed URL for better security (24 hours expiration)
           const { data, error } = await supabase.storage
             .from(bucketName)
@@ -84,7 +86,7 @@ export async function GET(request: NextRequest) {
             console.error("Supabase error:", error);
             return NextResponse.json(
               { error: "Failed to generate download link" },
-              { status: 500 }
+              { status: 500 },
             );
           }
 
@@ -115,8 +117,8 @@ export async function GET(request: NextRequest) {
         }
       } else {
         // It's just a file path, use the committee-applications bucket
-        const bucketName = 'committee-applications';
-        
+        const bucketName = "committee-applications";
+
         const { data, error } = await supabase.storage
           .from(bucketName)
           .createSignedUrl(portfolioLink, 86400);
@@ -125,7 +127,7 @@ export async function GET(request: NextRequest) {
           console.error("Supabase error:", error);
           return NextResponse.json(
             { error: "Failed to generate download link" },
-            { status: 500 }
+            { status: 500 },
           );
         }
 
@@ -145,15 +147,14 @@ export async function GET(request: NextRequest) {
       console.error("Supabase storage error:", supabaseError);
       return NextResponse.json(
         { error: "Failed to access portfolio file" },
-        { status: 500 }
+        { status: 500 },
       );
     }
-
   } catch (error) {
     console.error("Error generating portfolio download link:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

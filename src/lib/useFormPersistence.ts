@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from "react";
 
 interface FormData {
   [key: string]: unknown;
@@ -8,74 +8,87 @@ interface UIState {
   [key: string]: unknown;
 }
 
-export function useFormPersistence<T extends FormData, U extends UIState = Record<string, never>>(
+const SAVE_DEBOUNCE_MS = 500;
+
+export function useFormPersistence<
+  T extends FormData,
+  U extends UIState = Record<string, never>,
+>(
   initialData: T,
   storageKey: string,
-  dependencies: unknown[] = [],
-  initialUIState: U = {} as U
+  _dependencies: unknown[] = [],
+  initialUIState: U = {} as U,
 ) {
   const [formData, setFormData] = useState<T>(initialData);
   const [uiState, setUIState] = useState<U>(initialUIState);
   const [isLoaded, setIsLoaded] = useState(false);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const uiSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Load data from localStorage on mount
   useEffect(() => {
     try {
       const savedData = localStorage.getItem(storageKey);
       const savedUIState = localStorage.getItem(`${storageKey}-ui`);
-      
+
       if (savedData) {
         const parsedData = JSON.parse(savedData);
-        setFormData(prev => ({ ...prev, ...parsedData }));
+        setFormData((prev) => ({ ...prev, ...parsedData }));
       }
-      
+
       if (savedUIState) {
         const parsedUIState = JSON.parse(savedUIState);
-        setUIState(prev => ({ ...prev, ...parsedUIState }));
+        setUIState((prev) => ({ ...prev, ...parsedUIState }));
       }
     } catch (error) {
-      console.error('Error loading form data from localStorage:', error);
+      console.error("Error loading form data from localStorage:", error);
     } finally {
       setIsLoaded(true);
     }
   }, [storageKey]);
 
-  // Save form data to localStorage whenever formData changes
+  // Debounced save form data to localStorage
   useEffect(() => {
-    if (isLoaded) {
+    if (!isLoaded) return;
+
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
       try {
         localStorage.setItem(storageKey, JSON.stringify(formData));
       } catch (error) {
-        console.error('Error saving form data to localStorage:', error);
+        console.error("Error saving form data to localStorage:", error);
       }
-    }
+    }, SAVE_DEBOUNCE_MS);
+
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
   }, [formData, storageKey, isLoaded]);
 
-  // Save UI state to localStorage whenever uiState changes
+  // Debounced save UI state to localStorage
   useEffect(() => {
-    if (isLoaded) {
+    if (!isLoaded) return;
+
+    if (uiSaveTimerRef.current) clearTimeout(uiSaveTimerRef.current);
+    uiSaveTimerRef.current = setTimeout(() => {
       try {
         localStorage.setItem(`${storageKey}-ui`, JSON.stringify(uiState));
       } catch (error) {
-        console.error('Error saving UI state to localStorage:', error);
+        console.error("Error saving UI state to localStorage:", error);
       }
-    }
+    }, SAVE_DEBOUNCE_MS);
+
+    return () => {
+      if (uiSaveTimerRef.current) clearTimeout(uiSaveTimerRef.current);
+    };
   }, [uiState, storageKey, isLoaded]);
 
-  // Clear localStorage when dependencies change (e.g., when user completes application)
-  useEffect(() => {
-    return () => {
-      // This cleanup function will run when the component unmounts
-      // or when dependencies change
-    };
-  }, [dependencies]);
-
   const updateFormData = useCallback((updates: Partial<T>) => {
-    setFormData(prev => ({ ...prev, ...updates }));
+    setFormData((prev) => ({ ...prev, ...updates }));
   }, []);
 
   const updateUIState = useCallback((updates: Partial<U>) => {
-    setUIState(prev => ({ ...prev, ...updates }));
+    setUIState((prev) => ({ ...prev, ...updates }));
   }, []);
 
   const clearFormData = useCallback(() => {
@@ -85,7 +98,7 @@ export function useFormPersistence<T extends FormData, U extends UIState = Recor
       setFormData(initialData);
       setUIState(initialUIState);
     } catch (error) {
-      console.error('Error clearing form data:', error);
+      console.error("Error clearing form data:", error);
     }
   }, [storageKey, initialData, initialUIState]);
 
@@ -101,6 +114,6 @@ export function useFormPersistence<T extends FormData, U extends UIState = Recor
     updateUIState,
     clearFormData,
     resetFormData,
-    isLoaded
+    isLoaded,
   };
 }

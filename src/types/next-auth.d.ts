@@ -15,11 +15,20 @@ declare module "next-auth" {
       updatedAt: Date;
       hasCompletedProfile: boolean;
       hasMemberApplication: boolean;
-      memberApplication?: {id: string; hasAccepted: boolean; paymentProof?: string; createdAt: Date};
+      memberApplication?: {
+        id: string;
+        hasAccepted: boolean;
+        paymentProof?: string;
+        createdAt: Date;
+      };
       hasEAApplication: boolean;
-      eaApplication?: {id: string; hasAccepted: boolean; status: string};
+      eaApplication?: { id: string; hasAccepted: boolean; status: string };
       hasCommitteeApplication: boolean;
-      committeeApplication?: {id: string; hasAccepted: boolean; status: string};
+      committeeApplication?: {
+        id: string;
+        hasAccepted: boolean;
+        status: string;
+      };
       ebRole?: string;
       committeeId?: string;
       applicationStatus: {
