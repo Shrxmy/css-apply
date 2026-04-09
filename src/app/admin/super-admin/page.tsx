@@ -268,9 +268,123 @@ export default function SuperAdminDashboard() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F3F3FD]">
         <div className="animate-spin h-8 w-8 border-2 border-[#044FAF] border-t-transparent rounded-full" />
+    </div>
+  );
+}
+
+// ─── Email Test Tab ───────────────────────────────────────────────────────────
+
+const EMAIL_TEMPLATES = [
+  { value: "member_application", label: "Member Application Received" },
+  { value: "committee_application", label: "Committee Staff Application Received" },
+  { value: "executive_assistant_application", label: "EA Application Received" },
+  { value: "member_accepted", label: "Member Accepted" },
+  { value: "committee_accepted", label: "Committee Staff Accepted" },
+  { value: "executive_assistant_accepted", label: "EA Accepted" },
+  { value: "committee_rejected", label: "Committee Staff Rejected" },
+  { value: "executive_assistant_rejected", label: "EA Rejected" },
+  { value: "committee_redirected", label: "Committee Staff Redirected" },
+];
+
+function EmailTestTab() {
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
+  const { data: session } = useSession();
+
+  const handleSendTest = async (templateType: string) => {
+    setSending(true);
+    setResult(null);
+    try {
+      const res = await fetch("/api/admin/test-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ templateType }),
+      });
+      const data = await res.json();
+      setResult({
+        success: res.ok,
+        message: data.message || data.error || "Unknown error",
+      });
+    } catch {
+      setResult({ success: false, message: "Network error" });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const recipientEmail = session?.user?.email || "your email";
+
+  return (
+    <div className="space-y-5">
+      <div className="bg-white border border-[#005FD9]/10 rounded-xl p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="h-10 w-10 rounded-lg [background:linear-gradient(135deg,#044FAF,#134687)] flex items-center justify-center">
+            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-[#134687] font-poppins">
+              Test Email Sending
+            </h2>
+            <p className="text-xs text-[#134687]/50 font-mono">
+              Send test emails to your registered email: {recipientEmail}
+            </p>
+          </div>
+        </div>
+
+        {result && (
+          <div className={`mb-4 p-3 rounded-lg border ${
+            result.success
+              ? "bg-[#E8F2FF]/50 border-[#044FAF]/20"
+              : "bg-red-50 border-red-200"
+          }`}>
+            <p className={`text-sm ${result.success ? "text-[#044FAF]" : "text-red-600"}`}>
+              {result.message}
+            </p>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {EMAIL_TEMPLATES.map((template) => (
+            <button
+              key={template.value}
+              onClick={() => handleSendTest(template.value)}
+              disabled={sending}
+              className="flex items-center gap-3 p-4 border border-[#005FD9]/15 rounded-lg hover:bg-[#F3F3FD] transition-colors text-left disabled:opacity-50"
+            >
+              <div className="h-8 w-8 rounded-md [background:linear-gradient(135deg,#2F7EE3,#0349A2)] flex items-center justify-center shrink-0">
+                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                </svg>
+              </div>
+              <span className="text-sm text-[#134687] font-medium">
+                {template.label}
+              </span>
+            </button>
+          ))}
+        </div>
       </div>
-    );
-  }
+
+      <div className="bg-[#E8F2FF]/50 border border-[#005FD9]/10 rounded-xl p-5">
+        <div className="text-xs font-mono text-[#134687]/60 space-y-1">
+          <p>
+            <span className="text-[#044FAF]">{"// "}</span>
+            {"all test emails are sent to your registered email address"}
+          </p>
+          <p>
+            <span className="text-[#044FAF]">{"// "}</span>
+            {"templates use placeholder data to simulate real emails"}
+          </p>
+          <p>
+            <span className="text-[#044FAF]">{"// "}</span>
+            {"check your inbox to verify email delivery and design"}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
   if (status === "unauthenticated" || session?.user?.role !== "super_admin")
     return null;
 
@@ -310,6 +424,7 @@ export default function SuperAdminDashboard() {
             {[
               { key: "users" as Tab, label: "user_db" },
               { key: "settings" as Tab, label: "config" },
+              { key: "email" as Tab, label: "email_test" },
             ].map((tab) => (
               <button
                 key={tab.key}
@@ -328,7 +443,7 @@ export default function SuperAdminDashboard() {
       </div>
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-        {activeTab === "users" ? <UsersTab /> : <SettingsTab />}
+        {activeTab === "users" ? <UsersTab /> : activeTab === "settings" ? <SettingsTab /> : <EmailTestTab />}
       </div>
     </div>
   );
@@ -341,6 +456,7 @@ function UsersTab() {
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({
     currentPage: 1,
     totalPages: 1,
@@ -368,6 +484,7 @@ function UsersTab() {
   });
 
   const fetchUsers = useCallback(async (page: number) => {
+    setLoading(true);
     try {
       const res = await fetch(`/api/admin/users/all?page=${page}&limit=10`);
       if (res.ok) {
@@ -378,6 +495,8 @@ function UsersTab() {
       }
     } catch (_err) {
       /* empty */
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -554,8 +673,14 @@ function UsersTab() {
 
       {/* Users table */}
       <div className="bg-white border border-[#005FD9]/10 rounded-xl overflow-hidden">
-        {/* Desktop */}
-        <div className="hidden md:block overflow-x-auto">
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="animate-spin h-8 w-8 border-2 border-[#044FAF] border-t-transparent rounded-full" />
+          </div>
+        ) : (
+          <>
+            {/* Desktop */}
+            <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-[#F3F3FD] border-b border-[#005FD9]/10">
               <tr>
@@ -764,7 +889,9 @@ function UsersTab() {
                 next
               </button>
             </div>
-          </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 

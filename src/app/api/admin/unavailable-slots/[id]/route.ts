@@ -25,7 +25,7 @@ export async function GET(
       orderBy: [{ day: "asc" }, { timeStart: "asc" }],
     });
 
-    const unavailableSlotsData = unavailableSlots.map((slot) => ({
+    const unavailableSlotsData = unavailableSlots.map((slot: typeof unavailableSlots[number]) => ({
       id: slot.id,
       date: slot.day,
       timeSlot: `${slot.timeStart}-${slot.timeEnd}`,

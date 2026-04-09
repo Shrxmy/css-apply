@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
 
     // Find slots that exist in DB but not in incoming data (these should be deleted)
     const slotsToDelete = currentDbSlots.filter(
-      (dbSlot) => !incomingSlotIds.includes(dbSlot.id),
+      (dbSlot: typeof currentDbSlots[number]) => !incomingSlotIds.includes(dbSlot.id),
     );
 
     // Delete removed slots
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
       await prisma.availableEBInterviewTime.deleteMany({
         where: {
           id: {
-            in: slotsToDelete.map((slot) => slot.id),
+            in: slotsToDelete.map((slot: typeof slotsToDelete[number]) => slot.id),
           },
         },
       });
@@ -66,10 +66,10 @@ export async function POST(request: NextRequest) {
     // Calculate remaining DB slot IDs after deletion (exclude deleted ones)
     const remainingDbSlotIds = currentDbSlots
       .filter(
-        (slot) =>
-          !slotsToDelete.some((deletedSlot) => deletedSlot.id === slot.id),
+        (slot: typeof currentDbSlots[number]) =>
+          !slotsToDelete.some((deletedSlot: typeof slotsToDelete[number]) => deletedSlot.id === slot.id),
       )
-      .map((slot) => slot.id);
+      .map((slot: typeof currentDbSlots[number]) => slot.id);
 
     // Filter out slots that already exist in the database
     const newSlotsToCreate = unavailableSlotsData.filter(

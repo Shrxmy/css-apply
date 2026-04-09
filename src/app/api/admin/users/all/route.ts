@@ -75,6 +75,7 @@ export async function GET(request: Request) {
             position: true,
             committees: true,
             isActive: true,
+            meetingLink: true,
           },
         },
       },

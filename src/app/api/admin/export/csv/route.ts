@@ -107,7 +107,7 @@ async function exportMemberApplications(_status: string | null) {
     "Updated Date",
   ];
 
-  const rows = applications.map((app) => [
+  const rows = applications.map((app: typeof applications[number]) => [
     app.user.name,
     app.user.email,
     app.user.studentNumber || "",
@@ -203,7 +203,7 @@ async function exportCommitteeApplications(
     "Updated Date",
   ];
 
-  const rows = applications.map((app) => [
+  const rows = applications.map((app: typeof applications[number]) => [
     app.user.name,
     app.user.email,
     app.user.studentNumber || "",
@@ -266,7 +266,7 @@ async function exportEAApplications(_status: string | null) {
     "Updated Date",
   ];
 
-  const rows = applications.map((app) => [
+  const rows = applications.map((app: typeof applications[number]) => [
     app.user.name,
     app.user.email,
     app.user.studentNumber || "",

@@ -155,7 +155,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Filter committee applications (exclude truly processed ones)
-    const commApplications = allCommApplications.filter((app) => {
+    const commApplications = allCommApplications.filter((app: typeof allCommApplications[number]) => {
       const isAccepted = app.hasAccepted && app.status === "passed";
       const isRejected = app.status === "failed";
       const isRedirected = app.status === "redirected";
@@ -208,7 +208,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Filter EA applications (exclude truly processed ones)
-    const eAApplications = allEAApplications.filter((app) => {
+    const eAApplications = allEAApplications.filter((app: typeof allEAApplications[number]) => {
       const isAccepted = app.hasAccepted && app.status === "passed";
       const isRejected = app.status === "failed";
       const isRedirected = app.status === "redirected";
@@ -262,7 +262,7 @@ export async function GET(request: NextRequest) {
 
     // Add CV and Portfolio download links for Committee applications
     applications.committee = await Promise.all(
-      commApplications.map(async (application) => {
+      commApplications.map(async (application: typeof commApplications[number]) => {
         const cvDownloadUrl = application.supabaseFilePath
           ? `/api/admin/cv-download?applicationId=${application.id}&type=committee`
           : null;
@@ -286,7 +286,7 @@ export async function GET(request: NextRequest) {
 
     // Add CV download links for EA applications
     applications.ea = await Promise.all(
-      eAApplications.map(async (application) => {
+      eAApplications.map(async (application: typeof eAApplications[number]) => {
         const cvDownloadUrl = application.supabaseFilePath
           ? `/api/admin/cv-download?applicationId=${application.id}&type=ea`
           : null;
@@ -303,7 +303,7 @@ export async function GET(request: NextRequest) {
       }),
     );
 
-    applications.member = memberApplications.map((application) => ({
+    applications.member = memberApplications.map((application: typeof memberApplications[number]) => ({
       ...application,
       type: "member",
       isAssigned: true,
