@@ -123,7 +123,7 @@ export async function GET(
     );
 
     // Get all EA applications and compute whether each one is assigned to the current admin position
-    const allEAApplications = await prisma.eAApplication.findMany({
+    const allExecutiveAssociateApplications = await prisma.executiveAssociateApplication.findMany({
       orderBy: { createdAt: "desc" },
       include: {
         user: {
@@ -139,15 +139,15 @@ export async function GET(
     });
 
     console.log(
-      `Found ${allEAApplications.length} total EA applications for position: ${position}`,
+      `Found ${allExecutiveAssociateApplications.length} total EA applications for position: ${position}`,
     );
-    allEAApplications.forEach((app: typeof allEAApplications[number]) => {
+    allExecutiveAssociateApplications.forEach((app: typeof allExecutiveAssociateApplications[number]) => {
       console.log(
         `EA App ${app.id}: hasAccepted=${app.hasAccepted}, status=${app.status}, user=${app.user?.name}`,
       );
     });
 
-    const eAApplications = allEAApplications.filter((app: typeof allEAApplications[number]) => {
+    const executiveAssociateApplications = allExecutiveAssociateApplications.filter((app: typeof allExecutiveAssociateApplications[number]) => {
       // Include applications that are NOT truly processed
       const isAccepted = app.hasAccepted && app.status === "passed";
       const isRejected = app.status === "failed";
@@ -165,7 +165,7 @@ export async function GET(
     });
 
     console.log(
-      `Filtered to ${eAApplications.length} EA applications for All Applications tab`,
+      `Filtered to ${executiveAssociateApplications.length} EA applications for All Applications tab`,
     );
 
     // get member applications
@@ -210,14 +210,14 @@ export async function GET(
 
     // Add CV download links for EA applications
     applications.ea = await Promise.all(
-      eAApplications.map(async (application: typeof eAApplications[number]) => {
+      executiveAssociateApplications.map(async (application: typeof executiveAssociateApplications[number]) => {
         const cvDownloadUrl = application.supabaseFilePath
-          ? `/api/admin/cv-download?applicationId=${application.id}&type=ea`
+          ? `/api/admin/cv-download?applicationId=${application.id}&type=executive-associate`
           : null;
 
         return {
           ...application,
-          type: "ea",
+          type: "executive-associate",
           isAssigned: Boolean(
             application.interviewBy &&
               assignmentValues.includes(application.interviewBy.toLowerCase()),

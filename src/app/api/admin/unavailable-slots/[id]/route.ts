@@ -12,7 +12,10 @@ export async function GET(
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session) {
+    const userRole = session?.user?.role;
+    const hasAdminAccess = userRole === "admin" || userRole === "super_admin";
+
+    if (!session || !hasAdminAccess) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

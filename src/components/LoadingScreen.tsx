@@ -69,7 +69,7 @@ export default function LoadingScreen() {
       <div className="fixed inset-0 bg-[#F6F6FE] bg-[url('https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/pictures/loadingscreen_background.png')] bg-cover bg-center bg-no-repeat flex flex-col items-center justify-center z-50">
         {/* Committee Image Animation */}
         <div className="mb-8 flex items-center justify-center transition-all duration-500 ease-in-out">
-          <div className="relative w-[150px] h-[150px] flex items-center justify-center group">
+          <div className="relative w-37.5 h-37.5 flex items-center justify-center group">
             <Image
               key={currentImageIndex}
               src={committeeImages[currentImageIndex]}
@@ -102,7 +102,7 @@ export default function LoadingScreen() {
               style={{ width: `${progress}%` }}
             >
               {/* Shimmer effect */}
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-blue-600/60 to-transparent animate-pulse"></div>
+              <div className="absolute inset-0 bg-linear-to-r from-transparent via-blue-600/60 to-transparent animate-pulse"></div>
             </div>
           </div>
         </div>

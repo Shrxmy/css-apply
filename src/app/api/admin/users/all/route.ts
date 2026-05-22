@@ -52,7 +52,7 @@ export async function GET(request: Request) {
         // Count total applicants across all application types
         Promise.all([
           prisma.memberApplication.count(),
-          prisma.eAApplication.count(),
+          prisma.executiveAssociateApplication.count(),
           prisma.committeeApplication.count(),
         ]).then(
           ([memberCount, eaCount, committeeCount]) =>

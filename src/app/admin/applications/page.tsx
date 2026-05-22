@@ -128,7 +128,7 @@ interface Application {
   cvDownloadUrl?: string;
   portfolioDownloadUrl?: string;
   createdAt: string;
-  type: "committee" | "ea" | "member";
+  type: "committee" | "executive-associate" | "member";
   cv?: string;
   paymentProof?: string;
   isAssigned?: boolean;
@@ -315,7 +315,7 @@ const Applications = () => {
   const handleApplicationAction = useCallback(
     async (
       applicationId: string,
-      type: "committee" | "ea" | "member",
+      type: "committee" | "executive-associate" | "member",
       action: "accept" | "reject" | "redirect" | "evaluate",
     ) => {
       if (type === "member" && action === "evaluate") {
@@ -388,7 +388,7 @@ const Applications = () => {
     }
 
     if (
-      (application.type === "committee" || application.type === "ea") &&
+      (application.type === "committee" || application.type === "executive-associate") &&
       (!application.interviewSlotDay || !application.interviewSlotTimeStart)
     ) {
       return (
@@ -639,19 +639,16 @@ const Applications = () => {
                 className="w-full px-4 py-2 pl-10 pr-4 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#044FAF] focus:border-transparent"
               />
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg
-                  className="h-4 w-4 text-gray-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                  />
-                </svg>
+                <div
+                  className="h-4 w-4 text-gray-400 bg-current"
+                  style={{
+                    maskImage: "url(/icons/search.svg)",
+                    WebkitMaskImage: "url(/icons/search.svg)",
+                    maskSize: "contain",
+                    maskRepeat: "no-repeat",
+                    maskPosition: "center",
+                  }}
+                />
               </div>
               {isSearching && (
                 <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
@@ -1129,7 +1126,7 @@ const Applications = () => {
                   <div className="flex justify-between items-center bg-[#F3F3FD] border border-[#005FD9]/10 px-4 py-2.5 rounded-lg">
                     <div className="flex gap-2 items-center">
                       <h2 className="font-semibold text-xs text-[#134687] uppercase tracking-wider font-mono">
-                        Executive Assistant Applications
+                        Executive Associate Applications
                       </h2>
                       <span className="text-[10px] text-[#134687]/40 font-mono">
                         ({applicationCounts.ea})
@@ -1306,7 +1303,7 @@ const Applications = () => {
                                   onClick={() =>
                                     handleApplicationAction(
                                       application.id,
-                                      "ea",
+                                      "executive-associate",
                                       "evaluate",
                                     )
                                   }
@@ -1327,7 +1324,7 @@ const Applications = () => {
                                     onClick={() =>
                                       handleApplicationAction(
                                         application.id,
-                                        "ea",
+                                        "executive-associate",
                                         "accept",
                                       )
                                     }
@@ -1340,7 +1337,7 @@ const Applications = () => {
                                     onClick={() =>
                                       handleApplicationAction(
                                         application.id,
-                                        "ea",
+                                        "executive-associate",
                                         "reject",
                                       )
                                     }
@@ -1417,7 +1414,7 @@ const Applications = () => {
                   <optgroup label="Member">
                     <option value="member">Member</option>
                   </optgroup>
-                  <optgroup label="Executive Assistant Roles">
+                  <optgroup label="Executive Associate Roles">
                     {roles.map((role) => (
                       <option key={role.id} value={role.id}>
                         {role.title}
@@ -1435,12 +1432,12 @@ const Applications = () => {
                     ))}
                   </optgroup>
                 </>
-              ) : selectedApplication.type === "ea" ? (
+              ) : selectedApplication.type === "executive-associate" ? (
                 <>
                   <optgroup label="Member">
                     <option value="member">Member</option>
                   </optgroup>
-                  <optgroup label="Executive Assistant Roles">
+                  <optgroup label="Executive Associate Roles">
                     {roles.map((role) => (
                       <option key={role.id} value={role.id}>
                         {role.title}

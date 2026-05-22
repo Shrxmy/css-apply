@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect } from "react";
+import Image from "next/image";
 
 interface ConfirmationModalProps {
   isOpen: boolean;
@@ -56,18 +57,14 @@ export default function ConfirmationModal({
         <div className="text-center">
           {/* Header section with icon and title */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6 mb-4 sm:mb-6">
-            <div className="p-2 sm:p-3 flex items-center justify-center h-12 w-12 sm:h-15 sm:w-15 rounded-full bg-[#FFE7B4] flex-shrink-0">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
+            <div className="p-2 sm:p-3 flex items-center justify-center h-12 w-12 sm:h-15 sm:w-15 rounded-full bg-[#FFE7B4] shrink-0">
+              <Image
+                src="/icons/warning.svg"
+                alt="Warning"
+                width={34}
+                height={35}
                 className="w-6 h-6 sm:w-8 sm:h-8"
-                viewBox="0 0 34 35"
-                fill="none"
-              >
-                <path
-                  d="M1.57861 30.0413L16.8044 3.74219L32.0303 30.0413H1.57861ZM16.8044 25.8888C17.1966 25.8888 17.5256 25.756 17.7914 25.4902C18.0571 25.2244 18.1895 24.8959 18.1886 24.5047C18.1877 24.1134 18.0548 23.7849 17.79 23.5192C17.5251 23.2534 17.1966 23.1205 16.8044 23.1205C16.4123 23.1205 16.0838 23.2534 15.8189 23.5192C15.5541 23.7849 15.4212 24.1134 15.4203 24.5047C15.4194 24.8959 15.5522 25.2249 15.8189 25.4916C16.0856 25.7583 16.4141 25.8907 16.8044 25.8888ZM15.4203 21.7364H18.1886V14.8155H15.4203V21.7364Z"
-                  fill="#CE9823"
-                />
-              </svg>
+              />
             </div>
             <div className="flex flex-col items-center sm:items-start text-center sm:text-left">
               <h3 className="text-lg sm:text-xl font-inter font-bold text-[#CE9823] mb-2">
@@ -80,7 +77,7 @@ export default function ConfirmationModal({
           </div>
 
           {/* Note section */}
-          <div className="bg-[#ECECEC] border-[#C8C5C5] border-1 rounded-lg px-4 sm:px-8 lg:px-14 py-4 sm:py-6 lg:py-9 mb-4 sm:mb-6 text-left">
+          <div className="bg-[#ECECEC] border-[#C8C5C5] border rounded-lg px-4 sm:px-8 lg:px-14 py-4 sm:py-6 lg:py-9 mb-4 sm:mb-6 text-left">
             <p className="font-inter text-xs sm:text-sm text-[#CE9823] font-bold mb-2">
               Note:
             </p>

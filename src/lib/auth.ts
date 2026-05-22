@@ -2,6 +2,15 @@ import { type NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import { prisma } from "@/lib/prisma";
 
+const ALLOWED_SIGNIN_EMAIL_DOMAIN =
+  process.env.ALLOWED_SIGNIN_EMAIL_DOMAIN?.trim().toLowerCase() || "ust.edu.ph";
+
+function isAllowedSignInEmail(email?: string | null) {
+  if (!email) return false;
+
+  return email.toLowerCase().endsWith(`@${ALLOWED_SIGNIN_EMAIL_DOMAIN}`);
+}
+
 interface UserSession {
   id?: string;
   name?: string | null;
@@ -29,7 +38,7 @@ interface UserSession {
     };
   };
   hasMemberApplication?: boolean;
-  hasEAApplication?: boolean;
+  hasExecutiveAssociateApplication?: boolean;
   hasCommitteeApplication?: boolean;
   ebRole?: string;
   committeeId?: string;
@@ -57,6 +66,13 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async signIn({ user }) {
       try {
+        if (!isAllowedSignInEmail(user.email)) {
+          console.warn("Rejected sign-in for disallowed email domain", {
+            email: user.email,
+          });
+          return false;
+        }
+
         // Check if user exists in database
         const existingUser = await prisma.user.findUnique({
           where: { email: user.email! },
@@ -144,7 +160,7 @@ export const authOptions: NextAuthOptions = {
             role: true,
             createdAt: true,
             updatedAt: true,
-            memberApplication: {
+            memberApplications: {
               select: {
                 id: true,
                 hasAccepted: true,
@@ -152,7 +168,7 @@ export const authOptions: NextAuthOptions = {
                 createdAt: true,
               },
             },
-            eaApplication: {
+            executiveAssociateApplications: {
               select: {
                 id: true,
                 hasAccepted: true,
@@ -160,7 +176,7 @@ export const authOptions: NextAuthOptions = {
                 firstOptionEb: true,
               },
             },
-            committeeApplication: {
+            committeeApplications: {
               select: {
                 id: true,
                 hasAccepted: true,
@@ -194,15 +210,15 @@ export const authOptions: NextAuthOptions = {
 
         // Add application status information
         (session.user as UserSession).hasMemberApplication =
-          !!dbUser.memberApplication;
-        (session.user as UserSession).hasEAApplication = !!dbUser.eaApplication;
+          !!dbUser.memberApplications?.[0];
+        (session.user as UserSession).hasExecutiveAssociateApplication = !!dbUser.executiveAssociateApplications?.[0];
         (session.user as UserSession).hasCommitteeApplication =
-          !!dbUser.committeeApplication;
+          !!dbUser.committeeApplications?.[0];
 
         // Add redirect information for faster navigation
-        (session.user as UserSession).ebRole = dbUser.eaApplication?.firstOptionEb;
+        (session.user as UserSession).ebRole = dbUser.executiveAssociateApplications?.[0]?.firstOptionEb;
         (session.user as UserSession).committeeId =
-          dbUser.committeeApplication?.firstOptionCommittee;
+          dbUser.committeeApplications?.[0]?.firstOptionCommittee;
 
         // Check if user has completed their profile
         (session.user as UserSession).hasCompletedProfile =
@@ -210,28 +226,28 @@ export const authOptions: NextAuthOptions = {
 
         // Check application status for routing
         (session.user as UserSession).applicationStatus = {
-          member: dbUser.memberApplication
+          member: dbUser.memberApplications?.[0]
             ? {
                 hasApplication: true,
-                hasPayment: !!dbUser.memberApplication.paymentProof,
-                isAccepted: dbUser.memberApplication.hasAccepted,
-                appliedAt: dbUser.memberApplication.createdAt,
+                hasPayment: !!dbUser.memberApplications?.[0].paymentProof,
+                isAccepted: dbUser.memberApplications?.[0].hasAccepted,
+                appliedAt: dbUser.memberApplications?.[0].createdAt,
               }
             : { hasApplication: false },
 
-          ea: dbUser.eaApplication
+          ea: dbUser.executiveAssociateApplications?.[0]
             ? {
                 hasApplication: true,
-                status: dbUser.eaApplication.status ?? undefined,
-                isAccepted: dbUser.eaApplication.hasAccepted,
+                status: dbUser.executiveAssociateApplications?.[0].status ?? undefined,
+                isAccepted: dbUser.executiveAssociateApplications?.[0].hasAccepted,
               }
             : { hasApplication: false },
 
-          committee: dbUser.committeeApplication
+          committee: dbUser.committeeApplications?.[0]
             ? {
                 hasApplication: true,
-                status: dbUser.committeeApplication.status ?? undefined,
-                isAccepted: dbUser.committeeApplication.hasAccepted,
+                status: dbUser.committeeApplications?.[0].status ?? undefined,
+                isAccepted: dbUser.committeeApplications?.[0].hasAccepted,
               }
             : { hasApplication: false },
         };
@@ -253,7 +269,7 @@ export const authOptions: NextAuthOptions = {
         return url;
       }
 
-      return url;
+      return "/";
     },
   },
   pages: {

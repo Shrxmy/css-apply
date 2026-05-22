@@ -3,7 +3,7 @@ import useSWR from "swr";
 interface ApplicationStatusData {
   hasMemberApplication: boolean;
   hasCommitteeApplication: boolean;
-  hasEAApplication: boolean;
+  hasExecutiveAssociateApplication: boolean;
   applications: {
     member: { id: string } | null;
     committee: { id: string; firstOptionCommittee: string } | null;
@@ -37,7 +37,7 @@ export function useApplicationStatus(enabled = true) {
     hasAnyApplication: data
       ? data.hasMemberApplication ||
         data.hasCommitteeApplication ||
-        data.hasEAApplication
+        data.hasExecutiveAssociateApplication
       : false,
   };
 }

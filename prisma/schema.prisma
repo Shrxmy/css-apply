@@ -18,39 +18,49 @@ model User {
   name          String
   studentNumber String?  @unique @db.VarChar(10)
   section       String?
+  age           Int?
+  dateOfBirth   DateTime?
+  isOldCssMember Boolean?
   role          String   @default("user") // user, admin, super_admin
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   // Relationships
-  memberApplication    MemberApplication?
-  eaApplication        EAApplication?
-  committeeApplication CommitteeApplication?
+  memberApplications    MemberApplication[]
+  executiveAssociateApplications ExecutiveAssociateApplication[]
+  committeeApplications CommitteeApplication[]
   ebProfile            EBProfile?
 
   @@index([role])
 }
 
 model MemberApplication {
-  id            String   @id @default(cuid())
-  studentNumber String   @unique
-  user          User     @relation(fields: [studentNumber], references: [studentNumber], onDelete: Cascade)
-  paymentProof  String
-  hasAccepted   Boolean  @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                 String            @id @default(cuid())
+  studentNumber      String
+  user               User              @relation(fields: [studentNumber], references: [studentNumber], onDelete: Cascade)
+  recruitmentCycleId String?
+  recruitmentCycle   RecruitmentCycle? @relation(fields: [recruitmentCycleId], references: [id], onDelete: SetNull)
+  paymentProof       String
+  hasAccepted        Boolean           @default(false)
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
 
+  @@unique([studentNumber, recruitmentCycleId])
   @@index([hasAccepted])
+  @@index([recruitmentCycleId])
 }
 
-model EAApplication {
-  id                     String   @id @default(cuid())
-  studentNumber          String   @unique
-  user                   User     @relation(fields: [studentNumber], references: [studentNumber], onDelete: Cascade)
+model ExecutiveAssociateApplication {
+  id                     String            @id @default(cuid())
+  studentNumber          String
+  user                   User              @relation(fields: [studentNumber], references: [studentNumber], onDelete: Cascade)
+  recruitmentCycleId     String?
+  recruitmentCycle       RecruitmentCycle? @relation(fields: [recruitmentCycleId], references: [id], onDelete: SetNull)
   ebRole                 String   
   firstOptionEb          String
   secondOptionEb         String
   cv                     String
+  paymentProof           String?
   supabaseFilePath       String?
   interviewSlotDay       String?
   interviewSlotTimeStart String?
@@ -63,20 +73,26 @@ model EAApplication {
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 
+  @@unique([studentNumber, recruitmentCycleId])
   @@index([status])
   @@index([interviewBy])
   @@index([hasAccepted])
   @@index([hasFinishedInterview])
+  @@index([recruitmentCycleId])
+  @@map("EAApplication")
 }
 
 model CommitteeApplication {
-  id                     String   @id @default(cuid())
-  studentNumber          String   @unique
-  user                   User     @relation(fields: [studentNumber], references: [studentNumber], onDelete: Cascade)
+  id                     String            @id @default(cuid())
+  studentNumber          String
+  user                   User              @relation(fields: [studentNumber], references: [studentNumber], onDelete: Cascade)
+  recruitmentCycleId     String?
+  recruitmentCycle       RecruitmentCycle? @relation(fields: [recruitmentCycleId], references: [id], onDelete: SetNull)
   firstOptionCommittee   String
   secondOptionCommittee  String
   portfolioLink          String?
   cv                     String
+  paymentProof           String?
   supabaseFilePath       String?
   interviewSlotDay       String?
   interviewSlotTimeStart String?
@@ -89,10 +105,12 @@ model CommitteeApplication {
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 
+  @@unique([studentNumber, recruitmentCycleId])
   @@index([status])
   @@index([interviewBy])
   @@index([hasAccepted])
   @@index([hasFinishedInterview])
+  @@index([recruitmentCycleId])
 }
 
 model AvailableEBInterviewTime {
@@ -112,15 +130,19 @@ model AvailableEBInterviewTime {
 
 model EBProfile {
   id          String   @id @default(cuid())
-  userId      String   @unique
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  position    String
-  committees  String[] 
-  meetingLink String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  userId             String           @unique
+  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recruitmentCycleId String?
+  recruitmentCycle   RecruitmentCycle? @relation(fields: [recruitmentCycleId], references: [id], onDelete: SetNull)
+  position           String
+  committees         String[] 
+  meetingLink        String?
+  isActive           Boolean          @default(true)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
 
+  @@index([position])
+  @@index([recruitmentCycleId])
   @@index([isActive])
 }
 
@@ -142,6 +164,10 @@ model RecruitmentCycle {
   isActive          Boolean  @default(false)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+  ebProfiles        EBProfile[]
+  memberApplications MemberApplication[]
+  executiveAssociateApplications ExecutiveAssociateApplication[]
+  committeeApplications CommitteeApplication[]
 
   @@index([isActive])
 }

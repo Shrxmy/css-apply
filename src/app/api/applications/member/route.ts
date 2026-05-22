@@ -12,11 +12,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { studentNumber, section } = await request.json();
+    const { studentNumber, section, age, dateOfBirth, isOldCssMember } = await request.json();
 
-    if (!studentNumber || !section) {
+    if (!studentNumber || !section || !age || !dateOfBirth || typeof isOldCssMember !== "boolean") {
       return NextResponse.json(
-        { error: "Student number and section are required" },
+        { error: "Student number, section, age, date of birth, and CSS membership history are required" },
         { status: 400 },
       );
     }
@@ -39,9 +39,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check for already-accepted application BEFORE updating user data
-    const existingApplication = await prisma.memberApplication.findUnique({
-      where: { studentNumber },
+    const activeCycle = await prisma.recruitmentCycle.findFirst({
+      where: { isActive: true },
+      select: { id: true },
+    });
+
+    // Check for already-accepted application in the active cycle BEFORE updating user data
+    const existingApplication = await prisma.memberApplication.findFirst({
+      where: { studentNumber, recruitmentCycleId: activeCycle?.id ?? null },
     });
 
     if (existingApplication?.hasAccepted) {
@@ -56,19 +61,25 @@ export async function POST(request: NextRequest) {
       data: {
         studentNumber,
         section,
+        age: Number(age),
+        dateOfBirth: new Date(dateOfBirth),
+        isOldCssMember,
       },
     });
 
-    // Use upsert to handle race conditions atomically
-    const application = await prisma.memberApplication.upsert({
-      where: { studentNumber },
-      update: {},
-      create: {
-        studentNumber,
-        paymentProof: "",
-        hasAccepted: false,
-      },
-    });
+    const application = existingApplication
+      ? await prisma.memberApplication.update({
+          where: { id: existingApplication.id },
+          data: {},
+        })
+      : await prisma.memberApplication.create({
+          data: {
+            studentNumber,
+            recruitmentCycleId: activeCycle?.id ?? null,
+            paymentProof: "",
+            hasAccepted: false,
+          },
+        });
 
     // Send confirmation email
     try {
@@ -128,7 +139,14 @@ export async function GET() {
 
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
-      include: { memberApplication: true },
+      include: {
+        memberApplications: {
+          where: {
+            recruitmentCycleId: (await prisma.recruitmentCycle.findFirst({ where: { isActive: true }, select: { id: true } }))?.id ?? null,
+          },
+          take: 1,
+        },
+      },
     });
 
     if (!user) {
@@ -136,13 +154,16 @@ export async function GET() {
     }
 
     return NextResponse.json({
-      hasApplication: !!user.memberApplication,
-      application: user.memberApplication,
+      hasApplication: !!user.memberApplications?.[0],
+      application: user.memberApplications?.[0],
       user: {
         id: user.id,
         studentNumber: user.studentNumber,
         name: user.name,
         section: user.section,
+        age: user.age,
+        dateOfBirth: user.dateOfBirth,
+        isOldCssMember: user.isOldCssMember,
       },
     });
   } catch (error) {

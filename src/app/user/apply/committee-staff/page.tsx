@@ -35,9 +35,9 @@ export default function StaffApplication() {
       router.push(
         `/user/apply/committee-staff/${appStatus.committeeId}/progress`,
       );
-    } else if (appStatus.hasEAApplication && appStatus.ebRole) {
+    } else if (appStatus.hasExecutiveAssociateApplication && appStatus.ebRole) {
       router.push(
-        `/user/apply/executive-assistant/${appStatus.ebRole}/progress`,
+        `/user/apply/executive-associate/${appStatus.ebRole}/progress`,
       );
     }
   }, [appStatus, status, router]);
@@ -55,7 +55,7 @@ export default function StaffApplication() {
     appStatus &&
     (appStatus.hasMemberApplication ||
       appStatus.hasCommitteeApplication ||
-      appStatus.hasEAApplication)
+      appStatus.hasExecutiveAssociateApplication)
   ) {
     return <LoadingScreen />;
   }

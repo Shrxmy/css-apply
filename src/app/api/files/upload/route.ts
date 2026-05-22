@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     const file = formData.get("file") as File;
     const studentNumber = formData.get("studentNumber") as string;
     const fileType = formData.get("fileType") as string;
-    const applicationType = formData.get("applicationType") as string; // 'ea' or 'committee'
+    const applicationType = formData.get("applicationType") as string; // 'executive-associate' or 'committee'
 
     if (!file || !studentNumber || !fileType || !applicationType) {
       console.error("Missing required fields:", {
@@ -48,14 +48,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!["ea", "committee"].includes(applicationType)) {
+    if (!["executive-associate", "committee"].includes(applicationType)) {
       return NextResponse.json(
         { error: "Invalid application type" },
         { status: 400 },
       );
     }
 
-    if (applicationType === "ea" && fileType !== "cv") {
+    if (applicationType === "executive-associate" && fileType !== "cv") {
       return NextResponse.json(
         { error: "EA applications only support CV uploads" },
         { status: 400 },
@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
 
     // Determine the bucket and application type
     const bucketName =
-      applicationType === "ea" ? "ea-applications" : "committee-applications";
+      applicationType === "executive-associate" ? "executive-associate-applications" : "committee-applications";
 
     // Generate unique file name
     const timestamp = Date.now();

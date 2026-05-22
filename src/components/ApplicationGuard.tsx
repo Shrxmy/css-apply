@@ -8,14 +8,14 @@ import { useApplicationStatus } from "@/lib/useApplicationStatus";
 
 interface ApplicationGuardProps {
   children: React.ReactNode;
-  applicationType: "member" | "committee" | "ea";
+  applicationType: "member" | "committee" | "executive-associate";
   redirectPath?: string;
 }
 
 const DEFAULT_REDIRECTS: Record<string, string> = {
   member: "/user/apply/member",
   committee: "/user/apply/committee-staff",
-  ea: "/user/apply/executive-assistant",
+  ea: "/user/apply/executive-associate",
 };
 
 /**
@@ -55,7 +55,7 @@ export default function ApplicationGuard({
       ? appStatus.hasMemberApplication
       : applicationType === "committee"
         ? appStatus.hasCommitteeApplication
-        : appStatus.hasEAApplication
+        : appStatus.hasExecutiveAssociateApplication
     : false;
 
   useEffect(() => {

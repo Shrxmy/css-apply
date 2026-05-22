@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const applicationId = searchParams.get("applicationId");
-    const type = searchParams.get("type"); // 'ea' or 'committee'
+    const type = searchParams.get("type"); // 'executive-associate' or 'committee'
 
     if (!applicationId || !type) {
       return NextResponse.json(
@@ -38,8 +38,8 @@ export async function GET(request: NextRequest) {
     let application;
     let supabaseFilePath: string | null = null;
 
-    if (type === "ea") {
-      application = await prisma.eAApplication.findUnique({
+    if (type === "executive-associate") {
+      application = await prisma.executiveAssociateApplication.findUnique({
         where: { id: applicationId },
         include: {
           user: {
@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
       supabaseFilePath = application?.supabaseFilePath || null;
     } else {
       return NextResponse.json(
-        { error: "Invalid type parameter. Must be 'ea' or 'committee'" },
+        { error: "Invalid type parameter. Must be 'executive-associate' or 'committee'" },
         { status: 400 },
       );
     }
@@ -143,7 +143,7 @@ export async function GET(request: NextRequest) {
       } else {
         // It's just a file path, use the old method
         const bucketName =
-          type === "ea" ? "ea-applications" : "committee-applications";
+          type === "executive-associate" ? "executive-associate-applications" : "committee-applications";
 
         const { data, error } = await supabase.storage
           .from(bucketName)

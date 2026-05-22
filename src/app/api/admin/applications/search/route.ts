@@ -164,7 +164,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Search EA applications
-    const allEAApplications = await prisma.eAApplication.findMany({
+    const allExecutiveAssociateApplications = await prisma.executiveAssociateApplication.findMany({
       where: {
         OR: [
           {
@@ -208,7 +208,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Filter EA applications (exclude truly processed ones)
-    const eAApplications = allEAApplications.filter((app: typeof allEAApplications[number]) => {
+    const executiveAssociateApplications = allExecutiveAssociateApplications.filter((app: typeof allExecutiveAssociateApplications[number]) => {
       const isAccepted = app.hasAccepted && app.status === "passed";
       const isRejected = app.status === "failed";
       const isRedirected = app.status === "redirected";
@@ -286,14 +286,14 @@ export async function GET(request: NextRequest) {
 
     // Add CV download links for EA applications
     applications.ea = await Promise.all(
-      eAApplications.map(async (application: typeof eAApplications[number]) => {
+      executiveAssociateApplications.map(async (application: typeof executiveAssociateApplications[number]) => {
         const cvDownloadUrl = application.supabaseFilePath
-          ? `/api/admin/cv-download?applicationId=${application.id}&type=ea`
+          ? `/api/admin/cv-download?applicationId=${application.id}&type=executive-associate`
           : null;
 
         return {
           ...application,
-          type: "ea",
+          type: "executive-associate",
           isAssigned: Boolean(
             application.interviewBy &&
               assignmentValues.includes(application.interviewBy.toLowerCase()),

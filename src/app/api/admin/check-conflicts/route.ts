@@ -16,7 +16,7 @@ export async function GET() {
     }
 
     // Check for conflicts in EA Applications
-    const eaConflicts = await prisma.eAApplication.findMany({
+    const eaConflicts = await prisma.executiveAssociateApplication.findMany({
       where: {
         AND: [
           { interviewSlotDay: { not: null } },

@@ -144,11 +144,19 @@ export default function SchedulePageContent() {
         if (cycleRes.ok) {
           const cycleData = await cycleRes.json();
           if (cycleData.activeCycle?.interviewStart) {
-            start.setTime(new Date(cycleData.activeCycle.interviewStart).getTime());
+            const [year, month, day] = cycleData.activeCycle.interviewStart
+              .slice(0, 10)
+              .split("-")
+              .map(Number);
+            start.setFullYear(year, month - 1, day);
             start.setHours(0, 0, 0, 0);
           }
           if (cycleData.activeCycle?.interviewEnd) {
-            end.setTime(new Date(cycleData.activeCycle.interviewEnd).getTime());
+            const [year, month, day] = cycleData.activeCycle.interviewEnd
+              .slice(0, 10)
+              .split("-")
+              .map(Number);
+            end.setFullYear(year, month - 1, day);
           }
         }
       } catch {

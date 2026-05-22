@@ -62,7 +62,7 @@ export default function ErrorPage({
               alt="Error"
               width={150}
               height={150}
-              className="object-contain drop-shadow-lg sm:w-[200px] sm:h-[200px] mx-auto"
+              className="object-contain drop-shadow-lg sm:w-50 sm:h-50 mx-auto"
             />
           </div>
 

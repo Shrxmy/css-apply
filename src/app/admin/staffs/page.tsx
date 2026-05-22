@@ -554,7 +554,7 @@ const Staffs = () => {
               <optgroup label="Member">
                 <option value="member">Member</option>
               </optgroup>
-              <optgroup label="Executive Assistant Roles">
+              <optgroup label="Executive Associate Roles">
                 {roles.map((role) => (
                   <option key={role.id} value={role.id}>
                     {role.title}

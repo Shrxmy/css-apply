@@ -182,7 +182,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    if (type === "ea") {
+    if (type === "executive-associate") {
       const whereClause: Record<string, unknown> = {};
 
       // Filter by status if provided
@@ -214,11 +214,11 @@ export async function GET(request: NextRequest) {
       }
 
       // Get total count for pagination
-      const totalCount = await prisma.eAApplication.count({
+      const totalCount = await prisma.executiveAssociateApplication.count({
         where: whereClause,
       });
 
-      const eaApplications = await prisma.eAApplication.findMany({
+      const executiveAssociateApplications = await prisma.executiveAssociateApplication.findMany({
         where: whereClause,
         orderBy: { createdAt: "desc" },
         skip: skip,
@@ -237,16 +237,16 @@ export async function GET(request: NextRequest) {
       });
 
       // Add CV download links for EA applications (sync operation — no need for Promise.all)
-      const eaApplicationsWithCvLinks = eaApplications.map((app: typeof eaApplications[number]) => ({
+      const executiveAssociateApplicationsWithCvLinks = executiveAssociateApplications.map((app: typeof executiveAssociateApplications[number]) => ({
         ...app,
         cvDownloadUrl: app.supabaseFilePath
-          ? `/api/admin/cv-download?applicationId=${app.id}&type=ea`
+          ? `/api/admin/cv-download?applicationId=${app.id}&type=executive-associate`
           : null,
       }));
 
       return NextResponse.json({
         success: true,
-        applications: eaApplicationsWithCvLinks,
+        applications: executiveAssociateApplicationsWithCvLinks,
         pagination: {
           currentPage: page,
           totalPages: Math.ceil(totalCount / limit),
@@ -411,7 +411,7 @@ export async function DELETE(_request: NextRequest) {
       include: {
         user: {
           include: {
-            eaApplication: true,
+            executiveAssociateApplications: true,
           },
         },
       },
@@ -421,8 +421,8 @@ export async function DELETE(_request: NextRequest) {
     for (const committeeApp of orphanedCommitteeApps) {
       // Check if the corresponding EA application exists and is failed
       if (
-        committeeApp.user.eaApplication &&
-        committeeApp.user.eaApplication.status === "failed"
+        committeeApp.user.executiveAssociateApplications?.[0] &&
+        committeeApp.user.executiveAssociateApplications?.[0].status === "failed"
       ) {
         await prisma.committeeApplication.delete({
           where: { id: committeeApp.id },
@@ -684,9 +684,9 @@ export async function PUT(request: NextRequest) {
           console.error("Failed to send email:", emailError);
         }
       }
-    } else if (type === "ea") {
+    } else if (type === "executive-associate") {
       // First get the current application data to check if it was redirected
-      const currentApplication = await prisma.eAApplication.findUnique({
+      const currentApplication = await prisma.executiveAssociateApplication.findUnique({
         where: { id: applicationId },
         select: { status: true, redirection: true, studentNumber: true },
       });
@@ -762,7 +762,7 @@ export async function PUT(request: NextRequest) {
         updateData.redirection = redirection;
       }
 
-      updatedApplication = await prisma.eAApplication.update({
+      updatedApplication = await prisma.executiveAssociateApplication.update({
         where: { id: applicationId },
         data: updateData,
         include: {
@@ -823,7 +823,7 @@ export async function PUT(request: NextRequest) {
                 emailTemplates.executiveAssistantRedirectedToMember(
                   updatedApplication.user.name,
                   updatedApplication.user.id,
-                  updatedApplication.firstOptionEb || "Executive Assistant",
+                  updatedApplication.firstOptionEb || "Executive Associate",
                 );
               await sendEmail(
                 updatedApplication.user.email,
@@ -839,7 +839,7 @@ export async function PUT(request: NextRequest) {
                 emailTemplates.executiveAssistantRedirectedToCommittee(
                   updatedApplication.user.name,
                   updatedApplication.user.id,
-                  updatedApplication.firstOptionEb || "Executive Assistant",
+                  updatedApplication.firstOptionEb || "Executive Associate",
                   committeeId,
                 );
               await sendEmail(
@@ -855,7 +855,7 @@ export async function PUT(request: NextRequest) {
               const emailTemplate = emailTemplates.executiveAssistantRedirected(
                 updatedApplication.user.name,
                 updatedApplication.user.id,
-                updatedApplication.firstOptionEb || "Executive Assistant",
+                updatedApplication.firstOptionEb || "Executive Associate",
                 redirection,
               );
               await sendEmail(

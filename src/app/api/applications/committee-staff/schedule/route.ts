@@ -39,14 +39,19 @@ export async function POST(request: NextRequest) {
 
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
-      include: { committeeApplication: true },
+      include: {
+        committeeApplications: {
+          where: { recruitmentCycleId: (await prisma.recruitmentCycle.findFirst({ where: { isActive: true }, select: { id: true } }))?.id ?? null },
+          take: 1,
+        },
+      },
     });
 
     if (!user || !user.studentNumber) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    if (!user.committeeApplication) {
+    if (!user.committeeApplications?.[0]) {
       return NextResponse.json(
         { error: "Committee application not found" },
         { status: 400 },
@@ -57,7 +62,7 @@ export async function POST(request: NextRequest) {
     const studentNumber = user.studentNumber;
 
     // Check for slot conflicts before updating - check BOTH EA and Committee applications
-    const existingEABookings = await prisma.eAApplication.findMany({
+    const existingEABookings = await prisma.executiveAssociateApplication.findMany({
       where: {
         AND: [
           { interviewSlotDay },
@@ -96,7 +101,7 @@ export async function POST(request: NextRequest) {
     }
 
     const updatedApplication = await prisma.committeeApplication.update({
-      where: { studentNumber },
+      where: { id: user.committeeApplications?.[0].id },
       data: {
         interviewBy,
         interviewSlotDay,
@@ -121,9 +126,9 @@ export async function POST(request: NextRequest) {
       // Send email to applicant
       const emailTemplate = emailTemplates.committeeApplication(
         user.name ?? "Applicant",
-        user.committeeApplication.studentNumber,
-        user.committeeApplication.firstOptionCommittee,
-        user.committeeApplication.secondOptionCommittee,
+        user.committeeApplications?.[0].studentNumber,
+        user.committeeApplications?.[0].firstOptionCommittee,
+        user.committeeApplications?.[0].secondOptionCommittee,
         meetingLink || undefined,
         interviewBy,
       );
@@ -161,8 +166,8 @@ export async function POST(request: NextRequest) {
         const ebEmailTemplate = emailTemplates.ebInterviewNotificationCommittee(
           ebName,
           user.name ?? "Applicant",
-          user.committeeApplication.studentNumber,
-          user.committeeApplication.firstOptionCommittee,
+          user.committeeApplications?.[0].studentNumber,
+          user.committeeApplications?.[0].firstOptionCommittee,
           interviewDate,
           interviewTime,
           meetingLink || undefined,

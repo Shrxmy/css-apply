@@ -4,11 +4,17 @@ import { z } from 'zod';
 export const memberApplicationSchema = z.object({
   studentNumber: z.string().length(10).regex(/^\d{10}$/, 'Student number must be 10 digits'),
   section: z.string().min(1, 'Section is required').max(50),
+  age: z.coerce.number().int().min(1, 'Age is required').max(120, 'Enter a valid age'),
+  dateOfBirth: z.string().min(1, 'Date of birth is required'),
+  isOldCssMember: z.boolean(),
 });
 
 export const committeeApplicationSchema = z.object({
   studentNumber: z.string().length(10).regex(/^\d{10}$/, 'Student number must be 10 digits'),
   section: z.string().min(1, 'Section is required').max(50),
+  age: z.coerce.number().int().min(1, 'Age is required').max(120, 'Enter a valid age'),
+  dateOfBirth: z.string().min(1, 'Date of birth is required'),
+  isOldCssMember: z.boolean(),
   firstName: z.string().min(1, 'First name is required').max(100),
   lastName: z.string().min(1, 'Last name is required').max(100),
   firstOptionCommittee: z.string().min(1, 'First choice is required'),
@@ -17,9 +23,12 @@ export const committeeApplicationSchema = z.object({
   portfolioLink: z.string().optional(),
 });
 
-export const eaApplicationSchema = z.object({
+export const executiveAssociateApplicationSchema = z.object({
   studentNumber: z.string().length(10).regex(/^\d{10}$/, 'Student number must be 10 digits'),
   section: z.string().min(1, 'Section is required').max(50),
+  age: z.coerce.number().int().min(1, 'Age is required').max(120, 'Enter a valid age'),
+  dateOfBirth: z.string().min(1, 'Date of birth is required'),
+  isOldCssMember: z.boolean(),
   firstName: z.string().min(1, 'First name is required').max(100),
   lastName: z.string().min(1, 'Last name is required').max(100),
   firstOptionEb: z.string().min(1, 'First choice is required'),
@@ -46,7 +55,7 @@ export const eaScheduleSchema = z.object({
 // Admin actions
 export const applicationActionSchema = z.object({
   applicationId: z.string().min(1),
-  type: z.enum(['member', 'committee', 'ea']),
+  type: z.enum(['member', 'committee', 'executive-associate']),
   action: z.enum(['accept', 'reject', 'redirect', 'evaluate']),
   redirection: z.string().optional(),
   interviewBy: z.string().optional(),

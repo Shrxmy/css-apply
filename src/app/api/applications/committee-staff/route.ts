@@ -29,6 +29,9 @@ export async function POST(request: NextRequest) {
       firstName,
       lastName,
       section,
+      age,
+      dateOfBirth,
+      isOldCssMember,
       firstOptionCommittee,
       secondOptionCommittee,
       cv,
@@ -38,6 +41,9 @@ export async function POST(request: NextRequest) {
     if (
       !studentNumber ||
       !section ||
+      !age ||
+      !dateOfBirth ||
+      typeof isOldCssMember !== "boolean" ||
       !firstOptionCommittee ||
       !secondOptionCommittee ||
       !cv
@@ -86,8 +92,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Check for already-accepted application BEFORE updating user data
-    const existingApplication = await prisma.committeeApplication.findUnique({
-      where: { studentNumber },
+    const activeCycle = await prisma.recruitmentCycle.findFirst({
+      where: { isActive: true },
+      select: { id: true },
+    });
+
+    const existingApplication = await prisma.committeeApplication.findFirst({
+      where: { studentNumber, recruitmentCycleId: activeCycle?.id ?? null },
     });
 
     if (existingApplication?.hasAccepted) {
@@ -102,6 +113,9 @@ export async function POST(request: NextRequest) {
       data: {
         studentNumber,
         section,
+        age: Number(age),
+        dateOfBirth: new Date(dateOfBirth),
+        isOldCssMember,
         name: `${firstName} ${lastName}`.trim(),
       },
     });
@@ -110,6 +124,7 @@ export async function POST(request: NextRequest) {
       await prisma.committeeApplication.create({
         data: {
           studentNumber,
+          recruitmentCycleId: activeCycle?.id ?? null,
           firstOptionCommittee,
           secondOptionCommittee,
           cv: normalizedCvPath,
@@ -136,7 +151,7 @@ export async function POST(request: NextRequest) {
 
       // Update existing non-accepted application (NO EMAIL SENT)
       await prisma.committeeApplication.update({
-        where: { studentNumber },
+        where: { id: existingApplication.id },
         data: {
           firstOptionCommittee,
           secondOptionCommittee,
@@ -183,7 +198,14 @@ export async function GET() {
 
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
-      include: { committeeApplication: true },
+      include: {
+        committeeApplications: {
+          where: {
+            recruitmentCycleId: (await prisma.recruitmentCycle.findFirst({ where: { isActive: true }, select: { id: true } }))?.id ?? null,
+          },
+          take: 1,
+        },
+      },
     });
 
     if (!user) {
@@ -191,9 +213,9 @@ export async function GET() {
     }
 
     let meetingLink = null;
-    if (user.committeeApplication?.interviewBy) {
+    if (user.committeeApplications?.[0]?.interviewBy) {
       const positionTitle = getPositionTitle(
-        user.committeeApplication.interviewBy,
+        user.committeeApplications?.[0].interviewBy,
       );
 
       const ebProfile = await prisma.eBProfile.findFirst({
@@ -205,13 +227,16 @@ export async function GET() {
     }
 
     return NextResponse.json({
-      hasApplication: !!user.committeeApplication,
-      application: user.committeeApplication,
+      hasApplication: !!user.committeeApplications?.[0],
+      application: user.committeeApplications?.[0],
       user: {
         id: user.id,
         studentNumber: user.studentNumber,
         name: user.name,
         section: user.section,
+        age: user.age,
+        dateOfBirth: user.dateOfBirth,
+        isOldCssMember: user.isOldCssMember,
       },
       meetingLink: meetingLink,
     });
@@ -235,14 +260,21 @@ export async function DELETE() {
     // Get user data
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
-      include: { committeeApplication: true },
+      include: {
+        committeeApplications: {
+          where: {
+            recruitmentCycleId: (await prisma.recruitmentCycle.findFirst({ where: { isActive: true }, select: { id: true } }))?.id ?? null,
+          },
+          take: 1,
+        },
+      },
     });
 
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    if (!user.committeeApplication) {
+    if (!user.committeeApplications?.[0]) {
       return NextResponse.json(
         { error: "No application found" },
         { status: 404 },
@@ -251,7 +283,7 @@ export async function DELETE() {
 
     // Delete files from Supabase storage if they exist
     try {
-      const cvPath = normalizeStoragePath(user.committeeApplication.supabaseFilePath);
+      const cvPath = normalizeStoragePath(user.committeeApplications?.[0].supabaseFilePath);
       if (cvPath) {
         await supabase.storage
           .from("committee-applications")
@@ -259,9 +291,9 @@ export async function DELETE() {
       }
 
       // Also check if there's a portfolio file to delete
-      if (user.committeeApplication.portfolioLink) {
+      if (user.committeeApplications?.[0].portfolioLink) {
         const portfolioPath = normalizeStoragePath(
-          user.committeeApplication.portfolioLink,
+          user.committeeApplications?.[0].portfolioLink,
         );
         if (portfolioPath) {
           await supabase.storage
@@ -276,7 +308,7 @@ export async function DELETE() {
 
     // Delete the committee application
     await prisma.committeeApplication.delete({
-      where: { studentNumber: user.studentNumber! },
+      where: { id: user.committeeApplications?.[0].id },
     });
 
     return NextResponse.json({

@@ -8,9 +8,15 @@ import Footer from "@/components/Footer";
 import { committeeRolesSubmitted } from "@/data/committeeRoles";
 import { roles } from "@/data/ebRoles";
 import { useSession } from "next-auth/react";
+import { usePaymentQr } from "@/lib/usePaymentQr";
+import { useCommunityLink } from "@/lib/useCommunityLink";
+import { usePaymentReceiptTemplate } from "@/lib/usePaymentReceiptTemplate";
 import { truncateToLast7 } from "@/lib/truncate-utils";
 
 export default function CommitteeProgressPageContent() {
+  const { communityEnabled, communityUrl, communityLabel } = useCommunityLink();
+  const { paymentQrUrl } = usePaymentQr();
+  const { receiptTemplateUrl } = usePaymentReceiptTemplate();
   const router = useRouter();
   const { data: session } = useSession();
   const { committee: committeeId } = useParams<{ committee: string }>();
@@ -35,6 +41,7 @@ export default function CommitteeProgressPageContent() {
       hasAccepted: boolean;
       createdAt: string;
       updatedAt: string;
+      paymentProof?: string;
     };
     user: {
       studentNumber: string;
@@ -50,6 +57,38 @@ export default function CommitteeProgressPageContent() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isRespondingRedirect, setIsRespondingRedirect] = useState(false);
   const [redirectError, setRedirectError] = useState("");
+
+
+  const [paymentProof, setPaymentProof] = useState("");
+  const [submittingPaymentProof, setSubmittingPaymentProof] = useState(false);
+  const [paymentProofError, setPaymentProofError] = useState("");
+  const hasPaymentProof = !!applicationData?.application?.paymentProof;
+
+  const handlePaymentProofSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPaymentProofError("");
+    setSubmittingPaymentProof(true);
+
+    try {
+      const response = await fetch("/api/applications/payment-proof", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paymentProof }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to submit payment proof");
+
+      setApplicationData((current) => current && current.application
+        ? { ...current, application: { ...current.application, paymentProof: data.paymentProof } }
+        : current,
+      );
+      setPaymentProof("");
+    } catch (error) {
+      setPaymentProofError(error instanceof Error ? error.message : "Failed to submit payment proof");
+    } finally {
+      setSubmittingPaymentProof(false);
+    }
+  };
 
   const getRedirectionDisplayName = (redirection?: string) => {
     if (!redirection) return "";
@@ -67,7 +106,7 @@ export default function CommitteeProgressPageContent() {
     if (committee) return committee.title;
 
     const eaRole = roles.find((r) => r.id === redirection);
-    if (eaRole) return `Executive Assistant for ${eaRole.title}`;
+    if (eaRole) return `Executive Associate for ${eaRole.title}`;
 
     return redirection;
   };
@@ -194,20 +233,16 @@ export default function CommitteeProgressPageContent() {
             {/* Header section with icon and title */}
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6 mb-4 sm:mb-6">
               <div className="p-2 sm:p-3 flex items-center justify-center h-12 w-12 sm:h-15 sm:w-15 rounded-full bg-red-100 shrink-0">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="w-6 h-6 sm:w-8 sm:h-8 text-red-600"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                  />
-                </svg>
+                <div
+                  className="w-6 h-6 sm:w-8 sm:h-8 text-red-600 bg-current"
+                  style={{
+                    maskImage: "url(/icons/trash.svg)",
+                    WebkitMaskImage: "url(/icons/trash.svg)",
+                    maskSize: "contain",
+                    maskRepeat: "no-repeat",
+                    maskPosition: "center",
+                  }}
+                />
               </div>
               <div className="flex flex-col items-center sm:items-start text-center sm:text-left">
                 <h3 className="text-lg sm:text-xl font-inter font-bold text-red-600 mb-2">
@@ -483,7 +518,7 @@ export default function CommitteeProgressPageContent() {
                     <span
                       className={`text-sm sm:text-base ${application.hasAccepted ? "text-green-600 font-semibold" : "text-gray-500"}`}
                     >
-                      {application.hasAccepted ? memberIdDisplay : "Pending"}
+                      {application.hasAccepted && hasPaymentProof ? memberIdDisplay : application.hasAccepted ? "Submit payment proof first" : "Pending"}
                     </span>
                   </div>
 
@@ -540,7 +575,7 @@ export default function CommitteeProgressPageContent() {
                     <div className="text-gray-600">
                       <p>
                         <strong>Member ID:</strong>{" "}
-                        {memberIdDisplay}
+                        {hasPaymentProof ? memberIdDisplay : "Submit payment proof first"}
                       </p>
                       {application.redirection ? (
                         <p>
@@ -615,42 +650,84 @@ export default function CommitteeProgressPageContent() {
                 Payment Instructions
               </h3>
 
-              <div className="bg-[#F3F8FF] border border-[#005FD9]/15 rounded-xl p-4 sm:p-6 lg:p-8">
-                <p className="text-[#134687] text-center mb-4 sm:mb-6 text-sm sm:text-base lg:text-lg">
-                  To complete your membership, please proceed with the payment
-                  of{" "}
-                  <strong className="text-[#134687] text-lg sm:text-xl">
-                    ₱250.00
-                  </strong>{" "}
-                  using the GCash QR code below:
-                </p>
+              <div className="bg-[#F3F8FF] rounded-xl p-4 sm:p-6 lg:p-8">
+                {!hasPaymentProof && (
+                  <>
+                    <p className="text-[#134687] text-center mb-4 sm:mb-6 text-sm sm:text-base lg:text-lg">
+                      To complete your membership, please proceed with the payment
+                      of{" "}
+                      <strong className="text-[#134687] text-lg sm:text-xl">
+                        ₱250.00
+                      </strong>{" "}
+                      using the GCash QR code below:
+                    </p>
 
-                <div className="text-center mb-4 sm:mb-6">
-                  <Image
-                    src="https://itvimtcxzsubgcbnknvq.supabase.co/storage/v1/object/sign/payment/CSSPayment-Cropped.jpg?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8zZDI2NmE0Mi02NGNmLTQzZjItOTE5Mi00OTk1MmViZDMxY2QiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJwYXltZW50L0NTU1BheW1lbnQtQ3JvcHBlZC5qcGciLCJpYXQiOjE3NTk1ODE4MjksImV4cCI6MTc5MTExNzgyOX0.SVFyO2WgwnA0pasjevIYWNESH6udyOLJiivdGob-FP4"
-                    alt="GCash QR Code for CSS Payment"
-                    width={300}
-                    height={300}
-                    className="max-w-62.5 sm:max-w-75 w-full h-auto border-3 border-[#134687] rounded-xl shadow-lg mx-auto"
-                  />
-                </div>
+                    <div className="text-center mb-4 sm:mb-6">
+                      {paymentQrUrl ? (
+                        <Image
+                          src={paymentQrUrl}
+                          alt="GCash QR Code for CSS Payment"
+                          width={300}
+                          height={300}
+                          className="max-w-62.5 sm:max-w-75 w-full h-auto border-3 border-[#134687] rounded-xl shadow-lg mx-auto"
+                        />
+                      ) : (
+                        <div className="mx-auto max-w-md rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+                          Payment QR code is currently unavailable. Please contact
+                          {" "}css.cics@ust.edu.ph for payment instructions.
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
 
-                <div className="bg-white border border-[#005FD9]/15 rounded-lg p-3 sm:p-4 lg:p-6 mb-4 sm:mb-6">
+                <div className="bg-white rounded-lg p-3 sm:p-4 lg:p-6 mb-4 sm:mb-6">
                   <h4 className="text-[#044FAF] text-center font-bold mb-2 sm:mb-3 text-sm sm:text-base lg:text-lg">
                     Important Payment Message
                   </h4>
                   <p className="text-[#134687] text-center font-semibold mb-2 sm:mb-3 text-sm sm:text-base">
-                    When sending your payment via GCash QR, you MUST include
-                    this message:
+                    After payment, fill out the acknowledgement receipt PDF and upload it to Google Drive, then submit the shareable link below.
                   </p>
-                  <div className="bg-linear-to-r from-[#134687] to-[#0f3a6b] rounded-lg p-3 sm:p-4 text-center">
-                    <code className="text-white font-bold text-sm sm:text-base lg:text-lg font-mono">
-                      Member ID: {memberIdDisplay}
-                    </code>
-                  </div>
+                  {receiptTemplateUrl && (
+                    <div className="text-center mb-4 sm:mb-6">
+                      <a
+                        href={receiptTemplateUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[#044FAF] font-semibold underline"
+                      >
+                        Download acknowledgement receipt PDF
+                      </a>
+                    </div>
+                  )}
+                  {!hasPaymentProof ? (
+                    <form onSubmit={handlePaymentProofSubmit} className="space-y-3 mb-4 sm:mb-6">
+                      <input
+                        type="url"
+                        value={paymentProof}
+                        onChange={(e) => setPaymentProof(e.target.value)}
+                        required
+                        placeholder="Paste Google Drive receipt link"
+                        className="w-full rounded-lg border border-[#005FD9]/20 px-4 py-3 text-sm focus:outline-none focus:border-[#044FAF]"
+                      />
+                      {paymentProofError && (
+                        <p className="text-red-600 text-xs text-center">{paymentProofError}</p>
+                      )}
+                      <button
+                        type="submit"
+                        disabled={submittingPaymentProof}
+                        className="w-full bg-[#134687] text-white px-4 py-3 rounded-lg font-semibold disabled:opacity-50"
+                      >
+                        {submittingPaymentProof ? "Submitting..." : "Submit Payment Proof"}
+                      </button>
+                    </form>
+                  ) : (
+                    <p className="text-green-700 text-center text-sm font-semibold mb-4 sm:mb-6">
+                      Payment proof submitted. Your Member ID is now available above.
+                    </p>
+                  )}
                   <p className="text-[#134687]/80 text-center text-xs sm:text-sm mt-2">
-                    This message is required for payment verification and
-                    processing.
+                    Your Member ID will be shown after submitting your acknowledgement receipt link.
                   </p>
                 </div>
 
@@ -663,7 +740,7 @@ export default function CommitteeProgressPageContent() {
           )}
 
           {/* Join Our Community - Only show for accepted applications */}
-          {application.hasAccepted && (
+          {application.hasAccepted && communityEnabled && communityUrl && (
             <div className="rounded-2xl sm:rounded-[20px] lg:rounded-3xl bg-white shadow-[0_2px_8px_0_rgba(0,0,0,0.15)] sm:shadow-[0_4px_4px_0_rgba(0,0,0,0.31)] p-4 sm:p-6 lg:p-10 w-full max-w-4xl">
               <h3 className="text-base sm:text-lg lg:text-xl font-semibold mb-4 sm:mb-5 text-center">
                 Join Our Community
@@ -676,12 +753,12 @@ export default function CommitteeProgressPageContent() {
                 </p>
                 <div className="text-center">
                   <a
-                    href="https://fb.me/g/6UCY6FrzU/L7r94Zcj"
+                    href={communityUrl}
                     className="inline-block bg-linear-to-r from-[#134687] to-[#0f3a6b] text-white px-4 sm:px-6 lg:px-8 py-2 sm:py-3 lg:py-4 rounded-lg font-bold text-sm sm:text-base lg:text-lg shadow-lg hover:shadow-xl transition-all duration-200"
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    Join UST CSS Members 25&apos;-26&apos; Group
+                    {communityLabel}
                   </a>
                 </div>
                 <p className="text-[#134687]/70 text-center text-xs sm:text-sm mt-4">

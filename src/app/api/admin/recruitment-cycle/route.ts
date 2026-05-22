@@ -6,6 +6,22 @@ import { prisma } from "@/lib/prisma";
 // GET recruitment cycles (all + active)
 export async function GET() {
   try {
+    const session = await getServerSession(authOptions);
+
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const userRole = session.user.role;
+    const hasAdminAccess = userRole === "admin" || userRole === "super_admin";
+
+    if (!hasAdminAccess) {
+      return NextResponse.json(
+        { error: "Forbidden - Admin access required" },
+        { status: 403 },
+      );
+    }
+
     const [cycles, activeCycle] = await Promise.all([
       prisma.recruitmentCycle.findMany({ orderBy: { createdAt: "desc" } }),
       prisma.recruitmentCycle.findFirst({

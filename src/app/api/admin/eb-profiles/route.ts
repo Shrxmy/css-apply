@@ -32,7 +32,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create or update EB profile
+    const activeCycle = await prisma.recruitmentCycle.findFirst({
+      where: { isActive: true },
+      select: { id: true },
+    });
+
+    // Create or update EB profile for the current active academic year
     const ebProfile = await prisma.eBProfile.upsert({
       where: { userId },
       update: {
@@ -40,6 +45,7 @@ export async function POST(request: NextRequest) {
         committees: committees || [],
         isActive: isActive ?? true,
         meetingLink: meetingLink ?? null,
+        recruitmentCycleId: activeCycle?.id ?? null,
       },
       create: {
         userId,
@@ -47,6 +53,7 @@ export async function POST(request: NextRequest) {
         committees: committees || [],
         isActive: isActive ?? true,
         meetingLink: meetingLink ?? null,
+        recruitmentCycleId: activeCycle?.id ?? null,
       },
     });
 

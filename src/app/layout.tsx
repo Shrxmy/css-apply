@@ -30,7 +30,7 @@ export const metadata: Metadata = {
     template: "%s | CSSApply",
   },
   description:
-    "CSSApply Recruitment 101 Portal - Apply for positions in the Computer Science Society. Join our team as a member, committee staff, or executive assistant.",
+    "CSSApply Recruitment 101 Portal - Apply for positions in the Computer Science Society. Join our team as a member, committee staff, or executive associate.",
   keywords: [
     "CSSApply",
     "Computer Science Society",
@@ -55,7 +55,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "CSSApply - Computer Science Society Recruitment Portal",
     description:
-      "Apply for positions in the Computer Science Society. Join our team as a member, committee staff, or executive assistant.",
+      "Apply for positions in the Computer Science Society. Join our team as a member, committee staff, or executive associate.",
     url: "/",
     siteName: "CSSApply",
     images: [
@@ -73,7 +73,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "CSSApply - Computer Science Society Recruitment Portal",
     description:
-      "Apply for positions in the Computer Science Society. Join our team as a member, committee staff, or executive assistant.",
+      "Apply for positions in the Computer Science Society. Join our team as a member, committee staff, or executive associate.",
     images: [
       "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/logos/Logo_CSS Apply.svg",
     ],

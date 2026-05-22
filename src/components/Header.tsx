@@ -22,7 +22,7 @@ export default function Header() {
           width={110}
           height={190}
           sizes="(max-width: 640px) 64px, 110px"
-          className="w-20 h-auto sm:w-[110px] cursor-pointer"
+          className="w-20 h-auto sm:w-27.5 cursor-pointer"
         />
       </Link>
       <button

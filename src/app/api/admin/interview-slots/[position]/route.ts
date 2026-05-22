@@ -67,7 +67,7 @@ export async function GET(
       });
     applications.push(...committeeApplicationsSlots);
 
-    const eaApplicationsSlots = await prisma.eAApplication.findMany({
+    const executiveAssociateApplicationsSlots = await prisma.executiveAssociateApplication.findMany({
       where: {
         interviewBy: {
           equals: normalizedPosition,
@@ -88,7 +88,7 @@ export async function GET(
       },
       orderBy: [{ interviewSlotDay: "asc" }, { interviewSlotTimeStart: "asc" }],
     });
-    applications.push(...eaApplicationsSlots);
+    applications.push(...executiveAssociateApplicationsSlots);
 
     // Get meeting link from EBProfile
     let meetingLink = null;

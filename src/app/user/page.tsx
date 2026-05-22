@@ -73,9 +73,9 @@ export default function UserDashboard() {
       router.push(
         `/user/apply/committee-staff/${appStatus.committeeId}/progress`,
       );
-    } else if (appStatus.hasEAApplication && appStatus.ebRole) {
+    } else if (appStatus.hasExecutiveAssociateApplication && appStatus.ebRole) {
       router.push(
-        `/user/apply/executive-assistant/${appStatus.ebRole}/progress`,
+        `/user/apply/executive-associate/${appStatus.ebRole}/progress`,
       );
     }
   }, [status, session, appStatus, hasAnyApplication, router]);
@@ -238,7 +238,7 @@ export default function UserDashboard() {
                           </div>
                         </div>
                       </div>
-                      {/* Slide 3 - Executive Assistant */}
+                      {/* Slide 3 - Executive Associate */}
                       <div className="min-w-full flex justify-center">
                         <div className="relative flex flex-col w-64 h-110 md:w-80 md:h-120 rounded-[28px] border-2 border-[#005FD9] bg-white shadow-[0_8px_13px_0_rgba(0,0,0,0.25)] items-center justify-center">
                           <Briefcase
@@ -248,7 +248,7 @@ export default function UserDashboard() {
                           />
 
                           <div className="text-base md:text-lg text-[#134687] flex flex-col font-poppins items-center text-center w-full">
-                            Executive Assistant
+                            Executive Associate
                             <div className="text-black text-[10px] sm:text-[10px] md:text-[13px] text-justify font-inter font-light border-2 border-[#D1D1D1] bg-[#ECECEC] rounded-lg mt-4 h-60 w-50 md:mt-5 md:h-67.5 md:w-70 p-4 flex flex-col justify-between overflow-hidden">
                               <ul className="list-disc list-outside space-y-1 flex-1 overflow-y-auto pl-4">
                                 <li>
@@ -267,10 +267,10 @@ export default function UserDashboard() {
                                 </li>
                               </ul>
                               <a
-                                href="/user/apply/executive-assistant"
+                                href="/user/apply/executive-associate"
                                 className="whitespace-nowrap bg-[#044FAF] font-inter text-[10px] md:text-sm text-white px-3 py-2 md:px-4 md:py-3 rounded-md hover:bg-[#04387B] transition-all duration-300 ease-in-out text-center mt-2 shrink-0 shadow-md hover:shadow-lg"
                               >
-                                Apply as Executive Assistant
+                                Apply as Executive Associate
                               </a>
                             </div>
                           </div>
@@ -368,7 +368,7 @@ export default function UserDashboard() {
                     />
 
                     <div className="text-base xl:text-lg text-[#134687] flex flex-col font-poppins items-center text-center w-full">
-                      Executive Assistant
+                      Executive Associate
                       <div className="text-black lg:text-[10px] xl:text-[12px] text-justify font-inter font-light border-2 border-[#D1D1D1] bg-[#ECECEC] rounded-lg mt-4 xl:mt-5 h-55 xl:h-67.5 w-55 xl:w-70 p-4 flex flex-col justify-between overflow-hidden">
                         <ul className="list-disc list-outside space-y-2 flex-1 overflow-y-auto pl-4">
                           <li>
@@ -385,10 +385,10 @@ export default function UserDashboard() {
                           </li>
                         </ul>
                         <a
-                          href="/user/apply/executive-assistant"
+                          href="/user/apply/executive-associate"
                           className="whitespace-nowrap bg-[#044FAF] font-inter text-xs xl:text-sm text-white px-4 xl:px-6 py-2.5 xl:py-3 rounded-md hover:bg-[#04387B] transition-all duration-300 ease-in-out text-center mt-2 shrink-0 shadow-md hover:shadow-lg"
                         >
-                          Apply as Executive Assistant
+                          Apply as Executive Associate
                         </a>
                       </div>
                     </div>

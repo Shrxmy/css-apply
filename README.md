@@ -80,6 +80,10 @@ CSSApply is a comprehensive recruitment management system designed specifically 
    NEXT_PUBLIC_SUPABASE_URL="your-supabase-url"
    NEXT_PUBLIC_SUPABASE_ANON_KEY="your-supabase-anon-key"
    SUPABASE_SERVICE_ROLE_KEY="your-service-role-key"
+   NEXT_PUBLIC_PAYMENT_QR_URL="https://your-public-payment-qr-url"
+
+   # Auth
+   ALLOWED_SIGNIN_EMAIL_DOMAIN="ust.edu.ph"
 
    # Email (Brevo)
    BREVO_API_KEY="your-brevo-api-key"

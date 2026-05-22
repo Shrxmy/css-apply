@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
         html = committeeTemplate.html;
         break;
 
-      case "executive_assistant_application":
+      case "executive_associate_application":
         const eaTemplate = emailTemplates.executiveAssistantApplication(
           testName,
           "2024XXXX",
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
         html = committeeAcceptedTemplate.html;
         break;
 
-      case "executive_assistant_accepted":
+      case "executive_associate_accepted":
         const eaAcceptedTemplate = emailTemplates.executiveAssistantAccepted(
           testName,
           "test123",
@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
         html = committeeRejectedTemplate.html;
         break;
 
-      case "executive_assistant_rejected":
+      case "executive_associate_rejected":
         const eaRejectedTemplate = emailTemplates.executiveAssistantRejected(
           testName,
           "President",
@@ -112,6 +112,33 @@ export async function POST(request: NextRequest) {
         );
         subject = committeeRedirectedTemplate.subject;
         html = committeeRedirectedTemplate.html;
+        break;
+
+      case "member_id_released":
+        const memberIdReleasedTemplate = emailTemplates.memberIdReleased(
+          testName,
+          "TEST123"
+        );
+        subject = memberIdReleasedTemplate.subject;
+        html = memberIdReleasedTemplate.html;
+        break;
+
+      case "payment_reminder":
+        const paymentReminderTemplate = emailTemplates.paymentReminder(
+          testName
+        );
+        subject = paymentReminderTemplate.subject;
+        html = paymentReminderTemplate.html;
+        break;
+
+      case "css_group_join":
+        const cssGroupJoinTemplate = emailTemplates.cssGroupJoin(
+          testName,
+          "https://fb.me/g/6UCY6FrzU/L7r94Zcj",
+          "Join UST CSS Members 25'-26' Group"
+        );
+        subject = cssGroupJoinTemplate.subject;
+        html = cssGroupJoinTemplate.html;
         break;
 
       default:

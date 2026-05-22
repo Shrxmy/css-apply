@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { toast } from "sonner";
 import useSWR from "swr";
+import { roles as ebRoles } from "@/data/ebRoles";
 import { truncateToLast7 } from "@/lib/truncate-utils";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -163,19 +164,16 @@ function RoleDropdown({
         className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-full transition-colors ${color[display] ?? color.user} ${pendingRole ? "ring-2 ring-[#FFBC2B]" : ""}`}
       >
         {display.replace("_", " ")}
-        <svg
-          className="w-3 h-3 opacity-60"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M19 9l-7 7-7-7"
-          />
-        </svg>
+        <div
+          className="w-3 h-3 opacity-60 bg-current"
+          style={{
+            maskImage: "url(/icons/chevron-down.svg)",
+            WebkitMaskImage: "url(/icons/chevron-down.svg)",
+            maskSize: "contain",
+            maskRepeat: "no-repeat",
+            maskPosition: "center",
+          }}
+        />
       </button>
       {open &&
         createPortal(
@@ -277,13 +275,16 @@ export default function SuperAdminDashboard() {
 const EMAIL_TEMPLATES = [
   { value: "member_application", label: "Member Application Received" },
   { value: "committee_application", label: "Committee Staff Application Received" },
-  { value: "executive_assistant_application", label: "EA Application Received" },
+  { value: "executive_associate_application", label: "Executive Associate Application Received" },
   { value: "member_accepted", label: "Member Accepted" },
   { value: "committee_accepted", label: "Committee Staff Accepted" },
-  { value: "executive_assistant_accepted", label: "EA Accepted" },
+  { value: "executive_associate_accepted", label: "Executive Associate Accepted" },
   { value: "committee_rejected", label: "Committee Staff Rejected" },
-  { value: "executive_assistant_rejected", label: "EA Rejected" },
+  { value: "executive_associate_rejected", label: "Executive Associate Rejected" },
   { value: "committee_redirected", label: "Committee Staff Redirected" },
+  { value: "member_id_released", label: "Member ID Released" },
+  { value: "payment_reminder", label: "Payment Reminder" },
+  { value: "css_group_join", label: "CSS Group Join Invitation" },
 ];
 
 function EmailTestTab() {
@@ -319,9 +320,16 @@ function EmailTestTab() {
       <div className="bg-white border border-[#005FD9]/10 rounded-xl p-6">
         <div className="flex items-center gap-3 mb-4">
           <div className="h-10 w-10 rounded-lg [background:linear-gradient(135deg,#044FAF,#134687)] flex items-center justify-center">
-            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-            </svg>
+            <div
+              className="w-5 h-5 text-white bg-current"
+              style={{
+                maskImage: "url(/icons/mail.svg)",
+                WebkitMaskImage: "url(/icons/mail.svg)",
+                maskSize: "contain",
+                maskRepeat: "no-repeat",
+                maskPosition: "center",
+              }}
+            />
           </div>
           <div>
             <h2 className="text-lg font-bold text-[#134687] font-poppins">
@@ -354,9 +362,16 @@ function EmailTestTab() {
               className="flex items-center gap-3 p-4 border border-[#005FD9]/15 rounded-lg hover:bg-[#F3F3FD] transition-colors text-left disabled:opacity-50"
             >
               <div className="h-8 w-8 rounded-md [background:linear-gradient(135deg,#2F7EE3,#0349A2)] flex items-center justify-center shrink-0">
-                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                </svg>
+                <div
+                  className="w-4 h-4 text-white bg-current"
+                  style={{
+                    maskImage: "url(/icons/send.svg)",
+                    WebkitMaskImage: "url(/icons/send.svg)",
+                    maskSize: "contain",
+                    maskRepeat: "no-repeat",
+                    maskPosition: "center",
+                  }}
+                />
               </div>
               <span className="text-sm text-[#134687] font-medium">
                 {template.label}
@@ -1075,6 +1090,173 @@ function SettingsTab() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  const {
+    data: availabilityData,
+    isLoading: isAvailabilityLoading,
+    mutate: mutateAvailability,
+  } = useSWR<{ availability: Record<string, boolean> }>(
+    "/api/admin/available-executive-associate-roles",
+    swrFetcher,
+    { revalidateOnFocus: false },
+  );
+  const [savingAvailability, setSavingAvailability] = useState(false);
+  const [selectedPaymentQr, setSelectedPaymentQr] = useState<File | null>(null);
+  const [savingPaymentQr, setSavingPaymentQr] = useState(false);
+  const [selectedReceiptTemplate, setSelectedReceiptTemplate] = useState<File | null>(null);
+  const [savingReceiptTemplate, setSavingReceiptTemplate] = useState(false);
+  const [communityForm, setCommunityForm] = useState({
+    enabled: true,
+    url: "",
+    label: "",
+  });
+  const [savingCommunity, setSavingCommunity] = useState(false);
+  const {
+    data: paymentQrData,
+    isLoading: isPaymentQrLoading,
+    mutate: mutatePaymentQr,
+  } = useSWR<{ url: string }>("/api/admin/payment-qr", swrFetcher, {
+    revalidateOnFocus: false,
+  });
+  const { data: receiptTemplateData, mutate: mutateReceiptTemplate } = useSWR<{ url: string }>(
+    "/api/admin/payment-receipt-template",
+    swrFetcher,
+    { revalidateOnFocus: false },
+  );
+
+  const { data: communityData, mutate: mutateCommunity } = useSWR<{
+    enabled: boolean;
+    url: string;
+    label: string;
+  }>("/api/admin/community-link", swrFetcher, { revalidateOnFocus: false });
+
+  useEffect(() => {
+    if (!communityData) return;
+    setCommunityForm({
+      enabled: communityData.enabled !== false,
+      url: communityData.url,
+      label: communityData.label,
+    });
+  }, [communityData]);
+
+  const availability = availabilityData?.availability ?? Object.fromEntries(
+    ebRoles.map((role) => [role.id, true]),
+  );
+
+  const handleReceiptTemplateUpload = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!selectedReceiptTemplate) {
+      toast.error("Please select a receipt PDF");
+      return;
+    }
+
+    setSavingReceiptTemplate(true);
+
+    try {
+      const uploadFormData = new FormData();
+      uploadFormData.append("file", selectedReceiptTemplate);
+      const res = await fetch("/api/admin/payment-receipt-template", {
+        method: "POST",
+        body: uploadFormData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to upload receipt template");
+
+      toast.success("Receipt template updated");
+      setSelectedReceiptTemplate(null);
+      mutateReceiptTemplate({ url: data.url }, false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to upload receipt template");
+    } finally {
+      setSavingReceiptTemplate(false);
+    }
+  };
+
+  const handleCommunitySave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingCommunity(true);
+
+    try {
+      const res = await fetch("/api/admin/community-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(communityForm),
+      });
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.error || "Failed to save community link");
+
+      toast.success("Community link updated");
+      mutateCommunity(data, false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to save community link");
+    } finally {
+      setSavingCommunity(false);
+    }
+  };
+
+  const handlePaymentQrUpload = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!selectedPaymentQr) {
+      toast.error("Please select a QR image");
+      return;
+    }
+
+    setSavingPaymentQr(true);
+
+    try {
+      const uploadFormData = new FormData();
+      uploadFormData.append("file", selectedPaymentQr);
+
+      const res = await fetch("/api/admin/payment-qr", {
+        method: "POST",
+        body: uploadFormData,
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to upload payment QR");
+      }
+
+      toast.success("Payment QR updated");
+      setSelectedPaymentQr(null);
+      mutatePaymentQr({ url: data.url }, false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to upload payment QR");
+    } finally {
+      setSavingPaymentQr(false);
+    }
+  };
+
+  const handleToggleAvailability = async (roleId: string, enabled: boolean) => {
+    const nextAvailability = { ...availability, [roleId]: enabled };
+    mutateAvailability({ availability: nextAvailability }, false);
+    setSavingAvailability(true);
+
+    try {
+      const res = await fetch("/api/admin/available-executive-associate-roles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ availability: nextAvailability }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to update availability");
+      }
+
+      toast.success("Executive Associate role availability updated");
+      mutateAvailability();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to update availability");
+      mutateAvailability();
+    } finally {
+      setSavingAvailability(false);
+    }
+  };
+
   const handleNew = () => {
     setForm({ ...emptyForm, isActive: allCycles.length === 0 });
     setEditingId(null);
@@ -1143,6 +1325,197 @@ function SettingsTab() {
 
   return (
     <div className="space-y-5">
+      <div className="bg-white border border-[#005FD9]/10 rounded-xl p-6">
+        <h2 className="text-sm font-bold text-[#134687] font-poppins mb-1">
+          payment qr
+        </h2>
+        <p className="text-xs text-[#134687]/40 font-mono mb-5">
+          upload the QR code shown on accepted applicants&apos; payment instructions
+        </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-[180px_1fr] gap-5 items-start">
+          <div className="border border-[#005FD9]/10 rounded-lg bg-[#F3F3FD]/40 min-h-[180px] flex items-center justify-center overflow-hidden">
+            {isPaymentQrLoading ? (
+              <div className="animate-spin h-5 w-5 border-2 border-[#044FAF] border-t-transparent rounded-full" />
+            ) : paymentQrData?.url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={paymentQrData.url}
+                alt="Current payment QR"
+                className="w-full h-full object-contain"
+              />
+            ) : (
+              <span className="text-xs text-[#134687]/40 font-mono">no qr uploaded</span>
+            )}
+          </div>
+
+          <form onSubmit={handlePaymentQrUpload} className="space-y-3">
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => setSelectedPaymentQr(e.target.files?.[0] ?? null)}
+              className="block w-full text-sm text-[#134687] file:mr-4 file:rounded-lg file:border-0 file:bg-[#E8F2FF] file:px-4 file:py-2 file:text-sm file:font-medium file:text-[#134687] hover:file:bg-[#DCECFF]"
+            />
+            {selectedPaymentQr && (
+              <p className="text-xs text-[#134687]/50 font-mono">
+                selected: {selectedPaymentQr.name}
+              </p>
+            )}
+            <button
+              type="submit"
+              disabled={savingPaymentQr || !selectedPaymentQr}
+              className="px-6 py-2 text-sm font-medium text-white [background:linear-gradient(90deg,#2F7EE3_0%,#0349A2_100%)] rounded-lg hover:opacity-90 disabled:opacity-40 transition-opacity font-poppins"
+            >
+              {savingPaymentQr ? "uploading..." : "upload qr"}
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <div className="bg-white border border-[#005FD9]/10 rounded-xl p-6">
+        <h2 className="text-sm font-bold text-[#134687] font-poppins mb-1">
+          payment acknowledgement receipt
+        </h2>
+        <p className="text-xs text-[#134687]/40 font-mono mb-5">
+          upload the PDF template applicants must fill out and submit as a Google Drive link
+        </p>
+        <form onSubmit={handleReceiptTemplateUpload} className="space-y-3 max-w-xl">
+          {receiptTemplateData?.url && (
+            <a href={receiptTemplateData.url} target="_blank" rel="noopener noreferrer" className="block text-sm text-[#044FAF] underline font-mono">
+              view current receipt template
+            </a>
+          )}
+          <input
+            type="file"
+            accept="application/pdf"
+            onChange={(e) => setSelectedReceiptTemplate(e.target.files?.[0] ?? null)}
+            className="block w-full text-sm text-[#134687] file:mr-4 file:rounded-lg file:border-0 file:bg-[#E8F2FF] file:px-4 file:py-2 file:text-sm file:font-medium file:text-[#134687] hover:file:bg-[#DCECFF]"
+          />
+          {selectedReceiptTemplate && (
+            <p className="text-xs text-[#134687]/50 font-mono">selected: {selectedReceiptTemplate.name}</p>
+          )}
+          <button type="submit" disabled={savingReceiptTemplate || !selectedReceiptTemplate} className="px-6 py-2 text-sm font-medium text-white [background:linear-gradient(90deg,#2F7EE3_0%,#0349A2_100%)] rounded-lg hover:opacity-90 disabled:opacity-40 transition-opacity font-poppins">
+            {savingReceiptTemplate ? "uploading..." : "upload receipt pdf"}
+          </button>
+        </form>
+      </div>
+
+      <div className="bg-white border border-[#005FD9]/10 rounded-xl p-6">
+        <h2 className="text-sm font-bold text-[#134687] font-poppins mb-1">
+          community link
+        </h2>
+        <p className="text-xs text-[#134687]/40 font-mono mb-5">
+          configure the group link shown to accepted applicants
+        </p>
+        <form onSubmit={handleCommunitySave} className="space-y-3 max-w-xl">
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={communityForm.enabled}
+              onChange={(e) =>
+                setCommunityForm({ ...communityForm, enabled: e.target.checked })
+              }
+              className="rounded border-[#005FD9]/20 text-[#044FAF] focus:ring-[#044FAF]/30"
+            />
+            <span className="text-[#134687] text-xs">show community card to accepted applicants</span>
+          </label>
+          <div>
+            <label className="block text-xs font-semibold text-[#134687]/60 uppercase tracking-wider font-mono mb-1">
+              Button Label *
+            </label>
+            <input
+              type="text"
+              required
+              value={communityForm.label}
+              onChange={(e) =>
+                setCommunityForm({ ...communityForm, label: e.target.value })
+              }
+              className="w-full border border-[#005FD9]/15 rounded-lg px-3 py-2 text-sm focus:ring-[#044FAF]/20 focus:border-[#044FAF]/40"
+              placeholder="Join UST CSS Members 26'-27' Group"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-[#134687]/60 uppercase tracking-wider font-mono mb-1">
+              Group URL *
+            </label>
+            <input
+              type="url"
+              required
+              value={communityForm.url}
+              onChange={(e) =>
+                setCommunityForm({ ...communityForm, url: e.target.value })
+              }
+              className="w-full border border-[#005FD9]/15 rounded-lg px-3 py-2 text-sm focus:ring-[#044FAF]/20 focus:border-[#044FAF]/40"
+              placeholder="https://fb.me/g/..."
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={savingCommunity}
+            className="px-6 py-2 text-sm font-medium text-white [background:linear-gradient(90deg,#2F7EE3_0%,#0349A2_100%)] rounded-lg hover:opacity-90 disabled:opacity-40 transition-opacity font-poppins"
+          >
+            {savingCommunity ? "saving..." : "save community link"}
+          </button>
+        </form>
+      </div>
+
+      <div className="bg-white border border-[#005FD9]/10 rounded-xl p-6">
+        <div className="flex items-start justify-between gap-4 mb-5">
+          <div>
+            <h2 className="text-sm font-bold text-[#134687] font-poppins mb-1">
+              executive associate availability
+            </h2>
+            <p className="text-xs text-[#134687]/40 font-mono">
+              choose which EB roles applicants can apply to as Executive Associate
+            </p>
+          </div>
+          {savingAvailability && (
+            <span className="text-[11px] text-[#134687]/40 font-mono">saving...</span>
+          )}
+        </div>
+
+        {isAvailabilityLoading ? (
+          <div className="flex justify-center py-6">
+            <div className="animate-spin h-5 w-5 border-2 border-[#044FAF] border-t-transparent rounded-full" />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {ebRoles.map((role) => {
+              const enabled = availability[role.id] !== false;
+
+              return (
+                <label
+                  key={role.id}
+                  className={`flex items-center justify-between gap-3 border rounded-lg px-4 py-3 cursor-pointer transition-colors ${
+                    enabled
+                      ? "border-[#044FAF]/20 bg-[#E8F2FF]/40"
+                      : "border-[#005FD9]/10 bg-white"
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-[#134687] font-poppins">
+                      {role.title}
+                    </p>
+                    <p className="text-[11px] text-[#134687]/40 font-mono">
+                      {enabled ? "visible to applicants" : "hidden from applicants"}
+                    </p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={enabled}
+                    disabled={savingAvailability}
+                    onChange={(e) =>
+                      handleToggleAvailability(role.id, e.target.checked)
+                    }
+                    className="h-5 w-5 rounded border-[#005FD9]/20 text-[#044FAF] focus:ring-[#044FAF]/30"
+                  />
+                </label>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       {/* Existing Cycles */}
       {allCycles.length > 0 && (
         <div className="bg-white border border-[#005FD9]/10 rounded-xl overflow-hidden">

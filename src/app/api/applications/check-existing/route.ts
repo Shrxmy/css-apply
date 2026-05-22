@@ -11,6 +11,11 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const activeCycle = await prisma.recruitmentCycle.findFirst({
+      where: { isActive: true },
+      select: { id: true },
+    });
+
     // Use a more efficient query with only necessary fields
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
@@ -19,22 +24,28 @@ export async function GET() {
         email: true,
         name: true,
         role: true,
-        memberApplication: {
+        memberApplications: {
+          where: { recruitmentCycleId: activeCycle?.id ?? null },
           select: {
             id: true,
           },
+          take: 1,
         },
-        committeeApplication: {
+        committeeApplications: {
+          where: { recruitmentCycleId: activeCycle?.id ?? null },
           select: {
             id: true,
             firstOptionCommittee: true,
           },
+          take: 1,
         },
-        eaApplication: {
+        executiveAssociateApplications: {
+          where: { recruitmentCycleId: activeCycle?.id ?? null },
           select: {
             id: true,
             firstOptionEb: true,
           },
+          take: 1,
         },
       },
     });
@@ -53,7 +64,7 @@ export async function GET() {
         const existingApplications = {
           hasMemberApplication: false,
           hasCommitteeApplication: false,
-          hasEAApplication: false,
+          hasExecutiveAssociateApplication: false,
           applications: {
             member: null,
             committee: null,
@@ -74,17 +85,17 @@ export async function GET() {
     }
 
     const existingApplications = {
-      hasMemberApplication: !!user.memberApplication,
-      hasCommitteeApplication: !!user.committeeApplication,
-      hasEAApplication: !!user.eaApplication,
+      hasMemberApplication: !!user.memberApplications?.[0],
+      hasCommitteeApplication: !!user.committeeApplications?.[0],
+      hasExecutiveAssociateApplication: !!user.executiveAssociateApplications?.[0],
       applications: {
-        member: user.memberApplication,
-        committee: user.committeeApplication,
-        ea: user.eaApplication,
+        member: user.memberApplications?.[0],
+        committee: user.committeeApplications?.[0],
+        ea: user.executiveAssociateApplications?.[0],
       },
       // ADD these for proper redirects
-      ebRole: user.eaApplication?.firstOptionEb,
-      committeeId: user.committeeApplication?.firstOptionCommittee,
+      ebRole: user.executiveAssociateApplications?.[0]?.firstOptionEb,
+      committeeId: user.committeeApplications?.[0]?.firstOptionCommittee,
     };
 
     return NextResponse.json(existingApplications);

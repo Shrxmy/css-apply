@@ -26,8 +26,8 @@ export async function POST(request: NextRequest) {
 
     let updatedApplication;
 
-    if (applicationType === "ea") {
-      updatedApplication = await prisma.eAApplication.update({
+    if (applicationType === "executive-associate") {
+      updatedApplication = await prisma.executiveAssociateApplication.updateMany({
         where: { studentNumber },
         data: {
           interviewSlotDay: null,
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
         },
       });
     } else if (applicationType === "committee") {
-      updatedApplication = await prisma.committeeApplication.update({
+      updatedApplication = await prisma.committeeApplication.updateMany({
         where: { studentNumber },
         data: {
           interviewSlotDay: null,
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
       });
     } else {
       return NextResponse.json(
-        { error: 'Invalid application type. Must be "ea" or "committee"' },
+        { error: 'Invalid application type. Must be "executive-associate" or "committee"' },
         { status: 400 },
       );
     }
