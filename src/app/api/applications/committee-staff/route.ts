@@ -196,13 +196,25 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const activeCycle = await prisma.recruitmentCycle.findFirst({
+      where: { isActive: true },
+      select: { id: true },
+    });
+
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
       include: {
         committeeApplications: {
           where: {
-            recruitmentCycleId: (await prisma.recruitmentCycle.findFirst({ where: { isActive: true }, select: { id: true } }))?.id ?? null,
+            recruitmentCycleId: activeCycle?.id ?? null,
           },
+          take: 1,
+        },
+        memberships: {
+          where: {
+            recruitmentCycleId: activeCycle?.id ?? "__no_active_cycle__",
+          },
+          select: { memberId: true },
           take: 1,
         },
       },
@@ -237,6 +249,7 @@ export async function GET() {
         age: user.age,
         dateOfBirth: user.dateOfBirth,
         isOldCssMember: user.isOldCssMember,
+        memberships: user.memberships,
       },
       meetingLink: meetingLink,
     });
@@ -263,7 +276,13 @@ export async function DELETE() {
       include: {
         committeeApplications: {
           where: {
-            recruitmentCycleId: (await prisma.recruitmentCycle.findFirst({ where: { isActive: true }, select: { id: true } }))?.id ?? null,
+            recruitmentCycleId:
+              (
+                await prisma.recruitmentCycle.findFirst({
+                  where: { isActive: true },
+                  select: { id: true },
+                })
+              )?.id ?? null,
           },
           take: 1,
         },
@@ -283,11 +302,11 @@ export async function DELETE() {
 
     // Delete files from Supabase storage if they exist
     try {
-      const cvPath = normalizeStoragePath(user.committeeApplications?.[0].supabaseFilePath);
+      const cvPath = normalizeStoragePath(
+        user.committeeApplications?.[0].supabaseFilePath,
+      );
       if (cvPath) {
-        await supabase.storage
-          .from("committee-applications")
-          .remove([cvPath]);
+        await supabase.storage.from("committee-applications").remove([cvPath]);
       }
 
       // Also check if there's a portfolio file to delete

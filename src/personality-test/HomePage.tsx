@@ -62,7 +62,7 @@ const HomePage: React.FC<HomePageProps> = ({ onStartQuiz }) => {
 
         <div className={styles["home-central-content"]}>
           <Image
-            src="https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/Questions CSAR.png"
+            src="/assets/css-apply-static-images/assets/committee_test/Questions%20CSAR.webp"
             alt="An illustration with a question mark, representing the quiz"
             className={styles["home-main-image"]}
             width={400}

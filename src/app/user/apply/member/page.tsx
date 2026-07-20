@@ -206,7 +206,7 @@ export default function MemberApplication() {
   };
 
   return (
-    <div className="min-h-screen md:bg-[rgb(243,243,253)] md:bg-[url('https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/pictures/background.png')] flex flex-col justify-between bg-cover bg-repeat">
+    <div className="min-h-screen md:bg-[rgb(243,243,253)] md:bg-[url('/assets/css-apply-static-images/assets/pictures/background.webp')] flex flex-col justify-between bg-cover bg-repeat">
       <Header />
 
       <section className="flex flex-col justify-between items-center px-20 py-10 lg:px-50 lg:py-20">
@@ -318,7 +318,7 @@ export default function MemberApplication() {
 
               <div className="flex flex-col gap-2">
                 <div className="text-black text-xs lg:text-sm font-Inter font-normal">
-                  Were you an old member of CSS before? *
+                  Were you an old member/staff/executive associate of CSS before? *
                 </div>
                 <div className="flex gap-6 text-black text-sm font-Inter">
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -343,14 +343,14 @@ export default function MemberApplication() {
               </div>
 
               <div className="flex items-center justify-center lg:items-start gap-3">
-                <div className="relative flex-shrink-0">
+                <div className="relative flex-shrink-0 h-4 w-4 lg:h-6 lg:w-6">
                   <input
                     type="checkbox"
                     id="circle-checkbox"
                     checked={isChecked}
                     onChange={(e) => setIsChecked(e.target.checked)}
                     required
-                    className="w-4 h-4 lg:w-6 lg:h-6 appearance-none rounded-full border-2 border-gray-400 transition-all duration-200 focus:outline-none
+                    className="absolute inset-0 block h-full w-full appearance-none rounded-full border-2 border-gray-400 transition-all duration-200 focus:outline-none
                     hover:border-[#134687]
                     checked:bg-blue-500
                     shadow-inner cursor-pointer"
@@ -386,7 +386,7 @@ export default function MemberApplication() {
             <div className="hidden lg:flex justify-center items-center mt-8">
               <div className="relative w-[300px] h-[360px]">
                 <Image
-                  src="https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/pictures/MemberImage1.png"
+                  src="/assets/css-apply-static-images/assets/pictures/MemberImage1.webp"
                   alt="Member"
                   fill
                   sizes="300px"

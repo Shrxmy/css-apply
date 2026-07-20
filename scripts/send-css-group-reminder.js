@@ -261,7 +261,7 @@ const sendEmail = async (to, subject, html) => {
     sendSmtpEmail.subject = subject;
     sendSmtpEmail.htmlContent = html;
     sendSmtpEmail.sender = {
-      name: "CSS Apply",
+      name: "CSSApply",
       email: process.env.BREVO_FROM_EMAIL || "noreply@cssapply.com",
     };
     sendSmtpEmail.to = [{ email: to }];

@@ -8,7 +8,7 @@ import Image from "next/image";
 import { toast } from "sonner";
 import useSWR from "swr";
 import { roles as ebRoles } from "@/data/ebRoles";
-import { truncateToLast7 } from "@/lib/truncate-utils";
+import { committeeRoles } from "@/data/committeeRoles";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -27,6 +27,7 @@ interface User {
     isActive: boolean;
     meetingLink?: string;
   };
+  memberships?: Array<{ memberId: string }>;
 }
 
 interface EBProfileForm {
@@ -82,18 +83,18 @@ const EB_POSITIONS = [
   "Thomasian Wellness Advocate (TWA)",
 ] as const;
 
-const EB_COMMITTEES = [
-  "academics",
-  "community development",
-  "creatives and technical",
-  "documentation",
-  "external affairs",
-  "finance",
-  "logistics",
-  "publicity",
-  "sports and talent",
-  "technology development",
-] as const;
+const EB_COMMITTEES = committeeRoles.map(({ id, title }) => ({ id, title }));
+
+const normalizeCommitteeId = (value: string) => {
+  const normalizedValue = value.toLowerCase().replace(/&/g, "and");
+  const committee = committeeRoles.find(
+    ({ id, title }) =>
+      id.toLowerCase() === normalizedValue ||
+      title.toLowerCase().replace(/&/g, "and") === normalizedValue,
+  );
+
+  return committee?.id ?? value;
+};
 
 const ROLE_OPTIONS = [
   { value: "user", label: "User" },
@@ -266,145 +267,164 @@ export default function SuperAdminDashboard() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F3F3FD]">
         <div className="animate-spin h-8 w-8 border-2 border-[#044FAF] border-t-transparent rounded-full" />
-    </div>
-  );
-}
+      </div>
+    );
+  }
 
-// ─── Email Test Tab ───────────────────────────────────────────────────────────
+  // ─── Email Test Tab ───────────────────────────────────────────────────────────
 
-const EMAIL_TEMPLATES = [
-  { value: "member_application", label: "Member Application Received" },
-  { value: "committee_application", label: "Committee Staff Application Received" },
-  { value: "executive_associate_application", label: "Executive Associate Application Received" },
-  { value: "member_accepted", label: "Member Accepted" },
-  { value: "committee_accepted", label: "Committee Staff Accepted" },
-  { value: "executive_associate_accepted", label: "Executive Associate Accepted" },
-  { value: "committee_rejected", label: "Committee Staff Rejected" },
-  { value: "executive_associate_rejected", label: "Executive Associate Rejected" },
-  { value: "committee_redirected", label: "Committee Staff Redirected" },
-  { value: "member_id_released", label: "Member ID Released" },
-  { value: "payment_reminder", label: "Payment Reminder" },
-  { value: "css_group_join", label: "CSS Group Join Invitation" },
-];
+  const EMAIL_TEMPLATES = [
+    { value: "member_application", label: "Member Application Received" },
+    {
+      value: "committee_application",
+      label: "Committee Staff Application Received",
+    },
+    {
+      value: "executive_associate_application",
+      label: "Executive Associate Application Received",
+    },
+    { value: "member_accepted", label: "Member Accepted" },
+    { value: "committee_accepted", label: "Committee Staff Accepted" },
+    {
+      value: "executive_associate_accepted",
+      label: "Executive Associate Accepted",
+    },
+    { value: "committee_rejected", label: "Committee Staff Rejected" },
+    {
+      value: "executive_associate_rejected",
+      label: "Executive Associate Rejected",
+    },
+    { value: "committee_redirected", label: "Committee Staff Redirected" },
+    { value: "member_id_released", label: "Member ID Released" },
+    { value: "payment_reminder", label: "Payment Reminder" },
+    { value: "css_group_join", label: "CSS Group Join Invitation" },
+  ];
 
-function EmailTestTab() {
-  const [sending, setSending] = useState(false);
-  const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
-  const { data: session } = useSession();
+  function EmailTestTab() {
+    const [sending, setSending] = useState(false);
+    const [result, setResult] = useState<{
+      success: boolean;
+      message: string;
+    } | null>(null);
+    const { data: session } = useSession();
 
-  const handleSendTest = async (templateType: string) => {
-    setSending(true);
-    setResult(null);
-    try {
-      const res = await fetch("/api/admin/test-email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ templateType }),
-      });
-      const data = await res.json();
-      setResult({
-        success: res.ok,
-        message: data.message || data.error || "Unknown error",
-      });
-    } catch {
-      setResult({ success: false, message: "Network error" });
-    } finally {
-      setSending(false);
-    }
-  };
+    const handleSendTest = async (templateType: string) => {
+      setSending(true);
+      setResult(null);
+      try {
+        const res = await fetch("/api/admin/test-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ templateType }),
+        });
+        const data = await res.json();
+        setResult({
+          success: res.ok,
+          message: data.message || data.error || "Unknown error",
+        });
+      } catch {
+        setResult({ success: false, message: "Network error" });
+      } finally {
+        setSending(false);
+      }
+    };
 
-  const recipientEmail = session?.user?.email || "your email";
+    const recipientEmail = session?.user?.email || "your email";
 
-  return (
-    <div className="space-y-5">
-      <div className="bg-white border border-[#005FD9]/10 rounded-xl p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="h-10 w-10 rounded-lg [background:linear-gradient(135deg,#044FAF,#134687)] flex items-center justify-center">
+    return (
+      <div className="space-y-5">
+        <div className="bg-white border border-[#005FD9]/10 rounded-xl p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="h-10 w-10 rounded-lg [background:linear-gradient(135deg,#044FAF,#134687)] flex items-center justify-center">
+              <div
+                className="w-5 h-5 text-white bg-current"
+                style={{
+                  maskImage: "url(/icons/mail.svg)",
+                  WebkitMaskImage: "url(/icons/mail.svg)",
+                  maskSize: "contain",
+                  maskRepeat: "no-repeat",
+                  maskPosition: "center",
+                }}
+              />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-[#134687] font-poppins">
+                Test Email Sending
+              </h2>
+              <p className="text-xs text-[#134687]/50 font-mono">
+                Send test emails to your registered email: {recipientEmail}
+              </p>
+            </div>
+          </div>
+
+          {result && (
             <div
-              className="w-5 h-5 text-white bg-current"
-              style={{
-                maskImage: "url(/icons/mail.svg)",
-                WebkitMaskImage: "url(/icons/mail.svg)",
-                maskSize: "contain",
-                maskRepeat: "no-repeat",
-                maskPosition: "center",
-              }}
-            />
-          </div>
-          <div>
-            <h2 className="text-lg font-bold text-[#134687] font-poppins">
-              Test Email Sending
-            </h2>
-            <p className="text-xs text-[#134687]/50 font-mono">
-              Send test emails to your registered email: {recipientEmail}
-            </p>
-          </div>
-        </div>
-
-        {result && (
-          <div className={`mb-4 p-3 rounded-lg border ${
-            result.success
-              ? "bg-[#E8F2FF]/50 border-[#044FAF]/20"
-              : "bg-red-50 border-red-200"
-          }`}>
-            <p className={`text-sm ${result.success ? "text-[#044FAF]" : "text-red-600"}`}>
-              {result.message}
-            </p>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {EMAIL_TEMPLATES.map((template) => (
-            <button
-              key={template.value}
-              onClick={() => handleSendTest(template.value)}
-              disabled={sending}
-              className="flex items-center gap-3 p-4 border border-[#005FD9]/15 rounded-lg hover:bg-[#F3F3FD] transition-colors text-left disabled:opacity-50"
+              className={`mb-4 p-3 rounded-lg border ${
+                result.success
+                  ? "bg-[#E8F2FF]/50 border-[#044FAF]/20"
+                  : "bg-red-50 border-red-200"
+              }`}
             >
-              <div className="h-8 w-8 rounded-md [background:linear-gradient(135deg,#2F7EE3,#0349A2)] flex items-center justify-center shrink-0">
-                <div
-                  className="w-4 h-4 text-white bg-current"
-                  style={{
-                    maskImage: "url(/icons/send.svg)",
-                    WebkitMaskImage: "url(/icons/send.svg)",
-                    maskSize: "contain",
-                    maskRepeat: "no-repeat",
-                    maskPosition: "center",
-                  }}
-                />
-              </div>
-              <span className="text-sm text-[#134687] font-medium">
-                {template.label}
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
+              <p
+                className={`text-sm ${result.success ? "text-[#044FAF]" : "text-red-600"}`}
+              >
+                {result.message}
+              </p>
+            </div>
+          )}
 
-      <div className="bg-[#E8F2FF]/50 border border-[#005FD9]/10 rounded-xl p-5">
-        <div className="text-xs font-mono text-[#134687]/60 space-y-1">
-          <p>
-            <span className="text-[#044FAF]">{"// "}</span>
-            {"all test emails are sent to your registered email address"}
-          </p>
-          <p>
-            <span className="text-[#044FAF]">{"// "}</span>
-            {"templates use placeholder data to simulate real emails"}
-          </p>
-          <p>
-            <span className="text-[#044FAF]">{"// "}</span>
-            {"check your inbox to verify email delivery and design"}
-          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {EMAIL_TEMPLATES.map((template) => (
+              <button
+                key={template.value}
+                onClick={() => handleSendTest(template.value)}
+                disabled={sending}
+                className="flex items-center gap-3 p-4 border border-[#005FD9]/15 rounded-lg hover:bg-[#F3F3FD] transition-colors text-left disabled:opacity-50"
+              >
+                <div className="h-8 w-8 rounded-md [background:linear-gradient(135deg,#2F7EE3,#0349A2)] flex items-center justify-center shrink-0">
+                  <div
+                    className="w-4 h-4 text-white bg-current"
+                    style={{
+                      maskImage: "url(/icons/send.svg)",
+                      WebkitMaskImage: "url(/icons/send.svg)",
+                      maskSize: "contain",
+                      maskRepeat: "no-repeat",
+                      maskPosition: "center",
+                    }}
+                  />
+                </div>
+                <span className="text-sm text-[#134687] font-medium">
+                  {template.label}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-[#E8F2FF]/50 border border-[#005FD9]/10 rounded-xl p-5">
+          <div className="text-xs font-mono text-[#134687]/60 space-y-1">
+            <p>
+              <span className="text-[#044FAF]">{"// "}</span>
+              {"all test emails are sent to your registered email address"}
+            </p>
+            <p>
+              <span className="text-[#044FAF]">{"// "}</span>
+              {"templates use placeholder data to simulate real emails"}
+            </p>
+            <p>
+              <span className="text-[#044FAF]">{"// "}</span>
+              {"check your inbox to verify email delivery and design"}
+            </p>
+          </div>
         </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
   if (status === "unauthenticated" || session?.user?.role !== "super_admin")
     return null;
 
   return (
-    <div className="min-h-screen bg-[#F3F3FD] bg-[url('https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/pictures/background.png')] bg-cover bg-fixed">
+    <div className="min-h-screen bg-[#F3F3FD] bg-[url('/assets/css-apply-static-images/assets/pictures/background.webp')] bg-cover bg-fixed">
       {/* Header */}
       <div className="bg-white/80 backdrop-blur-sm border-b border-[#005FD9]/10 sticky top-0 z-30">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4">
@@ -458,7 +478,13 @@ function EmailTestTab() {
       </div>
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-        {activeTab === "users" ? <UsersTab /> : activeTab === "settings" ? <SettingsTab /> : <EmailTestTab />}
+        {activeTab === "users" ? (
+          <UsersTab />
+        ) : activeTab === "settings" ? (
+          <SettingsTab />
+        ) : (
+          <EmailTestTab />
+        )}
       </div>
     </div>
   );
@@ -501,7 +527,10 @@ function UsersTab() {
   const fetchUsers = useCallback(async (page: number) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/users/all?page=${page}&limit=10`);
+      const res = await fetch(
+        `/api/admin/users/all?page=${page}&limit=10&t=${Date.now()}`,
+        { cache: "no-store" },
+      );
       if (res.ok) {
         const data = await res.json();
         setUsers(data.users);
@@ -530,7 +559,8 @@ function UsersTab() {
     searchTimeoutRef.current = setTimeout(async () => {
       try {
         const res = await fetch(
-          `/api/admin/users/search?q=${encodeURIComponent(query)}`,
+          `/api/admin/users/search?q=${encodeURIComponent(query)}&t=${Date.now()}`,
+          { cache: "no-store" },
         );
         if (res.ok) {
           const data = await res.json();
@@ -564,7 +594,9 @@ function UsersTab() {
     setEbForm({
       userId: user.id,
       position: user.ebProfile?.position || "",
-      committees: user.ebProfile?.committees || [],
+      committees: Array.from(
+        new Set(user.ebProfile?.committees.map(normalizeCommitteeId) || []),
+      ),
       isActive: user.ebProfile?.isActive ?? true,
       meetingLink: user.ebProfile?.meetingLink || "",
     });
@@ -696,38 +728,142 @@ function UsersTab() {
           <>
             {/* Desktop */}
             <div className="hidden md:block overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-[#F3F3FD] border-b border-[#005FD9]/10">
-              <tr>
-                <th className="text-left px-4 py-3 text-[10px] font-semibold text-[#134687]/50 uppercase tracking-widest font-mono">
-                  User
-                </th>
-                <th className="text-left px-4 py-3 text-[10px] font-semibold text-[#134687]/50 uppercase tracking-widest font-mono">
-                  Role
-                </th>
-                <th className="text-left px-4 py-3 text-[10px] font-semibold text-[#134687]/50 uppercase tracking-widest font-mono">
-                  Member ID
-                </th>
-                <th className="text-left px-4 py-3 text-[10px] font-semibold text-[#134687]/50 uppercase tracking-widest font-mono">
-                  Position
-                </th>
-                <th className="text-left px-4 py-3 text-[10px] font-semibold text-[#134687]/50 uppercase tracking-widest font-mono">
-                  Committees
-                </th>
-                <th className="text-right px-4 py-3 text-[10px] font-semibold text-[#134687]/50 uppercase tracking-widest font-mono">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#005FD9]/5">
+              <table className="w-full text-sm">
+                <thead className="bg-[#F3F3FD] border-b border-[#005FD9]/10">
+                  <tr>
+                    <th className="text-left px-4 py-3 text-[10px] font-semibold text-[#134687]/50 uppercase tracking-widest font-mono">
+                      User
+                    </th>
+                    <th className="text-left px-4 py-3 text-[10px] font-semibold text-[#134687]/50 uppercase tracking-widest font-mono">
+                      Role
+                    </th>
+                    <th className="text-left px-4 py-3 text-[10px] font-semibold text-[#134687]/50 uppercase tracking-widest font-mono">
+                      Member ID
+                    </th>
+                    <th className="text-left px-4 py-3 text-[10px] font-semibold text-[#134687]/50 uppercase tracking-widest font-mono">
+                      Position
+                    </th>
+                    <th className="text-left px-4 py-3 text-[10px] font-semibold text-[#134687]/50 uppercase tracking-widest font-mono">
+                      Committees
+                    </th>
+                    <th className="text-right px-4 py-3 text-[10px] font-semibold text-[#134687]/50 uppercase tracking-widest font-mono">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#005FD9]/5">
+                  {filteredUsers.map((user) => (
+                    <tr
+                      key={user.id}
+                      className="hover:bg-[#F3F3FD]/50 transition-colors"
+                    >
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <UserAvatar
+                            name={user.name}
+                            image={user.image}
+                            size="sm"
+                          />
+                          <div className="min-w-0">
+                            <p className="font-medium text-[#134687] truncate">
+                              {user.name}
+                            </p>
+                            <p className="text-[11px] text-[#134687]/40 truncate font-mono">
+                              {user.email}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <RoleDropdown
+                          role={user.role}
+                          pendingRole={
+                            pendingChanges.find((c) => c.userId === user.id)
+                              ?.newRole ?? null
+                          }
+                          onChange={(newRole) =>
+                            handleRoleChange(user.id, user.role, newRole)
+                          }
+                        />
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="text-xs font-semibold text-[#044FAF] font-mono">
+                          {user.memberships?.[0]?.memberId ??
+                            user.id.slice(-7).toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        {user.ebProfile?.position ? (
+                          <Tag>{user.ebProfile.position}</Tag>
+                        ) : (
+                          <span className="text-[11px] text-[#134687]/25">
+                            &mdash;
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {user.ebProfile?.committees.length ? (
+                          <div className="flex flex-wrap gap-1 items-center">
+                            {Array.from(new Set(user.ebProfile.committees))
+                              .slice(0, 2)
+                              .map((c) => (
+                                <Tag key={c}>{c}</Tag>
+                              ))}
+                            {Array.from(new Set(user.ebProfile.committees))
+                              .length > 2 && (
+                              <span
+                                title={Array.from(
+                                  new Set(user.ebProfile.committees),
+                                )
+                                  .slice(2)
+                                  .join(", ")}
+                                className="text-[10px] text-[#134687]/50 font-bold font-mono px-1.5 py-0.5 bg-[#F3F3FD] rounded border border-[#005FD9]/10 cursor-help"
+                              >
+                                +
+                                {Array.from(new Set(user.ebProfile.committees))
+                                  .length - 2}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-[11px] text-[#134687]/25">
+                            &mdash;
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          onClick={() => handleMakeEb(user)}
+                          className="text-xs text-[#044FAF] font-medium px-2 py-1 rounded hover:bg-[#F3F3FD] transition-colors"
+                        >
+                          {user.ebProfile ? "edit eb" : "assign eb"}
+                        </button>
+                        {user.ebProfile && (
+                          <button
+                            onClick={() => handleRemoveEb(user.id)}
+                            className="text-xs text-[#134687]/40 hover:text-red-500 font-medium px-2 py-1 rounded transition-colors"
+                          >
+                            remove
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile */}
+            <div className="md:hidden divide-y divide-[#005FD9]/5">
               {filteredUsers.map((user) => (
-                <tr
-                  key={user.id}
-                  className="hover:bg-[#F3F3FD]/50 transition-colors"
-                >
-                  <td className="px-4 py-3">
+                <div key={user.id} className="p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
-                      <UserAvatar name={user.name} image={user.image} size="sm" />
+                      <UserAvatar
+                        name={user.name}
+                        image={user.image}
+                        size="md"
+                      />
                       <div className="min-w-0">
                         <p className="font-medium text-[#134687] truncate">
                           {user.name}
@@ -737,8 +873,6 @@ function UsersTab() {
                         </p>
                       </div>
                     </div>
-                  </td>
-                  <td className="px-4 py-3">
                     <RoleDropdown
                       role={user.role}
                       pendingRole={
@@ -749,161 +883,92 @@ function UsersTab() {
                         handleRoleChange(user.id, user.role, newRole)
                       }
                     />
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="text-xs font-semibold text-[#044FAF] font-mono">
-                      {truncateToLast7(user.id).toUpperCase()}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    {user.ebProfile?.position ? (
-                      <Tag>{user.ebProfile.position}</Tag>
-                    ) : (
-                      <span className="text-[11px] text-[#134687]/25">
-                        &mdash;
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    {user.ebProfile?.committees.length ? (
-                      <div className="flex flex-wrap gap-1">
-                        {user.ebProfile.committees.slice(0, 2).map((c) => (
+                  </div>
+                  <p className="text-[11px] font-mono text-[#044FAF]">
+                    Member ID:{" "}
+                    {user.memberships?.[0]?.memberId ??
+                      user.id.slice(-7).toUpperCase()}
+                  </p>
+                  {(user.ebProfile?.position ||
+                    user.ebProfile?.committees.length) && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {user.ebProfile?.position && (
+                        <Tag>{user.ebProfile.position}</Tag>
+                      )}
+                      {Array.from(new Set(user.ebProfile?.committees)).map(
+                        (c) => (
                           <Tag key={c}>{c}</Tag>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="text-[11px] text-[#134687]/25">
-                        &mdash;
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-right">
+                        ),
+                      )}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
                     <button
                       onClick={() => handleMakeEb(user)}
-                      className="text-xs text-[#044FAF] font-medium px-2 py-1 rounded hover:bg-[#F3F3FD] transition-colors"
+                      className="text-xs text-[#044FAF] font-medium px-3 py-1.5 border border-[#005FD9]/15 rounded-md hover:bg-[#F3F3FD] transition-colors"
                     >
                       {user.ebProfile ? "edit eb" : "assign eb"}
                     </button>
                     {user.ebProfile && (
                       <button
                         onClick={() => handleRemoveEb(user.id)}
-                        className="text-xs text-[#134687]/40 hover:text-red-500 font-medium px-2 py-1 rounded transition-colors"
+                        className="text-xs text-[#134687]/40 hover:text-red-500 font-medium px-3 py-1.5 border border-[#005FD9]/10 rounded-md transition-colors"
                       >
                         remove
                       </button>
                     )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Mobile */}
-        <div className="md:hidden divide-y divide-[#005FD9]/5">
-          {filteredUsers.map((user) => (
-            <div key={user.id} className="p-4 space-y-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <UserAvatar name={user.name} image={user.image} size="md" />
-                  <div className="min-w-0">
-                    <p className="font-medium text-[#134687] truncate">
-                      {user.name}
-                    </p>
-                    <p className="text-[11px] text-[#134687]/40 truncate font-mono">
-                      {user.email}
-                    </p>
                   </div>
                 </div>
-                <RoleDropdown
-                  role={user.role}
-                  pendingRole={
-                    pendingChanges.find((c) => c.userId === user.id)?.newRole ??
-                    null
-                  }
-                  onChange={(newRole) =>
-                    handleRoleChange(user.id, user.role, newRole)
-                  }
-                />
-              </div>
-              <p className="text-[11px] font-mono text-[#044FAF]">
-                Member ID: {truncateToLast7(user.id).toUpperCase()}
-              </p>
-              {(user.ebProfile?.position ||
-                user.ebProfile?.committees.length) && (
-                <div className="flex flex-wrap gap-1.5">
-                  {user.ebProfile?.position && (
-                    <Tag>{user.ebProfile.position}</Tag>
-                  )}
-                  {user.ebProfile?.committees.map((c) => (
-                    <Tag key={c}>{c}</Tag>
-                  ))}
-                </div>
-              )}
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handleMakeEb(user)}
-                  className="text-xs text-[#044FAF] font-medium px-3 py-1.5 border border-[#005FD9]/15 rounded-md hover:bg-[#F3F3FD] transition-colors"
-                >
-                  {user.ebProfile ? "edit eb" : "assign eb"}
-                </button>
-                {user.ebProfile && (
-                  <button
-                    onClick={() => handleRemoveEb(user.id)}
-                    className="text-xs text-[#134687]/40 hover:text-red-500 font-medium px-3 py-1.5 border border-[#005FD9]/10 rounded-md transition-colors"
-                  >
-                    remove
-                  </button>
-                )}
-              </div>
+              ))}
             </div>
-          ))}
-        </div>
 
-        {/* Pagination */}
-        {pagination.totalPages > 1 && !isGlobalSearch && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-[#005FD9]/10 bg-[#F3F3FD]/50">
-            <p className="text-[11px] text-[#134687]/40 font-mono">
-              {(currentPage - 1) * pagination.limit + 1}&ndash;
-              {Math.min(currentPage * pagination.limit, pagination.totalCount)}{" "}
-              / {pagination.totalCount}
-            </p>
-            <div className="flex gap-1">
-              <button
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={!pagination.hasPreviousPage}
-                className="px-2 py-1 text-[11px] font-mono text-[#134687] border border-[#005FD9]/15 rounded hover:bg-white disabled:opacity-30"
-              >
-                prev
-              </button>
-              {Array.from(
-                { length: Math.min(5, pagination.totalPages) },
-                (_, i) => {
-                  let page: number;
-                  if (pagination.totalPages <= 5) page = i + 1;
-                  else if (currentPage <= 3) page = i + 1;
-                  else if (currentPage >= pagination.totalPages - 2)
-                    page = pagination.totalPages - 4 + i;
-                  else page = currentPage - 2 + i;
-                  return (
-                    <button
-                      key={page}
-                      onClick={() => setCurrentPage(page)}
-                      className={`px-2 py-1 text-[11px] font-mono rounded ${currentPage === page ? "bg-[#044FAF] text-white" : "text-[#134687] border border-[#005FD9]/15 hover:bg-white"}`}
-                    >
-                      {page}
-                    </button>
-                  );
-                },
-              )}
-              <button
-                onClick={() => setCurrentPage((p) => p + 1)}
-                disabled={!pagination.hasNextPage}
-                className="px-2 py-1 text-[11px] font-mono text-[#134687] border border-[#005FD9]/15 rounded hover:bg-white disabled:opacity-30"
-              >
-                next
-              </button>
-            </div>
+            {/* Pagination */}
+            {pagination.totalPages > 1 && !isGlobalSearch && (
+              <div className="flex items-center justify-between px-4 py-3 border-t border-[#005FD9]/10 bg-[#F3F3FD]/50">
+                <p className="text-[11px] text-[#134687]/40 font-mono">
+                  {(currentPage - 1) * pagination.limit + 1}&ndash;
+                  {Math.min(
+                    currentPage * pagination.limit,
+                    pagination.totalCount,
+                  )}{" "}
+                  / {pagination.totalCount}
+                </p>
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={!pagination.hasPreviousPage}
+                    className="px-2 py-1 text-[11px] font-mono text-[#134687] border border-[#005FD9]/15 rounded hover:bg-white disabled:opacity-30"
+                  >
+                    prev
+                  </button>
+                  {Array.from(
+                    { length: Math.min(5, pagination.totalPages) },
+                    (_, i) => {
+                      let page: number;
+                      if (pagination.totalPages <= 5) page = i + 1;
+                      else if (currentPage <= 3) page = i + 1;
+                      else if (currentPage >= pagination.totalPages - 2)
+                        page = pagination.totalPages - 4 + i;
+                      else page = currentPage - 2 + i;
+                      return (
+                        <button
+                          key={page}
+                          onClick={() => setCurrentPage(page)}
+                          className={`px-2 py-1 text-[11px] font-mono rounded ${currentPage === page ? "bg-[#044FAF] text-white" : "text-[#134687] border border-[#005FD9]/15 hover:bg-white"}`}
+                        >
+                          {page}
+                        </button>
+                      );
+                    },
+                  )}
+                  <button
+                    onClick={() => setCurrentPage((p) => p + 1)}
+                    disabled={!pagination.hasNextPage}
+                    className="px-2 py-1 text-[11px] font-mono text-[#134687] border border-[#005FD9]/15 rounded hover:bg-white disabled:opacity-30"
+                  >
+                    next
+                  </button>
+                </div>
               </div>
             )}
           </>
@@ -946,23 +1011,27 @@ function UsersTab() {
                   Committees *
                 </label>
                 <div className="max-h-32 overflow-y-auto border border-[#005FD9]/15 rounded-lg p-2 space-y-1 bg-[#F3F3FD]/50">
-                  {EB_COMMITTEES.map((c) => (
+                  {EB_COMMITTEES.map((committee) => (
                     <label
-                      key={c}
+                      key={committee.id}
                       className="flex items-center gap-2 text-sm cursor-pointer"
                     >
                       <input
                         type="checkbox"
-                        checked={ebForm.committees.includes(c)}
+                        checked={ebForm.committees.includes(committee.id)}
                         onChange={(e) => {
                           const updated = e.target.checked
-                            ? [...ebForm.committees, c]
-                            : ebForm.committees.filter((x) => x !== c);
+                            ? [...ebForm.committees, committee.id]
+                            : ebForm.committees.filter(
+                                (x) => x !== committee.id,
+                              );
                           setEbForm({ ...ebForm, committees: updated });
                         }}
                         className="rounded border-[#005FD9]/20 text-[#044FAF] focus:ring-[#044FAF]/30"
                       />
-                      <span className="text-[#134687] text-xs">{c}</span>
+                      <span className="text-[#134687] text-xs">
+                        {committee.title}
+                      </span>
                     </label>
                   ))}
                 </div>
@@ -1102,7 +1171,8 @@ function SettingsTab() {
   const [savingAvailability, setSavingAvailability] = useState(false);
   const [selectedPaymentQr, setSelectedPaymentQr] = useState<File | null>(null);
   const [savingPaymentQr, setSavingPaymentQr] = useState(false);
-  const [selectedReceiptTemplate, setSelectedReceiptTemplate] = useState<File | null>(null);
+  const [selectedReceiptTemplate, setSelectedReceiptTemplate] =
+    useState<File | null>(null);
   const [savingReceiptTemplate, setSavingReceiptTemplate] = useState(false);
   const [communityForm, setCommunityForm] = useState({
     enabled: true,
@@ -1117,11 +1187,11 @@ function SettingsTab() {
   } = useSWR<{ url: string }>("/api/admin/payment-qr", swrFetcher, {
     revalidateOnFocus: false,
   });
-  const { data: receiptTemplateData, mutate: mutateReceiptTemplate } = useSWR<{ url: string }>(
-    "/api/admin/payment-receipt-template",
-    swrFetcher,
-    { revalidateOnFocus: false },
-  );
+  const { data: receiptTemplateData, mutate: mutateReceiptTemplate } = useSWR<{
+    url: string;
+  }>("/api/admin/payment-receipt-template", swrFetcher, {
+    revalidateOnFocus: false,
+  });
 
   const { data: communityData, mutate: mutateCommunity } = useSWR<{
     enabled: boolean;
@@ -1138,9 +1208,9 @@ function SettingsTab() {
     });
   }, [communityData]);
 
-  const availability = availabilityData?.availability ?? Object.fromEntries(
-    ebRoles.map((role) => [role.id, true]),
-  );
+  const availability =
+    availabilityData?.availability ??
+    Object.fromEntries(ebRoles.map((role) => [role.id, true]));
 
   const handleReceiptTemplateUpload = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1160,13 +1230,18 @@ function SettingsTab() {
         body: uploadFormData,
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to upload receipt template");
+      if (!res.ok)
+        throw new Error(data.error || "Failed to upload receipt template");
 
       toast.success("Receipt template updated");
       setSelectedReceiptTemplate(null);
       mutateReceiptTemplate({ url: data.url }, false);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to upload receipt template");
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to upload receipt template",
+      );
     } finally {
       setSavingReceiptTemplate(false);
     }
@@ -1184,12 +1259,17 @@ function SettingsTab() {
       });
       const data = await res.json();
 
-      if (!res.ok) throw new Error(data.error || "Failed to save community link");
+      if (!res.ok)
+        throw new Error(data.error || "Failed to save community link");
 
       toast.success("Community link updated");
       mutateCommunity(data, false);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to save community link");
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to save community link",
+      );
     } finally {
       setSavingCommunity(false);
     }
@@ -1224,7 +1304,9 @@ function SettingsTab() {
       setSelectedPaymentQr(null);
       mutatePaymentQr({ url: data.url }, false);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to upload payment QR");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to upload payment QR",
+      );
     } finally {
       setSavingPaymentQr(false);
     }
@@ -1236,11 +1318,14 @@ function SettingsTab() {
     setSavingAvailability(true);
 
     try {
-      const res = await fetch("/api/admin/available-executive-associate-roles", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ availability: nextAvailability }),
-      });
+      const res = await fetch(
+        "/api/admin/available-executive-associate-roles",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ availability: nextAvailability }),
+        },
+      );
 
       if (!res.ok) {
         const err = await res.json();
@@ -1250,7 +1335,11 @@ function SettingsTab() {
       toast.success("Executive Associate role availability updated");
       mutateAvailability();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to update availability");
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to update availability",
+      );
       mutateAvailability();
     } finally {
       setSavingAvailability(false);
@@ -1322,6 +1411,7 @@ function SettingsTab() {
     );
 
   const isEditing = !!editingId;
+  const todayDate = new Date().toISOString().split("T")[0];
 
   return (
     <div className="space-y-5">
@@ -1330,7 +1420,8 @@ function SettingsTab() {
           payment qr
         </h2>
         <p className="text-xs text-[#134687]/40 font-mono mb-5">
-          upload the QR code shown on accepted applicants&apos; payment instructions
+          upload the QR code shown on accepted applicants&apos; payment
+          instructions
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-[180px_1fr] gap-5 items-start">
@@ -1345,7 +1436,9 @@ function SettingsTab() {
                 className="w-full h-full object-contain"
               />
             ) : (
-              <span className="text-xs text-[#134687]/40 font-mono">no qr uploaded</span>
+              <span className="text-xs text-[#134687]/40 font-mono">
+                no qr uploaded
+              </span>
             )}
           </div>
 
@@ -1353,7 +1446,9 @@ function SettingsTab() {
             <input
               type="file"
               accept="image/*"
-              onChange={(e) => setSelectedPaymentQr(e.target.files?.[0] ?? null)}
+              onChange={(e) =>
+                setSelectedPaymentQr(e.target.files?.[0] ?? null)
+              }
               className="block w-full text-sm text-[#134687] file:mr-4 file:rounded-lg file:border-0 file:bg-[#E8F2FF] file:px-4 file:py-2 file:text-sm file:font-medium file:text-[#134687] hover:file:bg-[#DCECFF]"
             />
             {selectedPaymentQr && (
@@ -1377,24 +1472,41 @@ function SettingsTab() {
           payment acknowledgement receipt
         </h2>
         <p className="text-xs text-[#134687]/40 font-mono mb-5">
-          upload the PDF template applicants must fill out and submit as a Google Drive link
+          upload the PDF template applicants must fill out and submit as a
+          Google Drive link
         </p>
-        <form onSubmit={handleReceiptTemplateUpload} className="space-y-3 max-w-xl">
+        <form
+          onSubmit={handleReceiptTemplateUpload}
+          className="space-y-3 max-w-xl"
+        >
           {receiptTemplateData?.url && (
-            <a href={receiptTemplateData.url} target="_blank" rel="noopener noreferrer" className="block text-sm text-[#044FAF] underline font-mono">
+            <a
+              href={receiptTemplateData.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block text-sm text-[#044FAF] underline font-mono"
+            >
               view current receipt template
             </a>
           )}
           <input
             type="file"
             accept="application/pdf"
-            onChange={(e) => setSelectedReceiptTemplate(e.target.files?.[0] ?? null)}
+            onChange={(e) =>
+              setSelectedReceiptTemplate(e.target.files?.[0] ?? null)
+            }
             className="block w-full text-sm text-[#134687] file:mr-4 file:rounded-lg file:border-0 file:bg-[#E8F2FF] file:px-4 file:py-2 file:text-sm file:font-medium file:text-[#134687] hover:file:bg-[#DCECFF]"
           />
           {selectedReceiptTemplate && (
-            <p className="text-xs text-[#134687]/50 font-mono">selected: {selectedReceiptTemplate.name}</p>
+            <p className="text-xs text-[#134687]/50 font-mono">
+              selected: {selectedReceiptTemplate.name}
+            </p>
           )}
-          <button type="submit" disabled={savingReceiptTemplate || !selectedReceiptTemplate} className="px-6 py-2 text-sm font-medium text-white [background:linear-gradient(90deg,#2F7EE3_0%,#0349A2_100%)] rounded-lg hover:opacity-90 disabled:opacity-40 transition-opacity font-poppins">
+          <button
+            type="submit"
+            disabled={savingReceiptTemplate || !selectedReceiptTemplate}
+            className="px-6 py-2 text-sm font-medium text-white [background:linear-gradient(90deg,#2F7EE3_0%,#0349A2_100%)] rounded-lg hover:opacity-90 disabled:opacity-40 transition-opacity font-poppins"
+          >
             {savingReceiptTemplate ? "uploading..." : "upload receipt pdf"}
           </button>
         </form>
@@ -1413,11 +1525,16 @@ function SettingsTab() {
               type="checkbox"
               checked={communityForm.enabled}
               onChange={(e) =>
-                setCommunityForm({ ...communityForm, enabled: e.target.checked })
+                setCommunityForm({
+                  ...communityForm,
+                  enabled: e.target.checked,
+                })
               }
               className="rounded border-[#005FD9]/20 text-[#044FAF] focus:ring-[#044FAF]/30"
             />
-            <span className="text-[#134687] text-xs">show community card to accepted applicants</span>
+            <span className="text-[#134687] text-xs">
+              show community card to accepted applicants
+            </span>
           </label>
           <div>
             <label className="block text-xs font-semibold text-[#134687]/60 uppercase tracking-wider font-mono mb-1">
@@ -1466,11 +1583,14 @@ function SettingsTab() {
               executive associate availability
             </h2>
             <p className="text-xs text-[#134687]/40 font-mono">
-              choose which EB roles applicants can apply to as Executive Associate
+              choose which EB roles applicants can apply to as Executive
+              Associate
             </p>
           </div>
           {savingAvailability && (
-            <span className="text-[11px] text-[#134687]/40 font-mono">saving...</span>
+            <span className="text-[11px] text-[#134687]/40 font-mono">
+              saving...
+            </span>
           )}
         </div>
 
@@ -1497,7 +1617,9 @@ function SettingsTab() {
                       {role.title}
                     </p>
                     <p className="text-[11px] text-[#134687]/40 font-mono">
-                      {enabled ? "visible to applicants" : "hidden from applicants"}
+                      {enabled
+                        ? "visible to applicants"
+                        : "hidden from applicants"}
                     </p>
                   </div>
                   <input
@@ -1601,6 +1723,7 @@ function SettingsTab() {
             <input
               type="date"
               required
+              min={todayDate}
               value={form.applicationStart}
               onChange={(e) =>
                 setForm({ ...form, applicationStart: e.target.value })
@@ -1616,6 +1739,7 @@ function SettingsTab() {
               <input
                 type="date"
                 required
+                min={todayDate}
                 value={form.interviewStart}
                 onChange={(e) =>
                   setForm({ ...form, interviewStart: e.target.value })
@@ -1625,11 +1749,12 @@ function SettingsTab() {
             </div>
             <div>
               <label className="block text-xs font-semibold text-[#134687]/60 uppercase tracking-wider font-mono mb-1">
-                Interview End *
+                Interview Last Day *
               </label>
               <input
                 type="date"
                 required
+                min={todayDate}
                 value={form.interviewEnd}
                 onChange={(e) =>
                   setForm({ ...form, interviewEnd: e.target.value })

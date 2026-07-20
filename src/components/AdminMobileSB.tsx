@@ -15,8 +15,8 @@ const MobileSidebar = ({ children }: MobileSidebarProps) => {
       <div className="md:hidden fixed top-0 left-0 right-0 bg-white shadow-sm flex items-center justify-between px-4 py-6 z-20">
         {/* CSS logo */}
         <Image
-          src="https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/logos/Logo_CSS Apply.svg"
-          alt="CSS Apply Logo"
+          src="/assets/css-apply-static-images/assets/logos/Logo_CSS%20Apply.svg"
+          alt="CSSApply Logo"
           width={100}
           height={30}
         />

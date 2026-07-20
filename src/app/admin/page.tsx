@@ -48,6 +48,11 @@ const Schedule = () => {
       meetingLink: string;
     }>
   >([]);
+
+  const shouldShowCalendar =
+    showCalendar ||
+    unavailableTimeSlots.length > 0 ||
+    interviewSlots.length > 0;
   const [calendarEvents, setCalendarEvents] = useState<
     Array<{
       id: string;
@@ -134,13 +139,13 @@ const Schedule = () => {
   }, []);
 
   // SWR for EB profile data - caches for 5 minutes
-  const { data: ebData } = useSWR(
+  const { data: ebData, isLoading: isEbLoading } = useSWR(
     session?.user?.dbId ? `/api/admin/eb-profiles/${session.user.dbId}` : null,
     swrFetcher,
     {
-      revalidateOnFocus: false,
-      dedupingInterval: 30000,
-    }
+      revalidateOnFocus: true,
+      dedupingInterval: 0,
+    },
   );
 
   // Update ebProfile when EB data changes
@@ -156,23 +161,35 @@ const Schedule = () => {
   }, [ebData]);
 
   // SWR for unavailable slots - uses ebData position to avoid circular dependency
-  const { data: unavailableData, isLoading: isUnavailableLoading } = useSWR(
-    ebData?.ebProfile?.position ? `/api/admin/unavailable-slots/${ebData.ebProfile.position}` : null,
+  const {
+    data: unavailableData,
+    isLoading: isUnavailableLoading,
+    mutate: mutateUnavailable,
+  } = useSWR(
+    ebData?.ebProfile?.position
+      ? `/api/admin/unavailable-slots/${encodeURIComponent(ebData.ebProfile.position)}`
+      : null,
     swrFetcher,
     {
-      revalidateOnFocus: false,
-      dedupingInterval: 30000,
-    }
+      revalidateOnFocus: true,
+      dedupingInterval: 0,
+    },
   );
 
   // SWR for interview slots - uses ebData position to avoid circular dependency
-  const { data: interviewData, isLoading: isInterviewLoading } = useSWR(
-    ebData?.ebProfile?.position ? `/api/admin/interview-slots/${ebData.ebProfile.position}` : null,
+  const {
+    data: interviewData,
+    isLoading: isInterviewLoading,
+    mutate: mutateInterviews,
+  } = useSWR(
+    ebData?.ebProfile?.position
+      ? `/api/admin/interview-slots/${encodeURIComponent(ebData.ebProfile.position)}`
+      : null,
     swrFetcher,
     {
-      revalidateOnFocus: false,
-      dedupingInterval: 30000,
-    }
+      revalidateOnFocus: true,
+      dedupingInterval: 0,
+    },
   );
 
   // Update slots when SWR data changes
@@ -185,14 +202,11 @@ const Schedule = () => {
     } else if (interviewData) {
       setInterviewSlots([]);
     }
-    // Show calendar if we have data (either empty or with slots)
-    if (!isUnavailableLoading && !isInterviewLoading) {
-      setShowCalendar(true);
-    }
-  }, [unavailableData, interviewData, isUnavailableLoading, isInterviewLoading]);
+  }, [unavailableData, interviewData]);
 
-  // Combined loading state
-  const isSlotsLoading = isUnavailableLoading || isInterviewLoading;
+  // Combined loading state including EB profile load
+  const isSlotsLoading =
+    isEbLoading || isUnavailableLoading || isInterviewLoading;
 
   // FullCalendar event handlers
   const handleDateSelect = (selectInfo: { start: Date; end: Date }) => {
@@ -408,17 +422,9 @@ const Schedule = () => {
 
   // Refresh function - use SWR mutate to trigger revalidation
   const refreshSchedule = useCallback(() => {
-    if (ebData?.ebProfile?.position) {
-      const pos = ebData.ebProfile.position;
-      // Trigger revalidation of both endpoints
-      Promise.all([
-        fetch(`/api/admin/unavailable-slots/${pos}`),
-        fetch(`/api/admin/interview-slots/${pos}`),
-      ]).then(() => {
-        // After manual fetch, SWR will pick up fresh data on next render
-      });
-    }
-  }, [ebData]);
+    mutateUnavailable();
+    mutateInterviews();
+  }, [mutateUnavailable, mutateInterviews]);
 
   // SWR automatically loads data, no need for manual fetch
   // The useEffect above updates slots when SWR data changes
@@ -460,14 +466,9 @@ const Schedule = () => {
       // Reset form and close calendar
       setShowCalendar(false);
       setShowConfirmModal(false);
-      // Trigger refresh to reload data
-      if (ebData?.ebProfile?.position) {
-        const pos = ebData.ebProfile.position;
-        Promise.all([
-          fetch(`/api/admin/unavailable-slots/${pos}`),
-          fetch(`/api/admin/interview-slots/${pos}`),
-        ]);
-      }
+      // Trigger refresh to reload data via SWR mutate
+      mutateUnavailable();
+      mutateInterviews();
       toast.success("Unavailable time slots saved successfully!");
     } catch (error) {
       console.error("Error creating unavailable slots:", error);
@@ -480,7 +481,7 @@ const Schedule = () => {
   // Show loading for session only
   if (status === "loading") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F3F3FD] bg-[url('https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/pictures/background.png')] bg-cover bg-repeat">
+      <div className="min-h-screen flex items-center justify-center bg-[#F3F3FD] bg-[url('/assets/css-apply-static-images/assets/pictures/background.webp')] bg-cover bg-repeat">
         <div className="flex flex-col items-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#044FAF]"></div>
           <p className="mt-4 text-[#134687]">Loading session...</p>
@@ -490,7 +491,7 @@ const Schedule = () => {
   }
 
   return (
-    <div className="min-h-screen flex bg-[#F3F3FD] bg-[url('https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/pictures/background.png')] bg-cover bg-repeat overflow-x-hidden">
+    <div className="min-h-screen flex bg-[#F3F3FD] bg-[url('/assets/css-apply-static-images/assets/pictures/background.webp')] bg-cover bg-repeat overflow-x-hidden">
       {/* Sidebar Navigation */}
       <MobileSidebar>
         <SidebarContent activePage="schedule" />
@@ -554,7 +555,7 @@ const Schedule = () => {
                   Loading schedule data...
                 </p>
               </div>
-            ) : !showCalendar ? (
+            ) : !shouldShowCalendar ? (
               <div className="flex flex-col items-center justify-center h-full px-2">
                 {/* big calendar icon */}
                 <div className="w-16 h-16 md:w-24 md:h-24 mb-4 md:mb-6">

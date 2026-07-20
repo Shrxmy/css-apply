@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getDisplayMemberId } from "@/lib/member-id";
+
+async function getActiveCycleId() {
+  const activeCycle = await prisma.recruitmentCycle.findFirst({
+    where: { isActive: true },
+    select: { id: true },
+  });
+  return activeCycle?.id ?? "__no_active_cycle__";
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -72,8 +81,10 @@ export async function GET(request: NextRequest) {
 }
 
 async function exportMemberApplications(_status: string | null) {
+  const activeCycleId = await getActiveCycleId();
   const whereClause: Record<string, unknown> = {
     hasAccepted: true, // Only export accepted member applications
+    recruitmentCycleId: activeCycleId,
   };
 
   // Note: For member applications, we only export accepted ones
@@ -92,6 +103,11 @@ async function exportMemberApplications(_status: string | null) {
           age: true,
           dateOfBirth: true,
           isOldCssMember: true,
+          memberships: {
+            where: { recruitmentCycleId: activeCycleId },
+            select: { memberId: true },
+            take: 1,
+          },
         },
       },
     },
@@ -113,7 +129,7 @@ async function exportMemberApplications(_status: string | null) {
     "Updated Date",
   ];
 
-  const rows = applications.map((app: typeof applications[number]) => [
+  const rows = applications.map((app: (typeof applications)[number]) => [
     app.user.name,
     app.user.email,
     app.user.studentNumber || "",
@@ -121,7 +137,7 @@ async function exportMemberApplications(_status: string | null) {
     app.user.age?.toString() || "",
     formatDate(app.user.dateOfBirth),
     formatBoolean(app.user.isOldCssMember),
-    app.user.id.slice(-7).toUpperCase(), // Truncated Member ID
+    getDisplayMemberId(app.user),
     "Accepted", // All member applications in CSV are accepted
     app.paymentProof || "",
     app.createdAt.toISOString().split("T")[0],
@@ -135,7 +151,10 @@ async function exportCommitteeApplications(
   committee: string | null,
   _status: string | null,
 ) {
-  const whereClause: Record<string, unknown> = {};
+  const activeCycleId = await getActiveCycleId();
+  const whereClause: Record<string, unknown> = {
+    recruitmentCycleId: activeCycleId,
+  };
 
   if (committee && committee !== "all") {
     // For committee-specific exports, we need to be more precise about what to include:
@@ -192,6 +211,11 @@ async function exportCommitteeApplications(
           age: true,
           dateOfBirth: true,
           isOldCssMember: true,
+          memberships: {
+            where: { recruitmentCycleId: activeCycleId },
+            select: { memberId: true },
+            take: 1,
+          },
         },
       },
     },
@@ -218,7 +242,7 @@ async function exportCommitteeApplications(
     "Updated Date",
   ];
 
-  const rows = applications.map((app: typeof applications[number]) => [
+  const rows = applications.map((app: (typeof applications)[number]) => [
     app.user.name,
     app.user.email,
     app.user.studentNumber || "",
@@ -226,7 +250,7 @@ async function exportCommitteeApplications(
     app.user.age?.toString() || "",
     formatDate(app.user.dateOfBirth),
     formatBoolean(app.user.isOldCssMember),
-    app.user.id.slice(-7).toUpperCase(), // Truncated Member ID
+    getDisplayMemberId(app.user),
     app.firstOptionCommittee || "",
     app.secondOptionCommittee || "",
     app.redirection ? "Redirected" : app.hasAccepted ? "Accepted" : "Pending",
@@ -242,9 +266,11 @@ async function exportCommitteeApplications(
 }
 
 async function exportExecutiveAssociateApplications(_status: string | null) {
+  const activeCycleId = await getActiveCycleId();
   const whereClause: Record<string, unknown> = {
     hasAccepted: true, // Only export accepted EA applications
     redirection: null, // Exclude redirected applications
+    recruitmentCycleId: activeCycleId,
   };
 
   // Note: For EA applications, we only export accepted ones that were NOT redirected
@@ -263,6 +289,11 @@ async function exportExecutiveAssociateApplications(_status: string | null) {
           age: true,
           dateOfBirth: true,
           isOldCssMember: true,
+          memberships: {
+            where: { recruitmentCycleId: activeCycleId },
+            select: { memberId: true },
+            take: 1,
+          },
         },
       },
     },
@@ -290,7 +321,7 @@ async function exportExecutiveAssociateApplications(_status: string | null) {
     "Updated Date",
   ];
 
-  const rows = applications.map((app: typeof applications[number]) => [
+  const rows = applications.map((app: (typeof applications)[number]) => [
     app.user.name,
     app.user.email,
     app.user.studentNumber || "",
@@ -298,7 +329,7 @@ async function exportExecutiveAssociateApplications(_status: string | null) {
     app.user.age?.toString() || "",
     formatDate(app.user.dateOfBirth),
     formatBoolean(app.user.isOldCssMember),
-    app.user.id.slice(-7).toUpperCase(), // Truncated Member ID
+    getDisplayMemberId(app.user),
     app.ebRole || "",
     app.firstOptionEb || "",
     app.secondOptionEb || "",

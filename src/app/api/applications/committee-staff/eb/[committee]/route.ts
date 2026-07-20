@@ -2,7 +2,6 @@ import { authOptions } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { prisma } from "@/lib/prisma";
-import { getCommitteeEBRoleFromCommitteeId } from "@/data/committeeRoles";
 
 // GET all applications with filtering
 export async function GET(
@@ -23,8 +22,9 @@ export async function GET(
         position: true,
       },
       where: {
+        isActive: true,
         committees: {
-          has: getCommitteeEBRoleFromCommitteeId(committee),
+          has: committee,
         },
       },
     });

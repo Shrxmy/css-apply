@@ -37,11 +37,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const activeCycle = await prisma.recruitmentCycle.findFirst({
+      where: { isActive: true },
+      select: { id: true },
+    });
+    const activeCycleId = activeCycle?.id ?? "__no_active_cycle__";
+
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
       include: {
         committeeApplications: {
-          where: { recruitmentCycleId: (await prisma.recruitmentCycle.findFirst({ where: { isActive: true }, select: { id: true } }))?.id ?? null },
+          where: { recruitmentCycleId: activeCycleId },
           take: 1,
         },
       },
@@ -62,21 +68,24 @@ export async function POST(request: NextRequest) {
     const studentNumber = user.studentNumber;
 
     // Check for slot conflicts before updating - check BOTH EA and Committee applications
-    const existingEABookings = await prisma.executiveAssociateApplication.findMany({
-      where: {
-        AND: [
-          { interviewSlotDay },
-          { interviewSlotTimeStart },
-          { interviewSlotTimeEnd },
-          { interviewBy },
-        ],
-      },
-    });
+    const existingEABookings =
+      await prisma.executiveAssociateApplication.findMany({
+        where: {
+          AND: [
+            { recruitmentCycleId: activeCycleId },
+            { interviewSlotDay },
+            { interviewSlotTimeStart },
+            { interviewSlotTimeEnd },
+            { interviewBy },
+          ],
+        },
+      });
 
     const existingCommitteeBookings =
       await prisma.committeeApplication.findMany({
         where: {
           AND: [
+            { recruitmentCycleId: activeCycleId },
             { interviewSlotDay },
             { interviewSlotTimeStart },
             { interviewSlotTimeEnd },

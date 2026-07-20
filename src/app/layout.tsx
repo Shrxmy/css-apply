@@ -60,7 +60,7 @@ export const metadata: Metadata = {
     siteName: "CSSApply",
     images: [
       {
-        url: "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/logos/Logo_CSS Apply.svg",
+        url: "/assets/css-apply-static-images/assets/logos/Logo_CSS%20Apply.svg",
         width: 1200,
         height: 630,
         alt: "CSSApply Logo",
@@ -75,7 +75,7 @@ export const metadata: Metadata = {
     description:
       "Apply for positions in the Computer Science Society. Join our team as a member, committee staff, or executive associate.",
     images: [
-      "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/logos/Logo_CSS Apply.svg",
+      "/assets/css-apply-static-images/assets/logos/Logo_CSS%20Apply.svg",
     ],
     creator: "@cssociety", // Replace with actual Twitter handle if available
   },
@@ -91,11 +91,11 @@ export const metadata: Metadata = {
     },
   },
   icons: {
-    icon: "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/logos/Logo_CSS Apply.svg",
+    icon: "/assets/css-apply-static-images/assets/logos/Logo_CSS%20Apply.svg",
     shortcut:
-      "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/logos/Logo_CSS Apply.svg",
+      "/assets/css-apply-static-images/assets/logos/Logo_CSS%20Apply.svg",
     apple:
-      "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/logos/Logo_CSS Apply.svg",
+      "/assets/css-apply-static-images/assets/logos/Logo_CSS%20Apply.svg",
   },
 };
 

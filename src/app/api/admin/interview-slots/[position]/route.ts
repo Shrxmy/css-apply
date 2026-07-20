@@ -16,16 +16,11 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Check if user has admin access
     const userRole = session.user.role;
-    const hasAdminAccess = userRole === "admin" || userRole === "super_admin";
-
-    if (!hasAdminAccess) {
-      return NextResponse.json(
-        { error: "Forbidden - Admin access required" },
-        { status: 403 },
-      );
-    }
+    const hasAdminAccess =
+      userRole === "admin" ||
+      userRole === "super_admin" ||
+      userRole === "super-admin";
 
     const { position } = await params;
 
@@ -33,6 +28,12 @@ export async function GET(
     // Convert role IDs like "president" to position titles like "President"
     // For position titles or committee names, use as-is but ensure consistent casing
     const normalizedPosition = getPositionTitle(position);
+
+    const activeCycle = await prisma.recruitmentCycle.findFirst({
+      where: { isActive: true },
+      select: { id: true },
+    });
+    const activeCycleId = activeCycle?.id ?? "__no_active_cycle__";
 
     const applications: Array<{
       id: string;
@@ -44,6 +45,7 @@ export async function GET(
     const committeeApplicationsSlots =
       await prisma.committeeApplication.findMany({
         where: {
+          recruitmentCycleId: activeCycleId,
           interviewBy: {
             equals: normalizedPosition,
             mode: "insensitive",
@@ -67,43 +69,50 @@ export async function GET(
       });
     applications.push(...committeeApplicationsSlots);
 
-    const executiveAssociateApplicationsSlots = await prisma.executiveAssociateApplication.findMany({
-      where: {
-        interviewBy: {
-          equals: normalizedPosition,
-          mode: "insensitive",
-        },
-      },
-      select: {
-        id: true,
-        interviewSlotDay: true,
-        interviewSlotTimeStart: true,
-        interviewSlotTimeEnd: true,
-        interviewBy: true,
-        user: {
-          select: {
-            name: true,
+    const executiveAssociateApplicationsSlots =
+      await prisma.executiveAssociateApplication.findMany({
+        where: {
+          recruitmentCycleId: activeCycleId,
+          interviewBy: {
+            equals: normalizedPosition,
+            mode: "insensitive",
           },
         },
-      },
-      orderBy: [{ interviewSlotDay: "asc" }, { interviewSlotTimeStart: "asc" }],
-    });
+        select: {
+          id: true,
+          interviewSlotDay: true,
+          interviewSlotTimeStart: true,
+          interviewSlotTimeEnd: true,
+          interviewBy: true,
+          user: {
+            select: {
+              name: true,
+            },
+          },
+        },
+        orderBy: [
+          { interviewSlotDay: "asc" },
+          { interviewSlotTimeStart: "asc" },
+        ],
+      });
     applications.push(...executiveAssociateApplicationsSlots);
 
-    // Get meeting link from EBProfile
-    let meetingLink = null;
-    const ebProfile = await prisma.eBProfile.findFirst({
-      where: {
-        position: normalizedPosition,
-      },
-    });
-    meetingLink = ebProfile?.meetingLink || null;
+    const meetingLink = hasAdminAccess
+      ? (
+          await prisma.eBProfile.findFirst({
+            where: {
+              position: normalizedPosition,
+            },
+            select: { meetingLink: true },
+          })
+        )?.meetingLink || null
+      : null;
 
     const slots = applications.map((application) => ({
       id: application.id,
       day: application.interviewSlotDay,
-      name: application.user.name,
-      meetingLink: meetingLink,
+      name: hasAdminAccess ? application.user.name : "Booked",
+      meetingLink,
       timeStart: application.interviewSlotTimeStart,
       timeEnd: application.interviewSlotTimeEnd,
     }));

@@ -39,11 +39,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const activeCycle = await prisma.recruitmentCycle.findFirst({
+      where: { isActive: true },
+      select: { id: true },
+    });
+    const activeCycleId = activeCycle?.id ?? "__no_active_cycle__";
+
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
       include: {
         executiveAssociateApplications: {
-          where: { recruitmentCycleId: (await prisma.recruitmentCycle.findFirst({ where: { isActive: true }, select: { id: true } }))?.id ?? null },
+          where: { recruitmentCycleId: activeCycleId },
           take: 1,
         },
       },
@@ -64,22 +70,25 @@ export async function POST(request: NextRequest) {
     const studentNumber = user.studentNumber;
 
     // Check for slot conflicts before updating - check BOTH EA and Committee applications
-    const existingEABookings = await prisma.executiveAssociateApplication.findMany({
-      where: {
-        AND: [
-          { interviewSlotDay },
-          { interviewSlotTimeStart },
-          { interviewSlotTimeEnd },
-          { interviewBy },
-          { studentNumber: { not: studentNumber } }, // Exclude current user
-        ],
-      },
-    });
+    const existingEABookings =
+      await prisma.executiveAssociateApplication.findMany({
+        where: {
+          AND: [
+            { recruitmentCycleId: activeCycleId },
+            { interviewSlotDay },
+            { interviewSlotTimeStart },
+            { interviewSlotTimeEnd },
+            { interviewBy },
+            { studentNumber: { not: studentNumber } }, // Exclude current user
+          ],
+        },
+      });
 
     const existingCommitteeBookings =
       await prisma.committeeApplication.findMany({
         where: {
           AND: [
+            { recruitmentCycleId: activeCycleId },
             { interviewSlotDay },
             { interviewSlotTimeStart },
             { interviewSlotTimeEnd },
@@ -102,15 +111,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const updatedApplication = await prisma.executiveAssociateApplication.update({
-      where: { id: user.executiveAssociateApplications?.[0].id },
-      data: {
-        interviewSlotDay,
-        interviewSlotTimeStart,
-        interviewSlotTimeEnd,
-        interviewBy,
-      },
-    });
+    const updatedApplication =
+      await prisma.executiveAssociateApplication.update({
+        where: { id: user.executiveAssociateApplications?.[0].id },
+        data: {
+          interviewSlotDay,
+          interviewSlotTimeStart,
+          interviewSlotTimeEnd,
+          interviewBy,
+        },
+      });
 
     // Send email notification with meeting link when schedule is selected
     try {

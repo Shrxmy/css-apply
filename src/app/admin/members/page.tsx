@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import MobileSidebar from "@/components/AdminMobileSB";
 import SidebarContent from "@/components/AdminSidebar";
-import { truncateToLast7 } from "@/lib/truncate-utils";
+
 import { toast } from "sonner";
 
 interface Member {
@@ -16,6 +16,7 @@ interface Member {
     email: string;
     studentNumber: string;
     section: string;
+    memberships?: Array<{ memberId: string }>;
   };
   hasAccepted: boolean | null;
   paymentProof: string;
@@ -127,7 +128,7 @@ const Members = () => {
 
   if (status === "loading") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F3F3FD] bg-[url('https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/pictures/background.png')] bg-cover bg-repeat">
+      <div className="min-h-screen flex items-center justify-center bg-[#F3F3FD] bg-[url('/assets/css-apply-static-images/assets/pictures/background.webp')] bg-cover bg-repeat">
         <div className="flex flex-col items-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#044FAF]"></div>
           <p className="mt-4 text-[#134687]">Loading session...</p>
@@ -137,7 +138,7 @@ const Members = () => {
   }
 
   return (
-    <div className="min-h-screen flex bg-[#F3F3FD] bg-[url('https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/pictures/background.png')] bg-cover bg-repeat overflow-x-hidden">
+    <div className="min-h-screen flex bg-[#F3F3FD] bg-[url('/assets/css-apply-static-images/assets/pictures/background.webp')] bg-cover bg-repeat overflow-x-hidden">
       <MobileSidebar>
         <SidebarContent activePage="members" />
       </MobileSidebar>
@@ -149,7 +150,7 @@ const Members = () => {
             Members
           </div>
           <p className="text-black text-xs lg:text-lg font-Inter font-light leading-5 mb-4 md:mb-6">
-            View and manage all members of CSS Apply in one place.
+            View and manage all members of CSSApply in one place.
           </p>
           <hr className="border-[#005FD9]" />
         </div>
@@ -232,7 +233,9 @@ const Members = () => {
                         </div>
                         {member.hasAccepted && (
                           <div className="text-[#044FAF]/70">
-                            ID: {truncateToLast7(member.user.id).toUpperCase()}
+                            ID:{" "}
+                            {member.user.memberships?.[0]?.memberId ??
+                              member.user.id.slice(-7).toUpperCase()}
                           </div>
                         )}
                         <div>

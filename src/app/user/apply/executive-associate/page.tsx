@@ -60,7 +60,7 @@ export default function AssistantApplication() {
   if (!applicationsOpen) return <LoadingScreen />;
 
   return (
-    <div className="min-h-screen bg-white sm:bg-[rgb(243,243,253)] sm:bg-[url('https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/pictures/background.png')] sm:bg-cover  sm:bg-no-repeat flex flex-col justify-between">
+    <div className="min-h-screen bg-white sm:bg-[rgb(243,243,253)] sm:bg-[url('/assets/css-apply-static-images/assets/pictures/background.webp')] sm:bg-cover  sm:bg-no-repeat flex flex-col justify-between">
       <Header />
 
       <section className="flex flex-col items-center justify-center sm:my-12 lg:my-28">

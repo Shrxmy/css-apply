@@ -12,11 +12,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { studentNumber, section, age, dateOfBirth, isOldCssMember } = await request.json();
+    const { studentNumber, section, age, dateOfBirth, isOldCssMember } =
+      await request.json();
 
-    if (!studentNumber || !section || !age || !dateOfBirth || typeof isOldCssMember !== "boolean") {
+    if (
+      !studentNumber ||
+      !section ||
+      !age ||
+      !dateOfBirth ||
+      typeof isOldCssMember !== "boolean"
+    ) {
       return NextResponse.json(
-        { error: "Student number, section, age, date of birth, and CSS membership history are required" },
+        {
+          error:
+            "Student number, section, age, date of birth, and CSS membership history are required",
+        },
         { status: 400 },
       );
     }
@@ -137,13 +147,25 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const activeCycle = await prisma.recruitmentCycle.findFirst({
+      where: { isActive: true },
+      select: { id: true },
+    });
+
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
       include: {
         memberApplications: {
           where: {
-            recruitmentCycleId: (await prisma.recruitmentCycle.findFirst({ where: { isActive: true }, select: { id: true } }))?.id ?? null,
+            recruitmentCycleId: activeCycle?.id ?? null,
           },
+          take: 1,
+        },
+        memberships: {
+          where: {
+            recruitmentCycleId: activeCycle?.id ?? "__no_active_cycle__",
+          },
+          select: { memberId: true },
           take: 1,
         },
       },
@@ -164,6 +186,7 @@ export async function GET() {
         age: user.age,
         dateOfBirth: user.dateOfBirth,
         isOldCssMember: user.isOldCssMember,
+        memberships: user.memberships,
       },
     });
   } catch (error) {

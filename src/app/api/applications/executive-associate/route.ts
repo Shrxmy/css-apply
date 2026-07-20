@@ -87,9 +87,10 @@ export async function POST(request: NextRequest) {
       select: { id: true },
     });
 
-    const existingApplication = await prisma.executiveAssociateApplication.findFirst({
-      where: { studentNumber, recruitmentCycleId: activeCycle?.id ?? null },
-    });
+    const existingApplication =
+      await prisma.executiveAssociateApplication.findFirst({
+        where: { studentNumber, recruitmentCycleId: activeCycle?.id ?? null },
+      });
 
     if (existingApplication?.hasAccepted) {
       return NextResponse.json(
@@ -186,13 +187,25 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const activeCycle = await prisma.recruitmentCycle.findFirst({
+      where: { isActive: true },
+      select: { id: true },
+    });
+
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
       include: {
         executiveAssociateApplications: {
           where: {
-            recruitmentCycleId: (await prisma.recruitmentCycle.findFirst({ where: { isActive: true }, select: { id: true } }))?.id ?? null,
+            recruitmentCycleId: activeCycle?.id ?? null,
           },
+          take: 1,
+        },
+        memberships: {
+          where: {
+            recruitmentCycleId: activeCycle?.id ?? "__no_active_cycle__",
+          },
+          select: { memberId: true },
           take: 1,
         },
       },
@@ -206,7 +219,9 @@ export async function GET() {
     let meetingLink = null;
     if (user.executiveAssociateApplications?.[0]?.interviewBy) {
       // Convert EB role ID to position title for database lookup
-      const positionTitle = getPositionTitle(user.executiveAssociateApplications?.[0].interviewBy);
+      const positionTitle = getPositionTitle(
+        user.executiveAssociateApplications?.[0].interviewBy,
+      );
 
       const ebProfile = await prisma.eBProfile.findFirst({
         where: {
@@ -227,6 +242,7 @@ export async function GET() {
         age: user.age,
         dateOfBirth: user.dateOfBirth,
         isOldCssMember: user.isOldCssMember,
+        memberships: user.memberships,
       },
       ebRole: user.executiveAssociateApplications?.[0]?.ebRole,
       meetingLink: meetingLink,
@@ -254,7 +270,13 @@ export async function DELETE() {
       include: {
         executiveAssociateApplications: {
           where: {
-            recruitmentCycleId: (await prisma.recruitmentCycle.findFirst({ where: { isActive: true }, select: { id: true } }))?.id ?? null,
+            recruitmentCycleId:
+              (
+                await prisma.recruitmentCycle.findFirst({
+                  where: { isActive: true },
+                  select: { id: true },
+                })
+              )?.id ?? null,
           },
           take: 1,
         },
@@ -274,7 +296,9 @@ export async function DELETE() {
 
     // Delete files from Supabase storage if they exist
     try {
-      const cvPath = normalizeStoragePath(user.executiveAssociateApplications?.[0].supabaseFilePath);
+      const cvPath = normalizeStoragePath(
+        user.executiveAssociateApplications?.[0].supabaseFilePath,
+      );
       if (cvPath) {
         await supabase.storage
           .from("executive-associate-applications")

@@ -6,7 +6,7 @@ import MobileSidebar from "@/components/AdminMobileSB";
 import SidebarContent from "@/components/AdminSidebar";
 import { committeeRolesSubmitted } from "@/data/committeeRoles";
 import { roles } from "@/data/ebRoles";
-import { truncateToLast7 } from "@/lib/truncate-utils";
+
 import { LucideChevronDown, LucideChevronUp } from "lucide-react";
 import { toast } from "sonner";
 
@@ -89,6 +89,9 @@ const getEARedirectionMessage = (redirection: string): string => {
   // Default case (EA to EA)
   return "EA Applicant Redirected";
 };
+const getApplicationMemberId = (application: Application) =>
+  application.user.memberships?.[0]?.memberId ??
+  application.user.id.slice(-7).toUpperCase();
 
 // Helper function to get EB role full name
 const getEBRoleFullName = (roleId: string): string => {
@@ -112,6 +115,7 @@ interface Application {
     email: string;
     studentNumber: string;
     section: string;
+    memberships?: Array<{ memberId: string }>;
   };
   hasAccepted?: boolean;
   status?: string;
@@ -136,7 +140,7 @@ interface Application {
 
 // Cache for EB data to prevent unnecessary API calls
 const ebDataCache = new Map<string, { position: string; timestamp: number }>();
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const CACHE_DURATION = 0;
 const ITEMS_PER_PAGE = 10;
 
 const Applications = () => {
@@ -146,7 +150,7 @@ const Applications = () => {
     ea: Application[];
     member: Application[];
   }>({ committee: [], ea: [], member: [] });
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [showRedirectModal, setShowRedirectModal] = useState(false);
   const [selectedApplication, setSelectedApplication] =
@@ -190,6 +194,7 @@ const Applications = () => {
       }
     }
 
+    setLoading(true);
     try {
       // Add cache-busting timestamp
       const timestamp = Date.now();
@@ -208,6 +213,7 @@ const Applications = () => {
       return ebProfile;
     } catch (error) {
       console.error("Error fetching EB data:", error);
+      setLoading(false);
       return null;
     }
   }, []);
@@ -295,13 +301,19 @@ const Applications = () => {
   useEffect(() => {
     if (status === "loading") return;
 
-    if (!isInitialized && session?.user?.dbId) {
-      setIsInitialized(true);
-      getEBData(session.user.dbId).then((ebProfile) => {
-        if (ebProfile?.position) {
-          fetchApplications(ebProfile.position);
-        }
-      });
+    if (!isInitialized) {
+      if (session?.user?.dbId) {
+        setIsInitialized(true);
+        getEBData(session.user.dbId).then((ebProfile) => {
+          if (ebProfile?.position) {
+            fetchApplications(ebProfile.position);
+          } else {
+            setLoading(false);
+          }
+        });
+      } else {
+        setLoading(false);
+      }
     }
   }, [
     status,
@@ -388,7 +400,8 @@ const Applications = () => {
     }
 
     if (
-      (application.type === "committee" || application.type === "executive-associate") &&
+      (application.type === "committee" ||
+        application.type === "executive-associate") &&
       (!application.interviewSlotDay || !application.interviewSlotTimeStart)
     ) {
       return (
@@ -522,7 +535,12 @@ const Applications = () => {
     setMemberPage(1);
     setCommitteePage(1);
     setEaPage(1);
-  }, [searchQuery, applicationCounts.member, applicationCounts.committee, applicationCounts.ea]);
+  }, [
+    searchQuery,
+    applicationCounts.member,
+    applicationCounts.committee,
+    applicationCounts.ea,
+  ]);
 
   const memberTotalPages = Math.max(
     1,
@@ -539,7 +557,10 @@ const Applications = () => {
 
   const paginatedMemberApplications = useMemo(() => {
     const startIndex = (memberPage - 1) * ITEMS_PER_PAGE;
-    return currentApplications.member.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    return currentApplications.member.slice(
+      startIndex,
+      startIndex + ITEMS_PER_PAGE,
+    );
   }, [currentApplications.member, memberPage]);
 
   const paginatedCommitteeApplications = useMemo(() => {
@@ -552,13 +573,16 @@ const Applications = () => {
 
   const paginatedEaApplications = useMemo(() => {
     const startIndex = (eaPage - 1) * ITEMS_PER_PAGE;
-    return currentApplications.ea.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    return currentApplications.ea.slice(
+      startIndex,
+      startIndex + ITEMS_PER_PAGE,
+    );
   }, [currentApplications.ea, eaPage]);
 
   // Show loading for session only (not data fetching)
   if (status === "loading") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F3F3FD] bg-[url('https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/pictures/background.png')] bg-cover bg-repeat">
+      <div className="min-h-screen flex items-center justify-center bg-[#F3F3FD] bg-[url('/assets/css-apply-static-images/assets/pictures/background.webp')] bg-cover bg-repeat">
         <div className="flex flex-col items-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#044FAF]"></div>
           <p className="mt-4 text-[#134687]">Loading session...</p>
@@ -568,7 +592,7 @@ const Applications = () => {
   }
 
   return (
-    <div className="min-h-screen flex bg-[#F3F3FD] bg-[url('https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/pictures/background.png')] bg-cover bg-repeat overflow-x-hidden">
+    <div className="min-h-screen flex bg-[#F3F3FD] bg-[url('/assets/css-apply-static-images/assets/pictures/background.webp')] bg-cover bg-repeat overflow-x-hidden">
       {/* Sidebar Navigation */}
       <MobileSidebar>
         <SidebarContent activePage="applications" />
@@ -590,6 +614,8 @@ const Applications = () => {
                     getEBData(session.user.id, true).then((freshEbData) => {
                       if (freshEbData?.position) {
                         fetchApplications(freshEbData.position);
+                      } else {
+                        setLoading(false);
                       }
                     });
                   }
@@ -605,6 +631,8 @@ const Applications = () => {
                     getEBData(session.user.id, true).then((freshEbData) => {
                       if (freshEbData?.position) {
                         fetchApplications(freshEbData.position);
+                      } else {
+                        setLoading(false);
                       }
                     });
                   }
@@ -617,16 +645,18 @@ const Applications = () => {
             </div>
           </div>
           <p className="text-black text-xs lg:text-lg font-Inter font-light leading-5 mb-2">
-            Review and manage all applications from students for CSS Apply
+            Review and manage all applications from students for CSSApply
           </p>
-          {ebData?.position && (
+          {loading || !ebData ? (
+            <div className="h-5 w-48 bg-[#005FD9]/5 animate-pulse rounded mb-4" />
+          ) : ebData?.position ? (
             <p className="text-sm text-gray-600 mb-4">
               Current Position:{" "}
               <span className="font-semibold text-[#044FAF]">
                 {ebData.position}
               </span>
             </p>
-          )}
+          ) : null}
 
           {/* SEARCH BAR */}
           <div className="mb-6">
@@ -809,10 +839,7 @@ const Applications = () => {
                             )}
                             {application.hasAccepted && (
                               <div className="text-xs text-[#044FAF]/70 font-semibold text-left sm:text-right">
-                                Member ID:{" "}
-                                {truncateToLast7(
-                                  application.user.id,
-                                ).toUpperCase()}
+                                Member ID: {getApplicationMemberId(application)}
                               </div>
                             )}
                           </div>
@@ -1088,10 +1115,7 @@ const Applications = () => {
                               )}
                             {application.hasAccepted && (
                               <div className="text-xs text-[#044FAF]/70 font-semibold text-left sm:text-right">
-                                Member ID:{" "}
-                                {truncateToLast7(
-                                  application.user.id,
-                                ).toUpperCase()}
+                                Member ID: {getApplicationMemberId(application)}
                                 {application.redirection ? (
                                   <div className="text-blue-600">
                                     Redirected to:{" "}
@@ -1360,10 +1384,7 @@ const Applications = () => {
                               )}
                             {application.hasAccepted && (
                               <div className="text-xs text-[#044FAF]/70 font-semibold text-left sm:text-right">
-                                Member ID:{" "}
-                                {truncateToLast7(
-                                  application.user.id,
-                                ).toUpperCase()}
+                                Member ID: {getApplicationMemberId(application)}
                                 {application.redirection ? (
                                   <div className="text-blue-600">
                                     Redirected to:{" "}

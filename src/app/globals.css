@@ -566,7 +566,7 @@ body {
   display: none !important;
 }
 
-/* Sonner toast theming — CSS Apply blue palette */
+/* Sonner toast theming — CSSApply blue palette */
 [data-sonner-toaster] {
   --normal-bg: #ffffff;
   --normal-text: #134687;

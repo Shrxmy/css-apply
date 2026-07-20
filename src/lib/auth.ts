@@ -73,12 +73,18 @@ export const authOptions: NextAuthOptions = {
           return false;
         }
 
-        // Check if user exists in database
         const existingUser = await prisma.user.findUnique({
           where: { email: user.email! },
         });
 
+        // If user exists, update image from Google and return
         if (existingUser) {
+          if (user.image && existingUser.image !== user.image) {
+            await prisma.user.update({
+              where: { email: user.email! },
+              data: { image: user.image },
+            });
+          }
           return true;
         }
 
@@ -87,6 +93,7 @@ export const authOptions: NextAuthOptions = {
           data: {
             email: user.email!,
             name: user.name || "",
+            image: user.image || null,
             role: "user", // Default role
           },
         });

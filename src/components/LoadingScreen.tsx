@@ -9,16 +9,16 @@ export default function LoadingScreen() {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   const committeeImages = [
-    "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_ACADEMICS.png",
-    "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_COMMDEV.png",
-    "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_CREATIVES.png",
-    "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_DOCU.png",
-    "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_EXTERNALS.png",
-    "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_FINANCE.png",
-    "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_LOGISTICS.png",
-    "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_PUBLICITY.png",
-    "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_SPOTA.png",
-    "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_TECHDEV.png",
+    "/assets/css-apply-static-images/assets/committee_test/CSAR_ACADEMICS.webp",
+    "/assets/css-apply-static-images/assets/committee_test/CSAR_COMMDEV.webp",
+    "/assets/css-apply-static-images/assets/committee_test/CSAR_CREATIVES.webp",
+    "/assets/css-apply-static-images/assets/committee_test/CSAR_DOCU.webp",
+    "/assets/css-apply-static-images/assets/committee_test/CSAR_EXTERNALS.webp",
+    "/assets/css-apply-static-images/assets/committee_test/CSAR_FINANCE.webp",
+    "/assets/css-apply-static-images/assets/committee_test/CSAR_LOGISTICS.webp",
+    "/assets/css-apply-static-images/assets/committee_test/CSAR_PUBLICITY.webp",
+    "/assets/css-apply-static-images/assets/committee_test/CSAR_SPOTA.webp",
+    "/assets/css-apply-static-images/assets/committee_test/CSAR_TECHDEV.webp",
   ];
 
   useEffect(() => {
@@ -66,7 +66,7 @@ export default function LoadingScreen() {
           }
         }
       `}</style>
-      <div className="fixed inset-0 bg-[#F6F6FE] bg-[url('https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/pictures/loadingscreen_background.png')] bg-cover bg-center bg-no-repeat flex flex-col items-center justify-center z-50">
+      <div className="fixed inset-0 bg-[#F6F6FE] bg-[url('/assets/css-apply-static-images/assets/pictures/loadingscreen_background.webp')] bg-cover bg-center bg-no-repeat flex flex-col items-center justify-center z-50">
         {/* Committee Image Animation */}
         <div className="mb-8 flex items-center justify-center transition-all duration-500 ease-in-out">
           <div className="relative w-37.5 h-37.5 flex items-center justify-center group">
@@ -117,7 +117,7 @@ export default function LoadingScreen() {
             Compiling your journey...
           </p>
           <p className="text-[#134687]/80 text-sm drop-shadow-md">
-            Initializing CSS Apply system
+            Initializing CSSApply system
           </p>
         </div>
 

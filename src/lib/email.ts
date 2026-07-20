@@ -1096,12 +1096,13 @@ export const emailTemplates = {
             `
             <p>Hi ${userName}, your payment acknowledgement receipt has been recorded.</p>
             
-            <div style="background-color: #E8F2FF; padding: 18px; border-radius: 12px; margin: 20px 0; text-align: center;">
-              <p style="margin: 0 0 6px; color: #134687; font-size: 13px;">Member ID</p>
-              <p style="margin: 0; color: #044FAF; font-size: 26px; font-weight: 800; letter-spacing: 1px;">${memberId}</p>
+            <div class="accent-box" style="background-color: #E8F2FF; padding: 20px; border-radius: 12px; margin: 20px 0; text-align: center;">
+              <p style="margin: 0 0 8px; color: #134687; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;">Member ID</p>
+              <p style="margin: 0; color: #044FAF; font-size: 30px; font-weight: 800; letter-spacing: 1px;">${memberId}</p>
             </div>
             
             <p>Please keep this ID for CSS activities and payment verification.</p>
+            <p>If there are any issues, you may contact us at <a href="mailto:css.cics@ust.edu.ph" style="color: #044FAF; font-weight: 600;">css.cics@ust.edu.ph</a>.</p>
             `
         ),
     }),

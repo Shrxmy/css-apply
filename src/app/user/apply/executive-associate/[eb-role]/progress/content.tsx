@@ -11,7 +11,7 @@ import { useSession } from "next-auth/react";
 import { usePaymentQr } from "@/lib/usePaymentQr";
 import { useCommunityLink } from "@/lib/useCommunityLink";
 import { usePaymentReceiptTemplate } from "@/lib/usePaymentReceiptTemplate";
-import { truncateToLast7 } from "@/lib/truncate-utils";
+
 import type React from "react";
 
 export default function EAProgressPageContent() {
@@ -45,9 +45,11 @@ export default function EAProgressPageContent() {
       paymentProof?: string;
     };
     user: {
+      id: string;
       studentNumber: string;
       name: string;
       section: string;
+      memberships?: Array<{ memberId: string }>;
     };
     ebRole: string;
     meetingLink?: string;
@@ -58,7 +60,6 @@ export default function EAProgressPageContent() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isRespondingRedirect, setIsRespondingRedirect] = useState(false);
   const [redirectError, setRedirectError] = useState("");
-
 
   const [paymentProof, setPaymentProof] = useState("");
   const [submittingPaymentProof, setSubmittingPaymentProof] = useState(false);
@@ -77,15 +78,31 @@ export default function EAProgressPageContent() {
         body: JSON.stringify({ paymentProof }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Failed to submit payment proof");
+      if (!response.ok)
+        throw new Error(data.error || "Failed to submit payment proof");
 
-      setApplicationData((current) => current && current.application
-        ? { ...current, application: { ...current.application, paymentProof: data.paymentProof } }
-        : current,
+      setApplicationData((current) =>
+        current && current.application
+          ? {
+              ...current,
+              application: {
+                ...current.application,
+                paymentProof: data.paymentProof,
+              },
+              user: {
+                ...current.user,
+                memberships: [{ memberId: data.memberId }],
+              },
+            }
+          : current,
       );
       setPaymentProof("");
     } catch (error) {
-      setPaymentProofError(error instanceof Error ? error.message : "Failed to submit payment proof");
+      setPaymentProofError(
+        error instanceof Error
+          ? error.message
+          : "Failed to submit payment proof",
+      );
     } finally {
       setSubmittingPaymentProof(false);
     }
@@ -97,7 +114,9 @@ export default function EAProgressPageContent() {
 
     if (redirection.startsWith("committee-")) {
       const committeeId = redirection.replace("committee-", "");
-      const committee = committeeRolesSubmitted.find((c) => c.id === committeeId);
+      const committee = committeeRolesSubmitted.find(
+        (c) => c.id === committeeId,
+      );
       return committee?.title || committeeId;
     }
 
@@ -168,7 +187,9 @@ export default function EAProgressPageContent() {
 
       if (!response.ok) {
         const result = await response.json();
-        setRedirectError(result.error || "Failed to update redirection response");
+        setRedirectError(
+          result.error || "Failed to update redirection response",
+        );
         return;
       }
 
@@ -262,7 +283,9 @@ export default function EAProgressPageContent() {
                 Warning:
               </p>
               <ul className="list-disc pl-4 sm:pl-5 space-y-1 text-xs sm:text-sm text-black font-inter">
-                <li>This will delete your current Executive Associate application.</li>
+                <li>
+                  This will delete your current Executive Associate application.
+                </li>
                 <li>
                   You will need to start a new application to apply again.
                 </li>
@@ -342,7 +365,9 @@ export default function EAProgressPageContent() {
   const secondEB = roles.find((role) => role.id === application.secondOptionEb);
   const hasPendingRedirectionDecision =
     application.status === "redirected" && !!application.redirection;
-  const memberIdDisplay = truncateToLast7(application.id).toUpperCase();
+  const memberIdDisplay =
+    applicationData.user.memberships?.[0]?.memberId ??
+    applicationData.user.id.slice(-7).toUpperCase();
   const hideMeetingAccess =
     application.status === "evaluating" ||
     application.status === "failed" ||
@@ -362,7 +387,7 @@ export default function EAProgressPageContent() {
     : "";
 
   return (
-    <div className="min-h-screen bg-[rgb(243,243,253)] bg-[url('https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/pictures/background.png')] bg-cover bg-no-repeat flex flex-col justify-between">
+    <div className="min-h-screen bg-[rgb(243,243,253)] bg-[url('/assets/css-apply-static-images/assets/pictures/background.webp')] bg-cover bg-no-repeat flex flex-col justify-between">
       <Header />
 
       <section className="w-full py-8 sm:py-12 md:py-16 lg:py-20 px-4 sm:px-6 lg:px-8">
@@ -514,7 +539,11 @@ export default function EAProgressPageContent() {
                     <span
                       className={`text-sm sm:text-base ${application.hasAccepted ? "text-green-600 font-semibold" : "text-gray-500"}`}
                     >
-                      {application.hasAccepted && hasPaymentProof ? memberIdDisplay : application.hasAccepted ? "Submit payment proof first" : "Pending"}
+                      {application.hasAccepted && hasPaymentProof
+                        ? memberIdDisplay
+                        : application.hasAccepted
+                          ? "Submit payment proof first"
+                          : "Pending"}
                     </span>
                   </div>
 
@@ -571,11 +600,14 @@ export default function EAProgressPageContent() {
                     <div className="text-gray-600">
                       <p>
                         <strong>Member ID:</strong>{" "}
-                        {hasPaymentProof ? memberIdDisplay : "Submit payment proof first"}
+                        {hasPaymentProof
+                          ? memberIdDisplay
+                          : "Submit payment proof first"}
                       </p>
                       {application.redirection ? (
                         <p>
-                          <strong>Accepted at:</strong> {getRedirectionDisplayName(application.redirection)}
+                          <strong>Accepted at:</strong>{" "}
+                          {getRedirectionDisplayName(application.redirection)}
                         </p>
                       ) : (
                         <p>
@@ -606,7 +638,11 @@ export default function EAProgressPageContent() {
                       Application Redirected
                     </div>
                     <p className="text-[#134687]/80 text-sm sm:text-base text-center">
-                      You were offered a redirection to <strong>{getRedirectionDisplayName(application.redirection)}</strong>.
+                      You were offered a redirection to{" "}
+                      <strong>
+                        {getRedirectionDisplayName(application.redirection)}
+                      </strong>
+                      .
                     </p>
 
                     {hasPendingRedirectionDecision && (
@@ -616,7 +652,9 @@ export default function EAProgressPageContent() {
                           disabled={isRespondingRedirect}
                           className="px-4 py-2 rounded-lg bg-[#044FAF] text-white text-sm font-medium hover:bg-[#033c87] disabled:opacity-50"
                         >
-                          {isRespondingRedirect ? "Processing..." : "Accept Redirection"}
+                          {isRespondingRedirect
+                            ? "Processing..."
+                            : "Accept Redirection"}
                         </button>
                         <button
                           onClick={() => handleRedirectionResponse("reject")}
@@ -650,8 +688,8 @@ export default function EAProgressPageContent() {
                 {!hasPaymentProof && (
                   <>
                     <p className="text-[#134687] text-center mb-4 sm:mb-6 text-sm sm:text-base lg:text-lg">
-                      To complete your membership, please proceed with the payment
-                      of{" "}
+                      To complete your membership, please proceed with the
+                      payment of{" "}
                       <strong className="text-[#134687] text-lg sm:text-xl">
                         ₱250.00
                       </strong>{" "}
@@ -669,8 +707,8 @@ export default function EAProgressPageContent() {
                         />
                       ) : (
                         <div className="mx-auto max-w-md rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-                          Payment QR code is currently unavailable. Please contact
-                          {" "}css.cics@ust.edu.ph for payment instructions.
+                          Payment QR code is currently unavailable. Please
+                          contact css.cics@ust.edu.ph for payment instructions.
                         </div>
                       )}
                     </div>
@@ -682,7 +720,9 @@ export default function EAProgressPageContent() {
                     Important Payment Message
                   </h4>
                   <p className="text-[#134687] text-center font-semibold mb-2 sm:mb-3 text-sm sm:text-base">
-                    After payment, fill out the acknowledgement receipt PDF and upload it to Google Drive, then submit the shareable link below.
+                    After payment, fill out the acknowledgement receipt PDF and
+                    upload it to Google Drive, then submit the shareable link
+                    below.
                   </p>
                   {receiptTemplateUrl && (
                     <div className="text-center mb-4 sm:mb-6">
@@ -697,7 +737,10 @@ export default function EAProgressPageContent() {
                     </div>
                   )}
                   {!hasPaymentProof ? (
-                    <form onSubmit={handlePaymentProofSubmit} className="space-y-3 mb-4 sm:mb-6">
+                    <form
+                      onSubmit={handlePaymentProofSubmit}
+                      className="space-y-3 mb-4 sm:mb-6"
+                    >
                       <input
                         type="url"
                         value={paymentProof}
@@ -707,23 +750,29 @@ export default function EAProgressPageContent() {
                         className="w-full rounded-lg border border-[#005FD9]/20 px-4 py-3 text-sm focus:outline-none focus:border-[#044FAF]"
                       />
                       {paymentProofError && (
-                        <p className="text-red-600 text-xs text-center">{paymentProofError}</p>
+                        <p className="text-red-600 text-xs text-center">
+                          {paymentProofError}
+                        </p>
                       )}
                       <button
                         type="submit"
                         disabled={submittingPaymentProof}
                         className="w-full bg-[#134687] text-white px-4 py-3 rounded-lg font-semibold disabled:opacity-50"
                       >
-                        {submittingPaymentProof ? "Submitting..." : "Submit Payment Proof"}
+                        {submittingPaymentProof
+                          ? "Submitting..."
+                          : "Submit Payment Proof"}
                       </button>
                     </form>
                   ) : (
                     <p className="text-green-700 text-center text-sm font-semibold mb-4 sm:mb-6">
-                      Payment proof submitted. Your Member ID is now available above.
+                      Payment proof submitted. Your Member ID is now available
+                      above.
                     </p>
                   )}
                   <p className="text-[#134687]/80 text-center text-xs sm:text-sm mt-2">
-                    Your Member ID will be shown after submitting your acknowledgement receipt link.
+                    Your Member ID will be shown after submitting your
+                    acknowledgement receipt link.
                   </p>
                 </div>
 

@@ -6,7 +6,7 @@ function Footer() {
     <footer className="w-full py-8 px-5 md:px-20 bg-[#044FAF] text-white flex flex-col md:flex-row gap-8 md:gap-24 items-start border-b-10 border-[#287FEB]">
       <div className="flex flex-col gap-1">
         <Image
-          src="https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/logos/Logo_CSS.svg"
+          src="/assets/css-apply-static-images/assets/logos/Logo_CSS.webp"
           alt="A descriptive alt text for your image"
           width={60}
           height={60}

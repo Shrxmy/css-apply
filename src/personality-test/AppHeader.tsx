@@ -18,8 +18,8 @@ const AppHeader: React.FC<AppHeaderProps> = ({ page, onTakeTest }) => {
 
   const Logo = () => (
     <Image
-      src="https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/logos/Logo_CSS Apply.svg"
-      alt="CSS Apply Logo"
+      src="/assets/css-apply-static-images/assets/logos/Logo_CSS%20Apply.svg"
+      alt="CSSApply Logo"
       // STEP 2: Use the styles object for class names
       className={styles["header-logo"]}
       width={150}

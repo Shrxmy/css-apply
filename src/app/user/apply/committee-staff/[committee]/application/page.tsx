@@ -162,18 +162,18 @@ export default function CommitteeApplication() {
 
   const getCommitteeImage = (committeeId: string) => {
     const imageMap: { [key: string]: string } = {
-      academics: "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_ACADEMICS.png",
-      community: "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_COMMDEV.png",
-      creatives: "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_CREATIVES.png",
-      documentation: "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_DOCU.png",
-      external: "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_EXTERNALS.png",
-      finance: "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_FINANCE.png",
-      logistics: "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_LOGISTICS.png",
-      publicity: "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_PUBLICITY.png",
-      sports: "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_SPOTA.png",
-      technology: "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_TECHDEV.png",
+      academics: "/assets/css-apply-static-images/assets/committee_test/CSAR_ACADEMICS.webp",
+      community: "/assets/css-apply-static-images/assets/committee_test/CSAR_COMMDEV.webp",
+      creatives: "/assets/css-apply-static-images/assets/committee_test/CSAR_CREATIVES.webp",
+      documentation: "/assets/css-apply-static-images/assets/committee_test/CSAR_DOCU.webp",
+      external: "/assets/css-apply-static-images/assets/committee_test/CSAR_EXTERNALS.webp",
+      finance: "/assets/css-apply-static-images/assets/committee_test/CSAR_FINANCE.webp",
+      logistics: "/assets/css-apply-static-images/assets/committee_test/CSAR_LOGISTICS.webp",
+      publicity: "/assets/css-apply-static-images/assets/committee_test/CSAR_PUBLICITY.webp",
+      sports: "/assets/css-apply-static-images/assets/committee_test/CSAR_SPOTA.webp",
+      technology: "/assets/css-apply-static-images/assets/committee_test/CSAR_TECHDEV.webp",
     };
-    return imageMap[committeeId] || "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/Questions CSAR.png";
+    return imageMap[committeeId] || "/assets/css-apply-static-images/assets/committee_test/Questions%20CSAR.webp";
   };
 
   useEffect(() => {
@@ -429,7 +429,7 @@ export default function CommitteeApplication() {
   }
 
   return (
-    <div className="min-h-screen bg-white sm:bg-[rgb(243,243,253)] sm:bg-[url('https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/pictures/background.png')] sm:bg-cover  sm:bg-no-repeat flex flex-col justify-between">
+    <div className="min-h-screen bg-white sm:bg-[rgb(243,243,253)] sm:bg-[url('/assets/css-apply-static-images/assets/pictures/background.webp')] sm:bg-cover  sm:bg-no-repeat flex flex-col justify-between">
       <Header />
 
       <section className="flex flex-col items-center justify-center sm:my-12 lg:my-28">
@@ -641,7 +641,7 @@ export default function CommitteeApplication() {
                 </div>
 
                 <div className="flex flex-col gap-1 lg:gap-2">
-                  <div className="text-black text-xs lg:text-sm font-Inter font-normal">Were you an old member of CSS before? *</div>
+                  <div className="text-black text-xs lg:text-sm font-Inter font-normal">Were you an old member/staff/executive associate of CSS before? *</div>
                   <div className="flex gap-6 text-black text-sm font-Inter">
                     <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={formData.isOldCssMember} onChange={() => updateFormData({ isOldCssMember: true })} className="w-4 h-4 accent-[#134687]" />Yes</label>
                     <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={!formData.isOldCssMember} onChange={() => updateFormData({ isOldCssMember: false })} className="w-4 h-4 accent-[#134687]" />No</label>
@@ -767,13 +767,13 @@ export default function CommitteeApplication() {
                 )}
 
                 <div className="flex items-start gap-3">
-                  <div className="relative shrink-0">
+                  <div className="relative shrink-0 h-4 w-4 lg:h-6 lg:w-6">
                     <input
                       type="checkbox"
                       id="agreement-checkbox"
                       checked={isChecked}
                       onChange={(e) => setIsChecked(e.target.checked)}
-                      className="w-4 h-4 lg:w-6 lg:h-6 appearance-none rounded-full border-2 border-gray-400 transition-all duration-200 focus:outline-none hover:border-[#134687] checked:bg-blue-500 shadow-inner cursor-pointer"
+                      className="absolute inset-0 block h-full w-full appearance-none rounded-full border-2 border-gray-400 transition-all duration-200 focus:outline-none hover:border-[#134687] checked:bg-blue-500 shadow-inner cursor-pointer"
                       required
                     />
                     <div className="absolute inset-0 pointer-events-none flex items-center justify-center">

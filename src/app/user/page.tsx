@@ -3,11 +3,11 @@
 import { useSession } from "next-auth/react";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import useSWR from "swr";
 import Footer from "@/components/Footer";
 import LoadingScreen from "@/components/LoadingScreen";
 import Header from "@/components/Header";
 import { useApplicationStatus } from "@/lib/useApplicationStatus";
+import { useApplicationsOpen } from "@/lib/useApplicationsOpen";
 import {
   Users,
   ClipboardEdit,
@@ -15,8 +15,6 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-
-const swrFetcher = (url: string) => fetch(url).then((r) => r.json());
 
 export default function UserDashboard() {
   const { data: session, status } = useSession();
@@ -30,40 +28,11 @@ export default function UserDashboard() {
     hasAnyApplication,
   } = useApplicationStatus(status === "authenticated");
 
-  // Check if applications are open (active cycle with interview period not ended)
-  const { data: cycleData } = useSWR<{
-    activeCycle: { interviewEnd: string } | null;
-  }>(
-    status === "authenticated" ? "/api/admin/recruitment-cycle" : null,
-    swrFetcher,
-    { revalidateOnFocus: false },
-  );
-
-  const activeCycle = cycleData?.activeCycle ?? null;
-  const interviewEnded = activeCycle
-    ? new Date(activeCycle.interviewEnd) < new Date()
-    : true;
-  const applicationsOpen = !!activeCycle && !interviewEnded;
-
-  // Redirect to /user if applications are closed and user tries to access them
-  useEffect(() => {
-    if (cycleData && !applicationsOpen && !hasAnyApplication) {
-      // Already on /user, just show the closed message
-    }
-  }, [cycleData, applicationsOpen, hasAnyApplication]);
+  const applicationsOpen = useApplicationsOpen();
 
   // Redirect authenticated users with existing applications to their progress page
   useEffect(() => {
     if (status !== "authenticated" || !session || !appStatus) return;
-
-    if (
-      session.user.email.match(/\.cics@ust\.edu\.ph$/) &&
-      session.user.role !== "admin" &&
-      session.user.role !== "super_admin"
-    ) {
-      router.push("/");
-      return;
-    }
 
     if (!hasAnyApplication) return;
 
@@ -106,7 +75,7 @@ export default function UserDashboard() {
 
   return (
     <div>
-      <section className="min-h-screen bg-[#F3F3FD] bg-[url('https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/pictures/background.png')] flex flex-col justify-between relative bg-cover bg-repeat">
+      <section className="min-h-screen bg-[#F3F3FD] bg-[url('/assets/css-apply-static-images/assets/pictures/background.webp')] flex flex-col justify-between relative bg-cover bg-repeat">
         <Header />
 
         <div className="flex flex-col justify-center items-center mt-14 lg:mt-20 w-full mb-10 lg:mb-16">

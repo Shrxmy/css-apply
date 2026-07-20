@@ -3,6 +3,22 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
+const toDateOnlyTimestamp = (value: string) => {
+  const [year, month, day] = value.split("-").map(Number);
+  return Date.UTC(year, month - 1, day);
+};
+
+const getTodayDateOnlyTimestamp = () => {
+  const now = new Date();
+  return Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+};
+
+const isPrismaUniqueError = (error: unknown) =>
+  typeof error === "object" &&
+  error !== null &&
+  "code" in error &&
+  error.code === "P2002";
+
 // GET recruitment cycles (all + active)
 export async function GET() {
   try {
@@ -13,22 +29,21 @@ export async function GET() {
     }
 
     const userRole = session.user.role;
-    const hasAdminAccess = userRole === "admin" || userRole === "super_admin";
+    const hasAdminAccess =
+      userRole === "admin" ||
+      userRole === "super_admin" ||
+      userRole === "super-admin";
 
-    if (!hasAdminAccess) {
-      return NextResponse.json(
-        { error: "Forbidden - Admin access required" },
-        { status: 403 },
-      );
-    }
+    const activeCycle = await prisma.recruitmentCycle.findFirst({
+      where: { isActive: true },
+      orderBy: { createdAt: "desc" },
+    });
 
-    const [cycles, activeCycle] = await Promise.all([
-      prisma.recruitmentCycle.findMany({ orderBy: { createdAt: "desc" } }),
-      prisma.recruitmentCycle.findFirst({
-        where: { isActive: true },
-        orderBy: { createdAt: "desc" },
-      }),
-    ]);
+    const cycles = hasAdminAccess
+      ? await prisma.recruitmentCycle.findMany({
+          orderBy: { createdAt: "desc" },
+        })
+      : [];
 
     return NextResponse.json({ cycles, activeCycle });
   } catch (error) {
@@ -77,6 +92,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const applicationStartTime = toDateOnlyTimestamp(applicationStart);
+    const interviewStartTime = toDateOnlyTimestamp(interviewStart);
+    const interviewEndTime = toDateOnlyTimestamp(interviewEnd);
+    const todayTime = getTodayDateOnlyTimestamp();
+
+    if (
+      applicationStartTime < todayTime ||
+      interviewStartTime < todayTime ||
+      interviewEndTime < todayTime
+    ) {
+      return NextResponse.json(
+        { error: "Recruitment cycle dates cannot be set in the past" },
+        { status: 400 },
+      );
+    }
+
+    if (interviewStartTime < applicationStartTime) {
+      return NextResponse.json(
+        { error: "Interview start cannot be before application start" },
+        { status: 400 },
+      );
+    }
+
+    if (interviewEndTime < interviewStartTime) {
+      return NextResponse.json(
+        { error: "Interview last day cannot be before interview start" },
+        { status: 400 },
+      );
+    }
+
     // If this cycle is being set active, deactivate all others
     if (isActive) {
       await prisma.recruitmentCycle.updateMany({
@@ -98,8 +143,15 @@ export async function POST(request: NextRequest) {
         },
       });
     } else {
-      cycle = await prisma.recruitmentCycle.create({
-        data: {
+      cycle = await prisma.recruitmentCycle.upsert({
+        where: { schoolYear },
+        update: {
+          applicationStart: new Date(applicationStart),
+          interviewStart: new Date(interviewStart),
+          interviewEnd: new Date(interviewEnd),
+          isActive: isActive ?? false,
+        },
+        create: {
           schoolYear,
           applicationStart: new Date(applicationStart),
           interviewStart: new Date(interviewStart),
@@ -112,6 +164,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, cycle });
   } catch (error) {
     console.error("Error managing recruitment cycle:", error);
+
+    if (isPrismaUniqueError(error)) {
+      return NextResponse.json(
+        { error: "A recruitment cycle for this school year already exists" },
+        { status: 409 },
+      );
+    }
+
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },
