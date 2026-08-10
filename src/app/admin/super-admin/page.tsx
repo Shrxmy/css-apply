@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import useSWR from "swr";
 import { roles as ebRoles } from "@/data/ebRoles";
 import { committeeRoles } from "@/data/committeeRoles";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -266,7 +267,7 @@ export default function SuperAdminDashboard() {
   if (status === "loading") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F3F3FD]">
-        <div className="animate-spin h-8 w-8 border-2 border-[#044FAF] border-t-transparent rounded-full" />
+        <LoadingSpinner label="Loading" size="lg" />
       </div>
     );
   }
@@ -722,7 +723,7 @@ function UsersTab() {
       <div className="bg-white border border-[#005FD9]/10 rounded-xl overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <div className="animate-spin h-8 w-8 border-2 border-[#044FAF] border-t-transparent rounded-full" />
+            <LoadingSpinner label="Loading" size="lg" />
           </div>
         ) : (
           <>
@@ -1406,7 +1407,7 @@ function SettingsTab() {
   if (isLoading)
     return (
       <div className="flex justify-center py-12">
-        <div className="animate-spin h-6 w-6 border-2 border-[#044FAF] border-t-transparent rounded-full" />
+        <LoadingSpinner label="Loading settings" />
       </div>
     );
 
@@ -1427,7 +1428,7 @@ function SettingsTab() {
         <div className="grid grid-cols-1 md:grid-cols-[180px_1fr] gap-5 items-start">
           <div className="border border-[#005FD9]/10 rounded-lg bg-[#F3F3FD]/40 min-h-[180px] flex items-center justify-center overflow-hidden">
             {isPaymentQrLoading ? (
-              <div className="animate-spin h-5 w-5 border-2 border-[#044FAF] border-t-transparent rounded-full" />
+              <LoadingSpinner label="Loading configuration" size="sm" />
             ) : paymentQrData?.url ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -1596,7 +1597,7 @@ function SettingsTab() {
 
         {isAvailabilityLoading ? (
           <div className="flex justify-center py-6">
-            <div className="animate-spin h-5 w-5 border-2 border-[#044FAF] border-t-transparent rounded-full" />
+            <LoadingSpinner label="Loading configuration" size="sm" />
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

@@ -13,8 +13,11 @@ export async function GET() {
 
     const activeCycle = await prisma.recruitmentCycle.findFirst({
       where: { isActive: true },
+      orderBy: { createdAt: "desc" },
       select: { id: true },
     });
+
+    const activeCycleId = activeCycle?.id ?? "__no_active_cycle__";
 
     // Use a more efficient query with only necessary fields
     const user = await prisma.user.findUnique({
@@ -25,14 +28,14 @@ export async function GET() {
         name: true,
         role: true,
         memberApplications: {
-          where: { recruitmentCycleId: activeCycle?.id ?? null },
+          where: { recruitmentCycleId: activeCycleId },
           select: {
             id: true,
           },
           take: 1,
         },
         committeeApplications: {
-          where: { recruitmentCycleId: activeCycle?.id ?? null },
+          where: { recruitmentCycleId: activeCycleId },
           select: {
             id: true,
             firstOptionCommittee: true,
@@ -40,7 +43,7 @@ export async function GET() {
           take: 1,
         },
         executiveAssociateApplications: {
-          where: { recruitmentCycleId: activeCycle?.id ?? null },
+          where: { recruitmentCycleId: activeCycleId },
           select: {
             id: true,
             firstOptionEb: true,

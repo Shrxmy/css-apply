@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Keep development hot-reload artifacts separate from production builds.
+  // Running `next build` must not invalidate an active `next dev` server.
+  distDir: process.env.NODE_ENV === "development" ? ".next-dev" : ".next",
   poweredByHeader: false,
   experimental: {
     serverActions: {

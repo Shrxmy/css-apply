@@ -11,6 +11,7 @@ import { useFormPersistence } from "@/lib/useFormPersistence";
 import { useApplicationStatus } from "@/lib/useApplicationStatus";
 import { useApplicationsOpen } from "@/lib/useApplicationsOpen";
 import LoadingScreen from "@/components/LoadingScreen";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 export default function ExecutiveAssistantApplication() {
   const router = useRouter();
@@ -685,11 +686,17 @@ export default function ExecutiveAssistantApplication() {
                 disabled={loading}
                 className="whitespace-nowrap font-inter text-sm font-semibold text-[#134687] px-15 py-3 rounded-lg border-2 border-[#134687] bg-white hover:bg-[#B1CDF0] transition-all duration-150 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading
-                  ? uploading.cv
-                    ? "Uploading CV..."
-                    : "Submitting..."
-                  : "Next"}
+                {loading ? (
+                  <span className="inline-flex items-center justify-center gap-2">
+                    <LoadingSpinner
+                      label={uploading.cv ? "Uploading CV" : "Submitting application"}
+                      size="sm"
+                    />
+                    {uploading.cv ? "Uploading CV..." : "Submitting..."}
+                  </span>
+                ) : (
+                  "Next"
+                )}
               </button>
             </div>
           </form>

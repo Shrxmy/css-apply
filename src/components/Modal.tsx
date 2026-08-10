@@ -1,6 +1,8 @@
 // components/modals/ConfirmationModal.tsx
 "use client";
 
+import LoadingSpinner from "@/components/LoadingSpinner";
+
 import { useEffect } from "react";
 import Image from "next/image";
 
@@ -110,7 +112,7 @@ export default function ConfirmationModal({
             >
               {isLoading ? (
                 <>
-                  <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-white"></div>
+                  <LoadingSpinner label="Submitting interview schedule" size="sm" className="border-[#5B4515] border-t-transparent" />
                   <span>Submitting...</span>
                 </>
               ) : (

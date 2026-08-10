@@ -8,6 +8,7 @@ import { committeeRoles } from "@/data/committeeRoles";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import LoadingScreen from "@/components/LoadingScreen";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import { parseFullName } from "@/lib/name-parsing";
 import { useFormPersistence } from "@/lib/useFormPersistence";
 import { useApplicationStatus } from "@/lib/useApplicationStatus";
@@ -829,11 +830,19 @@ export default function CommitteeApplication() {
                 disabled={loading}
                 className="cursor-pointer whitespace-nowrap font-inter text-sm font-semibold text-[#134687] px-15 py-3 rounded-lg border-2 border-[#134687] bg-white hover:bg-[#B1CDF0] transition-all duration-150 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading
-                  ? uploading.cv || uploading.portfolio
-                    ? "Uploading files..."
-                    : "Submitting..."
-                  : "Next"}
+                {loading ? (
+                  <span className="inline-flex items-center justify-center gap-2">
+                    <LoadingSpinner
+                      label={uploading.cv || uploading.portfolio ? "Uploading files" : "Submitting application"}
+                      size="sm"
+                    />
+                    {uploading.cv || uploading.portfolio
+                      ? "Uploading files..."
+                      : "Submitting..."}
+                  </span>
+                ) : (
+                  "Next"
+                )}
               </button>
             </div>
           </form>

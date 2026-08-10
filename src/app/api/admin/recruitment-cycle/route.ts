@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 
 const toDateOnlyTimestamp = (value: string) => {
   const [year, month, day] = value.split("-").map(Number);
@@ -122,44 +123,40 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // If this cycle is being set active, deactivate all others
-    if (isActive) {
-      await prisma.recruitmentCycle.updateMany({
-        where: { isActive: true },
-        data: { isActive: false },
-      });
-    }
+    const cycle = await prisma.$transaction(async (tx) => {
+      // Serialize activation changes so concurrent requests cannot leave two
+      // recruitment cycles active.
+      await tx.$queryRaw(Prisma.sql`
+        SELECT pg_advisory_xact_lock(hashtext('active-recruitment-cycle'))
+      `);
 
-    let cycle;
-    if (id) {
-      cycle = await prisma.recruitmentCycle.update({
-        where: { id },
-        data: {
-          schoolYear,
-          applicationStart: new Date(applicationStart),
-          interviewStart: new Date(interviewStart),
-          interviewEnd: new Date(interviewEnd),
-          isActive: isActive ?? false,
-        },
-      });
-    } else {
-      cycle = await prisma.recruitmentCycle.upsert({
+      if (isActive) {
+        await tx.recruitmentCycle.updateMany({
+          where: { isActive: true },
+          data: { isActive: false },
+        });
+      }
+
+      const cycleData = {
+        applicationStart: new Date(applicationStart),
+        interviewStart: new Date(interviewStart),
+        interviewEnd: new Date(interviewEnd),
+        isActive: isActive ?? false,
+      };
+
+      if (id) {
+        return tx.recruitmentCycle.update({
+          where: { id },
+          data: { schoolYear, ...cycleData },
+        });
+      }
+
+      return tx.recruitmentCycle.upsert({
         where: { schoolYear },
-        update: {
-          applicationStart: new Date(applicationStart),
-          interviewStart: new Date(interviewStart),
-          interviewEnd: new Date(interviewEnd),
-          isActive: isActive ?? false,
-        },
-        create: {
-          schoolYear,
-          applicationStart: new Date(applicationStart),
-          interviewStart: new Date(interviewStart),
-          interviewEnd: new Date(interviewEnd),
-          isActive: isActive ?? false,
-        },
+        update: cycleData,
+        create: { schoolYear, ...cycleData },
       });
-    }
+    });
 
     return NextResponse.json({ success: true, cycle });
   } catch (error) {

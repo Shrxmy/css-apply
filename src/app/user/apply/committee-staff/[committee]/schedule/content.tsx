@@ -140,7 +140,7 @@ export default function SchedulePageContent() {
       const end = new Date();
       end.setDate(end.getDate() + 14); // Default fallback
       try {
-        const cycleRes = await fetch('/api/admin/recruitment-cycle');
+        const cycleRes = await fetch('/api/recruitment-cycle/active');
         if (cycleRes.ok) {
           const cycleData = await cycleRes.json();
           if (cycleData.activeCycle?.interviewStart) {

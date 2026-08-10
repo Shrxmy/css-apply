@@ -157,6 +157,13 @@ export const authOptions: NextAuthOptions = {
           return session;
         }
 
+        const activeCycle = await prisma.recruitmentCycle.findFirst({
+          where: { isActive: true },
+          orderBy: { createdAt: "desc" },
+          select: { id: true },
+        });
+        const activeCycleId = activeCycle?.id ?? "__no_active_cycle__";
+
         const dbUser = await prisma.user.findUnique({
           where: { email },
           select: {
@@ -168,6 +175,8 @@ export const authOptions: NextAuthOptions = {
             createdAt: true,
             updatedAt: true,
             memberApplications: {
+              where: { recruitmentCycleId: activeCycleId },
+              take: 1,
               select: {
                 id: true,
                 hasAccepted: true,
@@ -176,6 +185,8 @@ export const authOptions: NextAuthOptions = {
               },
             },
             executiveAssociateApplications: {
+              where: { recruitmentCycleId: activeCycleId },
+              take: 1,
               select: {
                 id: true,
                 hasAccepted: true,
@@ -184,6 +195,8 @@ export const authOptions: NextAuthOptions = {
               },
             },
             committeeApplications: {
+              where: { recruitmentCycleId: activeCycleId },
+              take: 1,
               select: {
                 id: true,
                 hasAccepted: true,

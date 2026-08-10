@@ -2,6 +2,7 @@
 
 import { useSearchParams } from "next/navigation";
 import ErrorPage from "@/components/ErrorPage";
+import LoadingScreen from "@/components/LoadingScreen";
 import { Suspense } from "react";
 
 function AuthErrorContent() {
@@ -35,7 +36,7 @@ function AuthErrorContent() {
 
 export default function AuthError() {
   return (
-    <Suspense fallback={<div>Loading...</div>}>
+    <Suspense fallback={<LoadingScreen message="Loading authentication details" />}>
       <AuthErrorContent />
     </Suspense>
   );

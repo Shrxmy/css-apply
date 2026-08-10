@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import MobileSidebar from "@/components/AdminMobileSB";
 import SidebarContent from "@/components/AdminSidebar";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import useSWR from "swr";
 
 // import {
@@ -501,8 +502,18 @@ const Schedule = () => {
       <div className="flex-1 p-6 md:p-8 pt-16 md:pt-12 overflow-y-auto h-screen">
         {/* PAGE HEADER */}
         <div className="mb-6 mt-8 md:mb-8 md:mt-8 text-center md:text-left">
-          <div className="rounded-[45px] text-white text-lg lg:text-4xl font-poppins font-medium px-6 py-2 lg:py-4 text-center [background:linear-gradient(90deg,_#2F7EE3_0%,_#0349A2_100%)] w-fit mb-4">
-            Welcome, {ebProfile?.position} 👋
+          <div className="inline-flex min-h-12 items-center gap-2 rounded-[45px] text-white text-lg lg:text-4xl font-poppins font-medium px-6 py-2 lg:py-4 text-center [background:linear-gradient(90deg,_#2F7EE3_0%,_#0349A2_100%)] w-fit mb-4">
+            <span>Welcome,</span>
+            {isEbLoading ? (
+              <LoadingSpinner
+                label="Loading position"
+                size="md"
+                className="border-white border-t-transparent"
+              />
+            ) : (
+              <span>{ebData?.ebProfile?.position ?? ebProfile?.position ?? "Admin"}</span>
+            )}
+            <span aria-hidden="true">👋</span>
           </div>
           <p className="text-black text-xs lg:text-lg font-Inter font-light leading-5 mb-4 md:mb-6">
             Stay organized and guide applicants through their journey with CSS
@@ -549,11 +560,9 @@ const Schedule = () => {
             style={{ minHeight: "calc(100vh - 400px)" }}
           >
             {isSlotsLoading ? (
-              <div className="flex flex-col items-center justify-center h-full px-2">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#044FAF] mb-4"></div>
-                <p className="text-sm text-[#134687]">
-                  Loading schedule data...
-                </p>
+              <div className="flex flex-col items-center justify-center gap-4 h-full px-2 text-sm text-[#134687]">
+                <LoadingSpinner label="Loading schedule data" size="lg" />
+                <p>Loading schedule data...</p>
               </div>
             ) : !shouldShowCalendar ? (
               <div className="flex flex-col items-center justify-center h-full px-2">

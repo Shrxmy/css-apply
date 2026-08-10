@@ -97,11 +97,16 @@ export async function GET(
       });
     applications.push(...executiveAssociateApplicationsSlots);
 
-    const meetingLink = hasAdminAccess
+    const meetingLink = hasAdminAccess && activeCycle
       ? (
           await prisma.eBProfile.findFirst({
             where: {
-              position: normalizedPosition,
+              recruitmentCycleId: activeCycle?.id,
+              isActive: true,
+              position: {
+                equals: normalizedPosition,
+                mode: "insensitive",
+              },
             },
             select: { meetingLink: true },
           })

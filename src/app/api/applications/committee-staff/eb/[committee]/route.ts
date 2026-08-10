@@ -16,12 +16,22 @@ export async function GET(
     }
 
     const { committee } = await params;
+    const activeCycle = await prisma.recruitmentCycle.findFirst({
+      where: { isActive: true },
+      orderBy: { createdAt: "desc" },
+      select: { id: true },
+    });
+
+    if (!activeCycle) {
+      return NextResponse.json({ success: true, ebs: [] });
+    }
 
     const ebs = await prisma.eBProfile.findMany({
       select: {
         position: true,
       },
       where: {
+        recruitmentCycleId: activeCycle.id,
         isActive: true,
         committees: {
           has: committee,

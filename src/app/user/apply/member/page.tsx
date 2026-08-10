@@ -8,6 +8,7 @@ import { useSession } from "next-auth/react";
 import Image from "next/image";
 import Header from "@/components/Header";
 import LoadingScreen from "@/components/LoadingScreen";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import { parseFullName } from "@/lib/name-parsing";
 import { useFormPersistence } from "@/lib/useFormPersistence";
 import { useApplicationStatus } from "@/lib/useApplicationStatus";
@@ -416,7 +417,14 @@ export default function MemberApplication() {
               }
               className="whitespace-nowrap font-inter text-sm font-semibold text-white px-12 py-3 rounded-lg bg-[#134687] hover:bg-[#0d3569] disabled:opacity-50"
             >
-              {loading ? "Submitting..." : "Submit"}
+              {loading ? (
+                <span className="inline-flex items-center justify-center gap-2">
+                  <LoadingSpinner label="Submitting member application" size="sm" className="border-white border-t-transparent" />
+                  Submitting...
+                </span>
+              ) : (
+                "Submit"
+              )}
             </button>
           </div>
         </form>

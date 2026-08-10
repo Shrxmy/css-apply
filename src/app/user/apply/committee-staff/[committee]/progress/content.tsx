@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Image from "next/image";
 import Header from "@/components/Header";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import Footer from "@/components/Footer";
 import { committeeRolesSubmitted } from "@/data/committeeRoles";
 import { roles } from "@/data/ebRoles";
@@ -760,9 +761,14 @@ export default function CommitteeProgressPageContent() {
                         disabled={submittingPaymentProof}
                         className="w-full bg-[#134687] text-white px-4 py-3 rounded-lg font-semibold disabled:opacity-50"
                       >
-                        {submittingPaymentProof
-                          ? "Submitting..."
-                          : "Submit Payment Proof"}
+                        {submittingPaymentProof ? (
+                          <span className="inline-flex items-center justify-center gap-2">
+                            <LoadingSpinner label="Submitting payment proof" size="sm" className="border-white border-t-transparent" />
+                            Submitting...
+                          </span>
+                        ) : (
+                          "Submit Payment Proof"
+                        )}
                       </button>
                     </form>
                   ) : (

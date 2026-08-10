@@ -105,7 +105,9 @@ export async function POST(request: NextRequest) {
 
     // Determine the bucket and application type
     const bucketName =
-      applicationType === "executive-associate" ? "executive-associate-applications" : "committee-applications";
+      applicationType === "executive-associate"
+        ? "ea-applications"
+        : "committee-applications";
 
     // Generate unique file name
     const timestamp = Date.now();
