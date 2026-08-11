@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const fileType = searchParams.get("fileType"); // 'cv' or 'portfolio'
-    const applicationType = searchParams.get("applicationType"); // 'ea' or 'committee'
+    const applicationType = searchParams.get("applicationType"); // 'executive-associate' or 'committee'
 
     if (!fileType || !applicationType) {
       return NextResponse.json(
@@ -45,8 +45,8 @@ export async function GET(request: NextRequest) {
     let application;
     let supabaseFilePath: string | null = null;
 
-    if (applicationType === "ea") {
-      application = await prisma.eAApplication.findUnique({
+    if (applicationType === "executive-associate") {
+      application = await prisma.executiveAssociateApplication.findFirst({
         where: { studentNumber: user.studentNumber },
         select: {
           supabaseFilePath: true,
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
       });
       supabaseFilePath = application?.supabaseFilePath || null;
     } else if (applicationType === "committee") {
-      application = await prisma.committeeApplication.findUnique({
+      application = await prisma.committeeApplication.findFirst({
         where: { studentNumber: user.studentNumber },
         select: {
           supabaseFilePath: true,
@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "Invalid applicationType parameter. Must be 'ea' or 'committee'",
+            "Invalid applicationType parameter. Must be 'executive-associate' or 'committee'",
         },
         { status: 400 },
       );
@@ -129,8 +129,8 @@ export async function GET(request: NextRequest) {
       } else {
         // It's just a file path, use the bucket name
         const bucketName =
-          applicationType === "ea"
-            ? "ea-applications"
+          applicationType === "executive-associate"
+            ? "executive-associate-applications"
             : "committee-applications";
 
         const { data, error } = await supabase.storage

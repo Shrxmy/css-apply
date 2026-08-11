@@ -140,15 +140,23 @@ export default function SchedulePageContent() {
       const end = new Date();
       end.setDate(end.getDate() + 14); // Default fallback
       try {
-        const cycleRes = await fetch('/api/admin/recruitment-cycle');
+        const cycleRes = await fetch('/api/recruitment-cycle/active');
         if (cycleRes.ok) {
           const cycleData = await cycleRes.json();
           if (cycleData.activeCycle?.interviewStart) {
-            start.setTime(new Date(cycleData.activeCycle.interviewStart).getTime());
+            const [year, month, day] = cycleData.activeCycle.interviewStart
+              .slice(0, 10)
+              .split("-")
+              .map(Number);
+            start.setFullYear(year, month - 1, day);
             start.setHours(0, 0, 0, 0);
           }
           if (cycleData.activeCycle?.interviewEnd) {
-            end.setTime(new Date(cycleData.activeCycle.interviewEnd).getTime());
+            const [year, month, day] = cycleData.activeCycle.interviewEnd
+              .slice(0, 10)
+              .split("-")
+              .map(Number);
+            end.setFullYear(year, month - 1, day);
           }
         }
       } catch {
@@ -456,7 +464,7 @@ export default function SchedulePageContent() {
   }
 
   return (
-    <div className="min-h-screen bg-white sm:bg-[rgb(243,243,253)] sm:bg-[url('https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/pictures/background.png')] sm:bg-cover  sm:bg-no-repeat flex flex-col justify-between">
+    <div className="min-h-screen bg-white sm:bg-[rgb(243,243,253)] sm:bg-[url('/assets/css-apply-static-images/assets/pictures/background.webp')] sm:bg-cover  sm:bg-no-repeat flex flex-col justify-between">
       <Header />
 
       <section className="flex flex-col items-center justify-center my-12 lg:my-28">

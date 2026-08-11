@@ -9,14 +9,14 @@ export default function SuccessPageContent() {
   const router = useRouter();
 
   return (
-    <div className="min-h-screen bg-[rgb(243,243,253)]">
+    <div className="min-h-screen bg-[rgb(243,243,253)] bg-[url('/assets/css-apply-static-images/assets/pictures/background.webp')] bg-cover bg-no-repeat">
       <Header />
 
       <section>
         <div className="flex flex-col items-center py-8 sm:py-12 lg:py-20 gap-4 sm:gap-6 px-4 sm:px-6 lg:px-8">
           <div>
             <Image
-              src="https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/pictures/CSAR_Excited.png"
+              src="/assets/css-apply-static-images/assets/pictures/CSAR_Excited.webp"
               alt="CSAR Excited"
               width={150}
               height={150}

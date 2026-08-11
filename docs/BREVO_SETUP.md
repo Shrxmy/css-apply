@@ -1,6 +1,6 @@
 # Brevo Email Integration Setup
 
-This document explains how to set up Brevo email integration for the CSS Apply application.
+This document explains how to set up Brevo email integration for the CSSApply application.
 
 ## Prerequisites
 
@@ -54,7 +54,7 @@ When users submit applications, they automatically receive confirmation emails f
 
 Each application type has a customized email template that includes:
 
-- Professional CSS Apply branding
+- Professional CSSApply branding
 - Application details (student number, application type, choices)
 - Status information
 - Contact information for questions

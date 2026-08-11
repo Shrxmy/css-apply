@@ -13,9 +13,11 @@ package-lock.json
 
 # testing
 /coverage
+/backup/
 
 # next.js
 /.next/
+/.next-dev/
 /out/
 
 # production

@@ -377,25 +377,25 @@ export const committeeDescriptions: Record<CommitteeName, string[]> = {
 
 export const committeeImagePaths: Record<CommitteeName, string> = {
   Academics:
-    "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_ACADEMICS.png",
+    "/assets/css-apply-static-images/assets/committee_test/CSAR_ACADEMICS.webp",
   "Community Development":
-    "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_COMMDEV.png",
+    "/assets/css-apply-static-images/assets/committee_test/CSAR_COMMDEV.webp",
   "Creatives & Technical":
-    "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_CREATIVES.png",
+    "/assets/css-apply-static-images/assets/committee_test/CSAR_CREATIVES.webp",
   Documentation:
-    "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_DOCU.png",
+    "/assets/css-apply-static-images/assets/committee_test/CSAR_DOCU.webp",
   "External Affairs":
-    "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_EXTERNALS.png",
+    "/assets/css-apply-static-images/assets/committee_test/CSAR_EXTERNALS.webp",
   Finance:
-    "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_FINANCE.png",
+    "/assets/css-apply-static-images/assets/committee_test/CSAR_FINANCE.webp",
   Logistics:
-    "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_LOGISTICS.png",
+    "/assets/css-apply-static-images/assets/committee_test/CSAR_LOGISTICS.webp",
   Publicity:
-    "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_PUBLICITY.png",
+    "/assets/css-apply-static-images/assets/committee_test/CSAR_PUBLICITY.webp",
   "Sports & Talent":
-    "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_SPOTA.png",
+    "/assets/css-apply-static-images/assets/committee_test/CSAR_SPOTA.webp",
   "Technology Development":
-    "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_TECHDEV.png",
+    "/assets/css-apply-static-images/assets/committee_test/CSAR_TECHDEV.webp",
 };
 
 export const OPTIONS = [

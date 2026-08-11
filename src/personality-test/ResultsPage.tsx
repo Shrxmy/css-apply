@@ -10,10 +10,15 @@ import Link from "next/link";
 
 interface ResultsPageProps {
   answers: Answers;
+  attemptId: string;
   onRetake: () => void;
 }
 
-const ResultsPage: React.FC<ResultsPageProps> = ({ answers, onRetake }) => {
+const ResultsPage: React.FC<ResultsPageProps> = ({
+  answers,
+  attemptId,
+  onRetake,
+}) => {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
@@ -60,13 +65,18 @@ const ResultsPage: React.FC<ResultsPageProps> = ({ answers, onRetake }) => {
 
   // Submit results to Supabase once when results are computed
   const didSubmitRef = useRef(false);
+  const submissionStorageKey = `css-apply-quiz-submission:${attemptId}`;
   useEffect(() => {
     const submitResults = async () => {
       const { rawScores, sortedResults } = quizData;
 
-      // Prevent duplicate inserts (Strict Mode double effect or re-renders)
+      // Prevent duplicate inserts from React Strict Mode remounts, route refreshes,
+      // and fast repeated renders for the same quiz attempt.
       if (didSubmitRef.current) return;
       didSubmitRef.current = true;
+
+      if (window.sessionStorage.getItem(submissionStorageKey)) return;
+      window.sessionStorage.setItem(submissionStorageKey, "pending");
       if (!sortedResults || sortedResults.length < 3) {
         console.error("Not enough results to submit.");
         return;
@@ -89,6 +99,7 @@ const ResultsPage: React.FC<ResultsPageProps> = ({ answers, onRetake }) => {
           second_committee: sortedResults[1].committee,
           third_committee: sortedResults[2].committee,
           ...scoresForDb,
+          idempotencyKey: attemptId,
         } as Record<string, unknown>;
 
         // Send to a server API that uses service role to bypass RLS safely
@@ -101,7 +112,10 @@ const ResultsPage: React.FC<ResultsPageProps> = ({ answers, onRetake }) => {
           const payload = await resp.json().catch(() => ({}));
           throw new Error(payload?.error || `API error (${resp.status})`);
         }
+        window.sessionStorage.setItem(submissionStorageKey, "submitted");
       } catch (error: unknown) {
+        window.sessionStorage.removeItem(submissionStorageKey);
+
         const errObj = (error as { name?: string; message?: string }) || {};
         const name = errObj.name ?? "";
         const message: string = errObj.message ?? String(error);
@@ -128,7 +142,7 @@ const ResultsPage: React.FC<ResultsPageProps> = ({ answers, onRetake }) => {
     };
 
     submitResults();
-  }, [quizData]);
+  }, [quizData, attemptId, submissionStorageKey]);
 
   const { sortedResults } = quizData;
   const [topResult, secondResult, thirdResult] = sortedResults;

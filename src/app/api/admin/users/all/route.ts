@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -27,6 +29,11 @@ export async function GET(request: Request) {
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "10");
     const skip = (page - 1) * limit;
+    const activeCycle = await prisma.recruitmentCycle.findFirst({
+      where: { isActive: true },
+      select: { id: true },
+    });
+    const activeCycleId = activeCycle?.id ?? "__no_active_cycle__";
 
     // Get total count for pagination
     const totalCount = await prisma.user.count();
@@ -52,7 +59,7 @@ export async function GET(request: Request) {
         // Count total applicants across all application types
         Promise.all([
           prisma.memberApplication.count(),
-          prisma.eAApplication.count(),
+          prisma.executiveAssociateApplication.count(),
           prisma.committeeApplication.count(),
         ]).then(
           ([memberCount, eaCount, committeeCount]) =>
@@ -65,6 +72,7 @@ export async function GET(request: Request) {
       select: {
         id: true,
         email: true,
+        image: true,
         name: true,
         role: true,
         studentNumber: true,
@@ -77,6 +85,11 @@ export async function GET(request: Request) {
             isActive: true,
             meetingLink: true,
           },
+        },
+        memberships: {
+          where: { recruitmentCycleId: activeCycleId },
+          select: { memberId: true },
+          take: 1,
         },
       },
       orderBy: {

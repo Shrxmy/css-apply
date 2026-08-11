@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { authOptions } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
@@ -69,7 +71,7 @@ export async function GET(request: NextRequest) {
             updatedAt: true,
           },
         },
-        memberApplication: {
+        memberApplications: {
           select: {
             id: true,
             hasAccepted: true,
@@ -77,7 +79,7 @@ export async function GET(request: NextRequest) {
             createdAt: true,
           },
         },
-        eaApplication: {
+        executiveAssociateApplications: {
           select: {
             id: true,
             hasAccepted: true,
@@ -94,7 +96,7 @@ export async function GET(request: NextRequest) {
             createdAt: true,
           },
         },
-        committeeApplication: {
+        committeeApplications: {
           select: {
             id: true,
             hasAccepted: true,
@@ -137,7 +139,7 @@ export async function GET(request: NextRequest) {
         // Count total applicants across all application types
         Promise.all([
           prisma.memberApplication.count(),
-          prisma.eAApplication.count(),
+          prisma.executiveAssociateApplication.count(),
           prisma.committeeApplication.count(),
         ]).then(
           ([memberCount, eaCount, committeeCount]) =>

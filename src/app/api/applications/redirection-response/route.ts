@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { committeeRolesSubmitted } from "@/data/committeeRoles";
 import { roles } from "@/data/ebRoles";
+import { ensureCycleMemberId } from "@/lib/member-id";
 
 const isMemberRedirection = (value?: string | null) =>
   value?.toLowerCase() === "member";
@@ -29,6 +30,44 @@ const getEaRoleIdFromRedirection = (value?: string | null) => {
   return role ? role.id : null;
 };
 
+const acceptMemberApplication = async (
+  studentNumber: string,
+  userId: string,
+  cycleId: string | null,
+) =>
+  prisma.$transaction(async (tx) => {
+    const existingMember = await tx.memberApplication.findFirst({
+      where: { studentNumber, recruitmentCycleId: cycleId },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const acceptedMember = existingMember
+      ? await tx.memberApplication.update({
+          where: { id: existingMember.id },
+          data: { hasAccepted: true },
+        })
+      : await tx.memberApplication.create({
+          data: {
+            studentNumber,
+            recruitmentCycleId: cycleId,
+            hasAccepted: true,
+            paymentProof: "",
+          },
+        });
+
+    await ensureCycleMemberId(tx, userId, acceptedMember.recruitmentCycleId);
+
+    await tx.memberApplication.deleteMany({
+      where: {
+        studentNumber,
+        recruitmentCycleId: cycleId,
+        id: { not: acceptedMember.id },
+      },
+    });
+
+    return acceptedMember;
+  });
+
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -40,17 +79,25 @@ export async function POST(request: NextRequest) {
     const decision = body?.decision;
 
     if (decision !== "accept" && decision !== "reject") {
-      return NextResponse.json(
-        { error: "Invalid decision" },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "Invalid decision" }, { status: 400 });
     }
 
+    const activeCycle = await prisma.recruitmentCycle.findFirst({
+      where: { isActive: true },
+      select: { id: true },
+    });
+    const cycleId = activeCycle?.id ?? null;
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
       include: {
-        committeeApplication: true,
-        eaApplication: true,
+        committeeApplications: {
+          where: { recruitmentCycleId: cycleId },
+          take: 1,
+        },
+        executiveAssociateApplications: {
+          where: { recruitmentCycleId: cycleId },
+          take: 1,
+        },
       },
     });
 
@@ -59,18 +106,22 @@ export async function POST(request: NextRequest) {
     }
 
     const committeeApp =
-      user.committeeApplication?.status === "redirected" &&
-      user.committeeApplication?.redirection
-        ? user.committeeApplication
+      user.committeeApplications?.[0]?.status === "redirected" &&
+      user.committeeApplications?.[0]?.redirection
+        ? user.committeeApplications?.[0]
         : null;
 
     const eaApp =
-      user.eaApplication?.status === "redirected" &&
-      user.eaApplication?.redirection
-        ? user.eaApplication
+      user.executiveAssociateApplications?.[0]?.status === "redirected" &&
+      user.executiveAssociateApplications?.[0]?.redirection
+        ? user.executiveAssociateApplications?.[0]
         : null;
 
-    const sourceType = committeeApp ? "committee" : eaApp ? "ea" : null;
+    const sourceType = committeeApp
+      ? "committee"
+      : eaApp
+        ? "executive-associate"
+        : null;
     const sourceApp = committeeApp ?? eaApp;
 
     if (!sourceType || !sourceApp) {
@@ -86,75 +137,95 @@ export async function POST(request: NextRequest) {
 
     if (decision === "accept") {
       if (isMemberRedirection(redirection)) {
-        await prisma.memberApplication.upsert({
-          where: { studentNumber: user.studentNumber },
-          update: { hasAccepted: true },
-          create: {
-            studentNumber: user.studentNumber,
-            hasAccepted: true,
-            paymentProof: "",
-          },
-        });
+        await acceptMemberApplication(user.studentNumber, user.id, cycleId);
       } else if (sourceType === "committee" && eaRoleId) {
-        await prisma.eAApplication.upsert({
-          where: { studentNumber: user.studentNumber },
-          update: {
-            ebRole: eaRoleId,
-            firstOptionEb: eaRoleId,
-            secondOptionEb: "",
-            status: "passed",
-            hasAccepted: true,
-            redirection: null,
-            cv: sourceApp.cv || "",
-            supabaseFilePath: sourceApp.supabaseFilePath || "",
+        const existingEa = await prisma.executiveAssociateApplication.findFirst(
+          {
+            where: {
+              studentNumber: user.studentNumber,
+              recruitmentCycleId: cycleId,
+            },
           },
-          create: {
+        );
+        if (existingEa)
+          await prisma.executiveAssociateApplication.update({
+            where: { id: existingEa.id },
+            data: {
+              ebRole: eaRoleId,
+              firstOptionEb: eaRoleId,
+              secondOptionEb: "",
+              status: "passed",
+              hasAccepted: true,
+              redirection: null,
+              cv: sourceApp.cv || "",
+              supabaseFilePath: sourceApp.supabaseFilePath || "",
+            },
+          });
+        else
+          await prisma.executiveAssociateApplication.create({
+            data: {
+              studentNumber: user.studentNumber,
+              recruitmentCycleId: cycleId,
+              ebRole: eaRoleId,
+              firstOptionEb: eaRoleId,
+              secondOptionEb: "",
+              cv: sourceApp.cv || "",
+              supabaseFilePath: sourceApp.supabaseFilePath || "",
+              hasFinishedInterview: false,
+              status: "passed",
+              hasAccepted: true,
+              redirection: null,
+            },
+          });
+      } else if (sourceType === "executive-associate" && committeeId) {
+        const existingCommittee = await prisma.committeeApplication.findFirst({
+          where: {
             studentNumber: user.studentNumber,
-            ebRole: eaRoleId,
-            firstOptionEb: eaRoleId,
-            secondOptionEb: "",
-            cv: sourceApp.cv || "",
-            supabaseFilePath: sourceApp.supabaseFilePath || "",
-            hasFinishedInterview: false,
-            status: "passed",
-            hasAccepted: true,
-            redirection: null,
+            recruitmentCycleId: cycleId,
           },
         });
-      } else if (sourceType === "ea" && committeeId) {
-        await prisma.committeeApplication.upsert({
-          where: { studentNumber: user.studentNumber },
-          update: {
-            firstOptionCommittee: committeeId,
-            secondOptionCommittee: "",
-            status: "passed",
-            hasAccepted: true,
-            redirection: null,
-            cv: sourceApp.cv || "",
-            supabaseFilePath: sourceApp.supabaseFilePath || "",
-            interviewSlotDay: sourceApp.interviewSlotDay,
-            interviewSlotTimeStart: sourceApp.interviewSlotTimeStart,
-            interviewSlotTimeEnd: sourceApp.interviewSlotTimeEnd,
-            interviewBy: sourceApp.interviewBy,
-          },
-          create: {
-            studentNumber: user.studentNumber,
-            firstOptionCommittee: committeeId,
-            secondOptionCommittee: "",
-            cv: sourceApp.cv || "",
-            supabaseFilePath: sourceApp.supabaseFilePath || "",
-            portfolioLink: null,
-            interviewSlotDay: sourceApp.interviewSlotDay,
-            interviewSlotTimeStart: sourceApp.interviewSlotTimeStart,
-            interviewSlotTimeEnd: sourceApp.interviewSlotTimeEnd,
-            interviewBy: sourceApp.interviewBy,
-            hasFinishedInterview: false,
-            status: "passed",
-            hasAccepted: true,
-            redirection: null,
-          },
-        });
+        if (existingCommittee)
+          await prisma.committeeApplication.update({
+            where: { id: existingCommittee.id },
+            data: {
+              firstOptionCommittee: committeeId,
+              secondOptionCommittee: "",
+              status: "passed",
+              hasAccepted: true,
+              redirection: null,
+              cv: sourceApp.cv || "",
+              supabaseFilePath: sourceApp.supabaseFilePath || "",
+              interviewSlotDay: sourceApp.interviewSlotDay,
+              interviewSlotTimeStart: sourceApp.interviewSlotTimeStart,
+              interviewSlotTimeEnd: sourceApp.interviewSlotTimeEnd,
+              interviewBy: sourceApp.interviewBy,
+            },
+          });
+        else
+          await prisma.committeeApplication.create({
+            data: {
+              studentNumber: user.studentNumber,
+              recruitmentCycleId: cycleId,
+              firstOptionCommittee: committeeId,
+              secondOptionCommittee: "",
+              cv: sourceApp.cv || "",
+              supabaseFilePath: sourceApp.supabaseFilePath || "",
+              portfolioLink: null,
+              interviewSlotDay: sourceApp.interviewSlotDay,
+              interviewSlotTimeStart: sourceApp.interviewSlotTimeStart,
+              interviewSlotTimeEnd: sourceApp.interviewSlotTimeEnd,
+              interviewBy: sourceApp.interviewBy,
+              hasFinishedInterview: false,
+              status: "passed",
+              hasAccepted: true,
+              redirection: null,
+            },
+          });
       }
+
+      await prisma.$transaction((tx) =>
+        ensureCycleMemberId(tx, user.id, cycleId),
+      );
 
       if (sourceType === "committee") {
         await prisma.committeeApplication.update({
@@ -165,7 +236,7 @@ export async function POST(request: NextRequest) {
           },
         });
       } else {
-        await prisma.eAApplication.update({
+        await prisma.executiveAssociateApplication.update({
           where: { id: sourceApp.id },
           data: {
             hasAccepted: true,
@@ -180,15 +251,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    await prisma.memberApplication.upsert({
-      where: { studentNumber: user.studentNumber },
-      update: { hasAccepted: true },
-      create: {
-        studentNumber: user.studentNumber,
-        hasAccepted: true,
-        paymentProof: "",
-      },
-    });
+    await acceptMemberApplication(user.studentNumber, user.id, cycleId);
 
     if (sourceType === "committee") {
       await prisma.committeeApplication.update({
@@ -200,7 +263,7 @@ export async function POST(request: NextRequest) {
         },
       });
     } else {
-      await prisma.eAApplication.update({
+      await prisma.executiveAssociateApplication.update({
         where: { id: sourceApp.id },
         data: {
           hasAccepted: true,

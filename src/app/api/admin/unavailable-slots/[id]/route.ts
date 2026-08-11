@@ -12,10 +12,9 @@ export async function GET(
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session) {
+    if (!session || !session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-
     const { id } = await params;
 
     const unavailableSlots = await prisma.availableEBInterviewTime.findMany({
@@ -25,13 +24,15 @@ export async function GET(
       orderBy: [{ day: "asc" }, { timeStart: "asc" }],
     });
 
-    const unavailableSlotsData = unavailableSlots.map((slot: typeof unavailableSlots[number]) => ({
-      id: slot.id,
-      date: slot.day,
-      timeSlot: `${slot.timeStart}-${slot.timeEnd}`,
-      startTime: slot.timeStart,
-      endTime: slot.timeEnd,
-    }));
+    const unavailableSlotsData = unavailableSlots.map(
+      (slot: (typeof unavailableSlots)[number]) => ({
+        id: slot.id,
+        date: slot.day,
+        timeSlot: `${slot.timeStart}-${slot.timeEnd}`,
+        startTime: slot.timeStart,
+        endTime: slot.timeEnd,
+      }),
+    );
 
     return NextResponse.json({ unavailableSlotsData });
   } catch (error) {

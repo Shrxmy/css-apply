@@ -2,7 +2,6 @@ import { authOptions } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { prisma } from "@/lib/prisma";
-import { getCommitteeEBRoleFromCommitteeId } from "@/data/committeeRoles";
 
 // GET all applications with filtering
 export async function GET(
@@ -17,14 +16,25 @@ export async function GET(
     }
 
     const { committee } = await params;
+    const activeCycle = await prisma.recruitmentCycle.findFirst({
+      where: { isActive: true },
+      orderBy: { createdAt: "desc" },
+      select: { id: true },
+    });
+
+    if (!activeCycle) {
+      return NextResponse.json({ success: true, ebs: [] });
+    }
 
     const ebs = await prisma.eBProfile.findMany({
       select: {
         position: true,
       },
       where: {
+        recruitmentCycleId: activeCycle.id,
+        isActive: true,
         committees: {
-          has: getCommitteeEBRoleFromCommitteeId(committee),
+          has: committee,
         },
       },
     });

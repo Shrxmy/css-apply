@@ -2,7 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { sendEmail, emailTemplates } from "@/lib/email";
+import { committeeRoles } from "@/data/committeeRoles";
+import { ensureCycleMemberId } from "@/lib/member-id";
+
+const normalizeCommitteeId = (value: string) => {
+  const normalizedValue = value.toLowerCase().replace(/&/g, "and");
+  const committee = committeeRoles.find(
+    ({ id, title }) =>
+      id.toLowerCase() === normalizedValue ||
+      title.toLowerCase().replace(/&/g, "and") === normalizedValue,
+  );
+
+  return committee?.id ?? value;
+};
 import { applicationActionSchema } from "@/lib/schemas";
 
 // Type definitions for raw query results
@@ -43,9 +57,31 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get("type");
     const status = searchParams.get("status");
     const committee = searchParams.get("committee");
+    const isSuperAdmin = userRole === "super_admin";
+
+    // Get EB profile of the logged in user to find their accessible committees
+    let accessibleCommittees: Set<string> | null = null;
+    if (!isSuperAdmin && session.user.dbId) {
+      const ebProfile = await prisma.eBProfile.findFirst({
+        where: { userId: session.user.dbId },
+        select: { committees: true },
+      });
+      if (ebProfile) {
+        accessibleCommittees = new Set(
+          ebProfile.committees.map(normalizeCommitteeId),
+        );
+      }
+    }
+
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "10");
     const skip = (page - 1) * limit;
+
+    const activeCycle = await prisma.recruitmentCycle.findFirst({
+      where: { isActive: true },
+      select: { id: true },
+    });
+    const activeCycleId = activeCycle?.id ?? "__no_active_cycle__";
 
     if (type === "member") {
       let memberApplications;
@@ -54,11 +90,11 @@ export async function GET(request: NextRequest) {
       if (status === "accepted") {
         // Get accepted applications
         totalCount = await prisma.memberApplication.count({
-          where: { hasAccepted: true },
+          where: { hasAccepted: true, recruitmentCycleId: activeCycleId },
         });
 
         memberApplications = await prisma.memberApplication.findMany({
-          where: { hasAccepted: true },
+          where: { hasAccepted: true, recruitmentCycleId: activeCycleId },
           orderBy: { createdAt: "desc" },
           skip: skip,
           take: limit,
@@ -70,6 +106,11 @@ export async function GET(request: NextRequest) {
                 email: true,
                 studentNumber: true,
                 section: true,
+                memberships: {
+                  where: { recruitmentCycleId: activeCycleId },
+                  select: { memberId: true },
+                  take: 1,
+                },
               },
             },
           },
@@ -81,6 +122,7 @@ export async function GET(request: NextRequest) {
               SELECT * FROM "MemberApplication" 
               WHERE "hasAccepted" = false 
               AND "createdAt" = "updatedAt"
+              AND "recruitmentCycleId" = ${activeCycleId}
               ORDER BY "createdAt" DESC
               LIMIT ${limit} OFFSET ${skip}
             `,
@@ -88,13 +130,16 @@ export async function GET(request: NextRequest) {
               SELECT COUNT(*) as count FROM "MemberApplication" 
               WHERE "hasAccepted" = false 
               AND "createdAt" = "updatedAt"
+              AND "recruitmentCycleId" = ${activeCycleId}
             `,
         ]);
 
         totalCount = Number(countResult[0].count);
 
         // Batch fetch users to avoid N+1 queries
-        const studentNumbers = applications.map((app: MemberApplicationRaw) => app.studentNumber);
+        const studentNumbers = applications.map(
+          (app: MemberApplicationRaw) => app.studentNumber,
+        );
         const users = await prisma.user.findMany({
           where: { studentNumber: { in: studentNumbers } },
           select: {
@@ -103,9 +148,16 @@ export async function GET(request: NextRequest) {
             email: true,
             studentNumber: true,
             section: true,
+            memberships: {
+              where: { recruitmentCycleId: activeCycleId },
+              select: { memberId: true },
+              take: 1,
+            },
           },
         });
-        const userMap = new Map(users.map((u: typeof users[number]) => [u.studentNumber, u]));
+        const userMap = new Map(
+          users.map((u: (typeof users)[number]) => [u.studentNumber, u]),
+        );
         memberApplications = applications.map((app: MemberApplicationRaw) => ({
           ...app,
           user: userMap.get(app.studentNumber) ?? null,
@@ -117,6 +169,7 @@ export async function GET(request: NextRequest) {
               SELECT * FROM "MemberApplication" 
               WHERE "hasAccepted" = false 
               AND "createdAt" != "updatedAt"
+              AND "recruitmentCycleId" = ${activeCycleId}
               ORDER BY "createdAt" DESC
               LIMIT ${limit} OFFSET ${skip}
             `,
@@ -124,13 +177,16 @@ export async function GET(request: NextRequest) {
               SELECT COUNT(*) as count FROM "MemberApplication" 
               WHERE "hasAccepted" = false 
               AND "createdAt" != "updatedAt"
+              AND "recruitmentCycleId" = ${activeCycleId}
             `,
         ]);
 
         totalCount = Number(countResult[0].count);
 
         // Batch fetch users to avoid N+1 queries
-        const studentNumbers = applications.map((app: MemberApplicationRaw) => app.studentNumber);
+        const studentNumbers = applications.map(
+          (app: MemberApplicationRaw) => app.studentNumber,
+        );
         const users = await prisma.user.findMany({
           where: { studentNumber: { in: studentNumbers } },
           select: {
@@ -139,18 +195,28 @@ export async function GET(request: NextRequest) {
             email: true,
             studentNumber: true,
             section: true,
+            memberships: {
+              where: { recruitmentCycleId: activeCycleId },
+              select: { memberId: true },
+              take: 1,
+            },
           },
         });
-        const userMap = new Map(users.map((u: typeof users[number]) => [u.studentNumber, u]));
+        const userMap = new Map(
+          users.map((u: (typeof users)[number]) => [u.studentNumber, u]),
+        );
         memberApplications = applications.map((app: MemberApplicationRaw) => ({
           ...app,
           user: userMap.get(app.studentNumber) ?? null,
         }));
       } else {
         // Get all applications
-        totalCount = await prisma.memberApplication.count();
+        totalCount = await prisma.memberApplication.count({
+          where: { recruitmentCycleId: activeCycleId },
+        });
 
         memberApplications = await prisma.memberApplication.findMany({
+          where: { recruitmentCycleId: activeCycleId },
           orderBy: { createdAt: "desc" },
           skip: skip,
           take: limit,
@@ -162,6 +228,11 @@ export async function GET(request: NextRequest) {
                 email: true,
                 studentNumber: true,
                 section: true,
+                memberships: {
+                  where: { recruitmentCycleId: activeCycleId },
+                  select: { memberId: true },
+                  take: 1,
+                },
               },
             },
           },
@@ -182,8 +253,10 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    if (type === "ea") {
-      const whereClause: Record<string, unknown> = {};
+    if (type === "executive-associate") {
+      const whereClause: Record<string, unknown> = {
+        recruitmentCycleId: activeCycleId,
+      };
 
       // Filter by status if provided
       if (status === "accepted") {
@@ -214,39 +287,48 @@ export async function GET(request: NextRequest) {
       }
 
       // Get total count for pagination
-      const totalCount = await prisma.eAApplication.count({
+      const totalCount = await prisma.executiveAssociateApplication.count({
         where: whereClause,
       });
 
-      const eaApplications = await prisma.eAApplication.findMany({
-        where: whereClause,
-        orderBy: { createdAt: "desc" },
-        skip: skip,
-        take: limit,
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              studentNumber: true,
-              section: true,
+      const executiveAssociateApplications =
+        await prisma.executiveAssociateApplication.findMany({
+          where: whereClause,
+          orderBy: { createdAt: "desc" },
+          skip: skip,
+          take: limit,
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                studentNumber: true,
+                section: true,
+                memberships: {
+                  where: { recruitmentCycleId: activeCycleId },
+                  select: { memberId: true },
+                  take: 1,
+                },
+              },
             },
           },
-        },
-      });
+        });
 
       // Add CV download links for EA applications (sync operation — no need for Promise.all)
-      const eaApplicationsWithCvLinks = eaApplications.map((app: typeof eaApplications[number]) => ({
-        ...app,
-        cvDownloadUrl: app.supabaseFilePath
-          ? `/api/admin/cv-download?applicationId=${app.id}&type=ea`
-          : null,
-      }));
+      const executiveAssociateApplicationsWithCvLinks =
+        executiveAssociateApplications.map(
+          (app: (typeof executiveAssociateApplications)[number]) => ({
+            ...app,
+            cvDownloadUrl: app.supabaseFilePath
+              ? `/api/admin/cv-download?applicationId=${app.id}&type=executive-associate`
+              : null,
+          }),
+        );
 
       return NextResponse.json({
         success: true,
-        applications: eaApplicationsWithCvLinks,
+        applications: executiveAssociateApplicationsWithCvLinks,
         pagination: {
           currentPage: page,
           totalPages: Math.ceil(totalCount / limit),
@@ -259,15 +341,46 @@ export async function GET(request: NextRequest) {
     }
 
     if (type === "committee") {
-      const whereClause: Record<string, unknown> = {};
+      const whereClause: Prisma.CommitteeApplicationWhereInput = {
+        recruitmentCycleId: activeCycleId,
+      };
+
+      // To avoid OR collisions, compile conditions into an AND array if needed
+      const andConditions: Prisma.CommitteeApplicationWhereInput[] = [];
+
+      // Enforce accessible committees
+      if (accessibleCommittees) {
+        const accessibleList = Array.from(accessibleCommittees);
+
+        if (committee && committee !== "all") {
+          // If they selected a committee, check if they have access to it
+          if (!accessibleCommittees.has(normalizeCommitteeId(committee))) {
+            return NextResponse.json({
+              success: true,
+              applications: [],
+              pagination: {
+                currentPage: page,
+                totalPages: 0,
+                totalCount: 0,
+                limit: limit,
+                hasNextPage: false,
+                hasPreviousPage: false,
+              },
+            });
+          }
+        } else {
+          // If they selected "all" committees, restrict to their accessible ones
+          andConditions.push({
+            OR: [
+              { firstOptionCommittee: { in: accessibleList } },
+              { redirection: { in: accessibleList } },
+            ],
+          });
+        }
+      }
 
       // Filter by committee if provided
       if (committee && committee !== "all") {
-        // For committee-specific filtering, we need to handle redirected applications
-        // A redirected application should only appear in the committee they were redirected TO
-        // We need to handle both committee ID and committee title since redirections store the full title
-
-        // Get the committee title for the given committee ID
         const { committeeRolesSubmitted } =
           await import("@/data/committeeRoles");
         const committeeData = committeeRolesSubmitted.find(
@@ -275,47 +388,50 @@ export async function GET(request: NextRequest) {
         );
         const committeeTitle = committeeData?.title;
 
-        whereClause.OR = [
-          // Direct applications to this committee (not redirected)
-          {
-            firstOptionCommittee: committee,
-            redirection: null, // Not redirected
-          },
-          // Applications redirected TO this committee (by ID or title)
-          ...(committeeTitle
-            ? [
-                { redirection: committee }, // By committee ID
-                { redirection: committeeTitle }, // By committee title
-              ]
-            : [
-                { redirection: committee }, // Fallback to just committee ID
-              ]),
-        ];
+        andConditions.push({
+          OR: [
+            {
+              firstOptionCommittee: committee,
+              redirection: null,
+            },
+            ...(committeeTitle
+              ? [{ redirection: committee }, { redirection: committeeTitle }]
+              : [{ redirection: committee }]),
+          ],
+        });
       }
 
       // Filter by status if provided
       if (status === "accepted") {
         whereClause.hasAccepted = true;
-        whereClause.status = { not: null }; // Exclude applications with NULL status
+        whereClause.status = { not: null };
       } else if (status === "pending") {
-        whereClause.OR = [
-          { hasAccepted: false, status: null },
-          { hasAccepted: false, status: "pending" },
-          { hasAccepted: true, status: null }, // Include accepted applications that were reset to NULL
-        ];
+        andConditions.push({
+          OR: [
+            { hasAccepted: false, status: null },
+            { hasAccepted: false, status: "pending" },
+            { hasAccepted: true, status: null },
+          ],
+        });
       } else if (status === "evaluating") {
         whereClause.status = "evaluating";
       } else if (status === "rejected") {
         whereClause.status = "failed";
       } else if (status === "redirected") {
-        whereClause.redirection = { not: null }; // Show only applications with redirection
+        whereClause.redirection = { not: null };
       } else if (status === "no-schedule") {
-        whereClause.OR = [
-          { interviewSlotDay: null },
-          { interviewSlotTimeStart: null },
-          { interviewSlotDay: "" },
-          { interviewSlotTimeStart: "" },
-        ];
+        andConditions.push({
+          OR: [
+            { interviewSlotDay: null },
+            { interviewSlotTimeStart: null },
+            { interviewSlotDay: "" },
+            { interviewSlotTimeStart: "" },
+          ],
+        });
+      }
+
+      if (andConditions.length > 0) {
+        whereClause.AND = andConditions;
       }
 
       // Get total count for pagination
@@ -336,6 +452,11 @@ export async function GET(request: NextRequest) {
               email: true,
               studentNumber: true,
               section: true,
+              memberships: {
+                where: { recruitmentCycleId: activeCycleId },
+                select: { memberId: true },
+                take: 1,
+              },
             },
           },
         },
@@ -343,7 +464,7 @@ export async function GET(request: NextRequest) {
 
       // Add CV and Portfolio download links for Committee applications (sync — no need for Promise.all)
       const committeeApplicationsWithCvLinks = committeeApplications.map(
-        (app: typeof committeeApplications[number]) => ({
+        (app: (typeof committeeApplications)[number]) => ({
           ...app,
           cvDownloadUrl: app.supabaseFilePath
             ? `/api/admin/cv-download?applicationId=${app.id}&type=committee`
@@ -411,7 +532,7 @@ export async function DELETE(_request: NextRequest) {
       include: {
         user: {
           include: {
-            eaApplication: true,
+            executiveAssociateApplications: true,
           },
         },
       },
@@ -421,8 +542,9 @@ export async function DELETE(_request: NextRequest) {
     for (const committeeApp of orphanedCommitteeApps) {
       // Check if the corresponding EA application exists and is failed
       if (
-        committeeApp.user.eaApplication &&
-        committeeApp.user.eaApplication.status === "failed"
+        committeeApp.user.executiveAssociateApplications?.[0] &&
+        committeeApp.user.executiveAssociateApplications?.[0].status ===
+          "failed"
       ) {
         await prisma.committeeApplication.delete({
           where: { id: committeeApp.id },
@@ -471,7 +593,10 @@ export async function PUT(request: NextRequest) {
     const body = await request.json();
     const parsed = applicationActionSchema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
+      return NextResponse.json(
+        { error: parsed.error.issues[0].message },
+        { status: 400 },
+      );
     }
 
     const { applicationId, type, action, redirection } = parsed.data;
@@ -487,20 +612,44 @@ export async function PUT(request: NextRequest) {
 
     if (type === "member") {
       if (action === "accept") {
-        updatedApplication = await prisma.memberApplication.update({
-          where: { id: applicationId },
-          data: { hasAccepted: true },
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                studentNumber: true,
-                section: true,
+        updatedApplication = await prisma.$transaction(async (tx) => {
+          const acceptedApplication = await tx.memberApplication.update({
+            where: { id: applicationId },
+            data: { hasAccepted: true },
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  studentNumber: true,
+                  section: true,
+                },
               },
             },
-          },
+          });
+
+          const memberId = await ensureCycleMemberId(
+            tx,
+            acceptedApplication.user.id,
+            acceptedApplication.recruitmentCycleId,
+          );
+
+          await tx.memberApplication.deleteMany({
+            where: {
+              studentNumber: acceptedApplication.studentNumber,
+              recruitmentCycleId: acceptedApplication.recruitmentCycleId,
+              id: { not: acceptedApplication.id },
+            },
+          });
+
+          return {
+            ...acceptedApplication,
+            user: {
+              ...acceptedApplication.user,
+              memberships: [{ memberId }],
+            },
+          };
         });
 
         // Send acceptance email
@@ -566,20 +715,40 @@ export async function PUT(request: NextRequest) {
         updateData.redirection = redirection;
       }
 
-      updatedApplication = await prisma.committeeApplication.update({
-        where: { id: applicationId },
-        data: updateData,
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              studentNumber: true,
-              section: true,
+      updatedApplication = await prisma.$transaction(async (tx) => {
+        const application = await tx.committeeApplication.update({
+          where: { id: applicationId },
+          data: updateData,
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                studentNumber: true,
+                section: true,
+              },
             },
           },
-        },
+        });
+
+        if (action !== "accept") {
+          return application;
+        }
+
+        const memberId = await ensureCycleMemberId(
+          tx,
+          application.user.id,
+          application.recruitmentCycleId,
+        );
+
+        return {
+          ...application,
+          user: {
+            ...application.user,
+            memberships: [{ memberId }],
+          },
+        };
       });
 
       // Send appropriate email based on action
@@ -684,12 +853,13 @@ export async function PUT(request: NextRequest) {
           console.error("Failed to send email:", emailError);
         }
       }
-    } else if (type === "ea") {
+    } else if (type === "executive-associate") {
       // First get the current application data to check if it was redirected
-      const currentApplication = await prisma.eAApplication.findUnique({
-        where: { id: applicationId },
-        select: { status: true, redirection: true, studentNumber: true },
-      });
+      const currentApplication =
+        await prisma.executiveAssociateApplication.findUnique({
+          where: { id: applicationId },
+          select: { status: true, redirection: true, studentNumber: true },
+        });
 
       const updateData: {
         hasAccepted?: boolean;
@@ -762,20 +932,40 @@ export async function PUT(request: NextRequest) {
         updateData.redirection = redirection;
       }
 
-      updatedApplication = await prisma.eAApplication.update({
-        where: { id: applicationId },
-        data: updateData,
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              studentNumber: true,
-              section: true,
+      updatedApplication = await prisma.$transaction(async (tx) => {
+        const application = await tx.executiveAssociateApplication.update({
+          where: { id: applicationId },
+          data: updateData,
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                studentNumber: true,
+                section: true,
+              },
             },
           },
-        },
+        });
+
+        if (action !== "accept") {
+          return application;
+        }
+
+        const memberId = await ensureCycleMemberId(
+          tx,
+          application.user.id,
+          application.recruitmentCycleId,
+        );
+
+        return {
+          ...application,
+          user: {
+            ...application.user,
+            memberships: [{ memberId }],
+          },
+        };
       });
 
       // Send appropriate email based on action
@@ -823,7 +1013,7 @@ export async function PUT(request: NextRequest) {
                 emailTemplates.executiveAssistantRedirectedToMember(
                   updatedApplication.user.name,
                   updatedApplication.user.id,
-                  updatedApplication.firstOptionEb || "Executive Assistant",
+                  updatedApplication.firstOptionEb || "Executive Associate",
                 );
               await sendEmail(
                 updatedApplication.user.email,
@@ -839,7 +1029,7 @@ export async function PUT(request: NextRequest) {
                 emailTemplates.executiveAssistantRedirectedToCommittee(
                   updatedApplication.user.name,
                   updatedApplication.user.id,
-                  updatedApplication.firstOptionEb || "Executive Assistant",
+                  updatedApplication.firstOptionEb || "Executive Associate",
                   committeeId,
                 );
               await sendEmail(
@@ -855,7 +1045,7 @@ export async function PUT(request: NextRequest) {
               const emailTemplate = emailTemplates.executiveAssistantRedirected(
                 updatedApplication.user.name,
                 updatedApplication.user.id,
-                updatedApplication.firstOptionEb || "Executive Assistant",
+                updatedApplication.firstOptionEb || "Executive Associate",
                 redirection,
               );
               await sendEmail(

@@ -1,12 +1,24 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 
+const RECENT_SUBMISSION_TTL_MS = 5 * 60 * 1000;
+const recentSubmissionKeys = new Map<string, number>();
+
+const pruneRecentSubmissionKeys = (now: number) => {
+  for (const [key, expiresAt] of recentSubmissionKeys) {
+    if (expiresAt <= now) recentSubmissionKeys.delete(key);
+  }
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
     const submission = body?.submission ?? body;
 
-    if (!submission || typeof submission !== "object") {
+    if (!isRecord(submission)) {
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
     }
 
@@ -19,12 +31,31 @@ export async function POST(req: Request) {
       );
     }
 
+    const { idempotencyKey, ...submissionRecord } = submission;
+
+    if (typeof idempotencyKey === "string" && idempotencyKey.length > 0) {
+      const now = Date.now();
+      pruneRecentSubmissionKeys(now);
+
+      if (recentSubmissionKeys.has(idempotencyKey)) {
+        return NextResponse.json(
+          { data: [], duplicate: true },
+          { status: 200 },
+        );
+      }
+
+      recentSubmissionKeys.set(idempotencyKey, now + RECENT_SUBMISSION_TTL_MS);
+    }
+
     const { data, error } = await supabase
       .from("quiz_submissions")
-      .insert([submission])
+      .insert([submissionRecord])
       .select();
 
     if (error) {
+      if (typeof idempotencyKey === "string") {
+        recentSubmissionKeys.delete(idempotencyKey);
+      }
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 

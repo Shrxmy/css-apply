@@ -23,10 +23,10 @@ function CommitteeSchedulePage() {
   );
 }
 
-// 3. Executive Assistant application protection
+// 3. Executive Associate application protection
 function EASchedulePage() {
   return (
-    <ApplicationGuard applicationType="ea">
+    <ApplicationGuard applicationType="executive-associate">
       <div>EA Schedule Page Content</div>
     </ApplicationGuard>
   );

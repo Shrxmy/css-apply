@@ -15,9 +15,16 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const activeCycle = await prisma.recruitmentCycle.findFirst({
+      where: { isActive: true },
+      select: { id: true },
+    });
+    const activeCycleId = activeCycle?.id ?? "__no_active_cycle__";
+
     // Check for conflicts in EA Applications
-    const eaConflicts = await prisma.eAApplication.findMany({
+    const eaConflicts = await prisma.executiveAssociateApplication.findMany({
       where: {
+        recruitmentCycleId: activeCycleId,
         AND: [
           { interviewSlotDay: { not: null } },
           { interviewSlotTimeStart: { not: null } },
@@ -48,6 +55,7 @@ export async function GET() {
     // Check for conflicts in Committee Applications
     const committeeConflicts = await prisma.committeeApplication.findMany({
       where: {
+        recruitmentCycleId: activeCycleId,
         AND: [
           { interviewSlotDay: { not: null } },
           { interviewSlotTimeStart: { not: null } },

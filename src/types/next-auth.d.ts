@@ -21,8 +21,8 @@ declare module "next-auth" {
         paymentProof?: string;
         createdAt: Date;
       };
-      hasEAApplication: boolean;
-      eaApplication?: { id: string; hasAccepted: boolean; status: string };
+      hasExecutiveAssociateApplication: boolean;
+      executiveAssociateApplication?: { id: string; hasAccepted: boolean; status: string };
       hasCommitteeApplication: boolean;
       committeeApplication?: {
         id: string;

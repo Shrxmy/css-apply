@@ -8,6 +8,7 @@ import { useSession } from "next-auth/react";
 import Image from "next/image";
 import Header from "@/components/Header";
 import LoadingScreen from "@/components/LoadingScreen";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import { parseFullName } from "@/lib/name-parsing";
 import { useFormPersistence } from "@/lib/useFormPersistence";
 import { useApplicationStatus } from "@/lib/useApplicationStatus";
@@ -33,6 +34,9 @@ export default function MemberApplication() {
   const initialFormData = {
     studentNumber: "",
     section: "",
+    age: "",
+    dateOfBirth: "",
+    isOldCssMember: false,
     firstName: "",
     lastName: "",
   };
@@ -50,9 +54,9 @@ export default function MemberApplication() {
       router.push(
         `/user/apply/committee-staff/${appStatus.committeeId}/progress`,
       );
-    else if (appStatus.hasEAApplication && appStatus.ebRole)
+    else if (appStatus.hasExecutiveAssociateApplication && appStatus.ebRole)
       router.push(
-        `/user/apply/executive-assistant/${appStatus.ebRole}/progress`,
+        `/user/apply/executive-associate/${appStatus.ebRole}/progress`,
       );
   }, [appStatus, status, router]);
 
@@ -85,6 +89,18 @@ export default function MemberApplication() {
           if (!formData.section && data.user?.section) {
             updates.section = data.user.section;
           }
+
+          if (!formData.age && data.user?.age) {
+            updates.age = String(data.user.age);
+          }
+
+          if (!formData.dateOfBirth && data.user?.dateOfBirth) {
+            updates.dateOfBirth = data.user.dateOfBirth.slice(0, 10);
+          }
+
+          if (data.user?.isOldCssMember !== null && data.user?.isOldCssMember !== undefined) {
+            updates.isOldCssMember = data.user.isOldCssMember;
+          }
           
           // Only update if there are changes to make
           if (Object.keys(updates).length > 0) {
@@ -99,7 +115,17 @@ export default function MemberApplication() {
     };
 
     fetchApplicationData();
-  }, [session, status, isLoaded, updateFormData, hasFetchedData, formData.studentNumber, formData.section]);
+  }, [
+    session,
+    status,
+    isLoaded,
+    updateFormData,
+    hasFetchedData,
+    formData.studentNumber,
+    formData.section,
+    formData.age,
+    formData.dateOfBirth,
+  ]);
 
   // Early returns AFTER all hooks
   if (status === "loading" || isAppLoading) return <LoadingScreen />;
@@ -107,7 +133,7 @@ export default function MemberApplication() {
     appStatus &&
     (appStatus.hasMemberApplication ||
       appStatus.hasCommitteeApplication ||
-      appStatus.hasEAApplication)
+      appStatus.hasExecutiveAssociateApplication)
   )
     return <LoadingScreen />;
   if (!applicationsOpen) return <LoadingScreen />;
@@ -116,6 +142,9 @@ export default function MemberApplication() {
     const { name, value } = e.target;
     if (name === "studentNumber") {
       const numericValue = value.replace(/[^0-9]/g, "").slice(0, 10);
+      updateFormData({ [name]: numericValue });
+    } else if (name === "age") {
+      const numericValue = value.replace(/[^0-9]/g, "").slice(0, 3);
       updateFormData({ [name]: numericValue });
     } else {
       updateFormData({ [name]: value });
@@ -130,6 +159,9 @@ export default function MemberApplication() {
     const parsed = memberApplicationSchema.safeParse({
       studentNumber: formData.studentNumber,
       section: formData.section,
+      age: formData.age,
+      dateOfBirth: formData.dateOfBirth,
+      isOldCssMember: formData.isOldCssMember,
     });
 
     if (!parsed.success) {
@@ -153,6 +185,9 @@ export default function MemberApplication() {
         body: JSON.stringify({
           studentNumber: formData.studentNumber,
           section: formData.section,
+          age: Number(formData.age),
+          dateOfBirth: formData.dateOfBirth,
+          isOldCssMember: formData.isOldCssMember,
         }),
       });
 
@@ -172,7 +207,7 @@ export default function MemberApplication() {
   };
 
   return (
-    <div className="min-h-screen md:bg-[rgb(243,243,253)] md:bg-[url('https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/pictures/background.png')] flex flex-col justify-between bg-cover bg-repeat">
+    <div className="min-h-screen md:bg-[rgb(243,243,253)] md:bg-[url('/assets/css-apply-static-images/assets/pictures/background.webp')] flex flex-col justify-between bg-cover bg-repeat">
       <Header />
 
       <section className="flex flex-col justify-between items-center px-20 py-10 lg:px-50 lg:py-20">
@@ -255,35 +290,85 @@ export default function MemberApplication() {
                 </div>
               </div>
 
+              <div className="flex gap-4">
+                <div className="flex flex-col gap-2">
+                  <div className="text-black text-xs lg:text-sm font-Inter font-normal">Age *</div>
+                  <input
+                    type="text"
+                    name="age"
+                    value={formData.age}
+                    onChange={handleInputChange}
+                    required
+                    inputMode="numeric"
+                    className="w-24 h-9 lg:h-12 rounded-md border-2 border-[#CDCECF] focus:border-2 focus:border-[#044FAF] focus:outline-none bg-white px-4 py-3 text-sm lg:text-base"
+                    placeholder="Age"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <div className="text-black text-xs lg:text-sm font-Inter font-normal">Date of Birth *</div>
+                  <input
+                    type="date"
+                    name="dateOfBirth"
+                    value={formData.dateOfBirth}
+                    onChange={handleInputChange}
+                    required
+                    className="w-44 lg:w-56 h-9 lg:h-12 rounded-md border-2 border-[#CDCECF] focus:border-2 focus:border-[#044FAF] focus:outline-none bg-white px-4 py-3 text-sm lg:text-base"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <div className="text-black text-xs lg:text-sm font-Inter font-normal">
+                  Were you an old member/staff/executive associate of CSS before? *
+                </div>
+                <div className="flex gap-6 text-black text-sm font-Inter">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.isOldCssMember}
+                      onChange={() => updateFormData({ isOldCssMember: true })}
+                      className="w-4 h-4 accent-[#134687]"
+                    />
+                    Yes
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={!formData.isOldCssMember}
+                      onChange={() => updateFormData({ isOldCssMember: false })}
+                      className="w-4 h-4 accent-[#134687]"
+                    />
+                    No
+                  </label>
+                </div>
+              </div>
+
               <div className="flex items-center justify-center lg:items-start gap-3">
-                <div className="relative flex-shrink-0">
+                <div className="relative flex-shrink-0 h-4 w-4 lg:h-6 lg:w-6">
                   <input
                     type="checkbox"
                     id="circle-checkbox"
                     checked={isChecked}
                     onChange={(e) => setIsChecked(e.target.checked)}
                     required
-                    className="w-4 h-4 lg:w-6 lg:h-6 appearance-none rounded-full border-2 border-gray-400 transition-all duration-200 focus:outline-none
+                    className="absolute inset-0 block h-full w-full appearance-none rounded-full border-2 border-gray-400 transition-all duration-200 focus:outline-none
                     hover:border-[#134687]
                     checked:bg-blue-500
                     shadow-inner cursor-pointer"
                   />
                   <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                    <svg
-                      className={`w-2 h-2 lg:w-4 lg:h-4 text-white transition-opacity duration-20 ${
+                    <div
+                      className={`w-2 h-2 lg:w-4 lg:h-4 text-white transition-opacity duration-20 bg-current ${
                         isChecked ? "opacity-100" : "opacity-0"
                       }`}
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 26 26"
-                      strokeWidth="3"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M5 13l4 4L19 7"
-                      />
-                    </svg>
+                      style={{
+                        maskImage: "url(/icons/check.svg)",
+                        WebkitMaskImage: "url(/icons/check.svg)",
+                        maskSize: "contain",
+                        maskRepeat: "no-repeat",
+                        maskPosition: "center",
+                      }}
+                    />
                   </div>
                 </div>
 
@@ -302,7 +387,7 @@ export default function MemberApplication() {
             <div className="hidden lg:flex justify-center items-center mt-8">
               <div className="relative w-[300px] h-[360px]">
                 <Image
-                  src="https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/pictures/MemberImage1.png"
+                  src="/assets/css-apply-static-images/assets/pictures/MemberImage1.webp"
                   alt="Member"
                   fill
                   sizes="300px"
@@ -326,11 +411,20 @@ export default function MemberApplication() {
                 loading ||
                 !formData.studentNumber ||
                 formData.studentNumber.length !== 10 ||
-                !formData.section
+                !formData.section ||
+                !formData.age ||
+                !formData.dateOfBirth
               }
               className="whitespace-nowrap font-inter text-sm font-semibold text-white px-12 py-3 rounded-lg bg-[#134687] hover:bg-[#0d3569] disabled:opacity-50"
             >
-              {loading ? "Submitting..." : "Submit"}
+              {loading ? (
+                <span className="inline-flex items-center justify-center gap-2">
+                  <LoadingSpinner label="Submitting member application" size="sm" className="border-white border-t-transparent" />
+                  Submitting...
+                </span>
+              ) : (
+                "Submit"
+              )}
             </button>
           </div>
         </form>

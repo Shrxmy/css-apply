@@ -88,7 +88,7 @@ export const roles = [
     title: "Chief of Staff",
     ebName: "Carylle Keona Ilano",
     description:
-      "Leads the pool of staff and executive assistants, making sure manpower is allocated properly during events and projects. They coordinate with the EB to deliver logistical support and ensure that every mission is carried out smoothly.",
+      "Leads the pool of staff and executive associates, making sure manpower is allocated properly during events and projects. They coordinate with the EB to deliver logistical support and ensure that every mission is carried out smoothly.",
   },
   {
     id: "director-digital-productions",

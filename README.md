@@ -8,8 +8,8 @@
 
 [![Next.js](https://img.shields.io/badge/Next.js-15.4.6-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind%20CSS-4.1.12-38B2AC?style=for-the-badge&logo=tailwind-css)](https://tailwindcss.com/)
-[![Prisma](https://img.shields.io/badge/Prisma-6.16.1-2D3748?style=for-the-badge&logo=prisma)](https://prisma.io/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind%20CSS-4.2.2-38B2AC?style=for-the-badge&logo=tailwind-css)](https://tailwindcss.com/)
+[![Prisma](https://img.shields.io/badge/Prisma-7.7.0-2D3748?style=for-the-badge&logo=prisma)](https://prisma.io/)
 
 </div>
 
@@ -24,10 +24,11 @@ CSSApply is a comprehensive recruitment management system designed specifically 
 - **Multi-Position Applications**: Support for Members, Committee Staff, and Executive Assistant positions
 - **Smart Interview Scheduling**: Automated conflict detection and prevention
 - **Admin Dashboard**: Comprehensive management tools for recruitment staff
-- **Email Notifications**: Automated communication system using Brevo
+- **Email Notifications**: Automated communication system using Brevo with test email feature
 - **Personality Assessment**: Integrated personality test for candidate evaluation
 - **Secure Authentication**: NextAuth.js integration with role-based access control
 - **Responsive Design**: Mobile-first approach with modern UI/UX
+- **Performance Optimized**: SWR caching for fast data fetching and instant page loads
 
 ---
 
@@ -79,6 +80,10 @@ CSSApply is a comprehensive recruitment management system designed specifically 
    NEXT_PUBLIC_SUPABASE_URL="your-supabase-url"
    NEXT_PUBLIC_SUPABASE_ANON_KEY="your-supabase-anon-key"
    SUPABASE_SERVICE_ROLE_KEY="your-service-role-key"
+   NEXT_PUBLIC_PAYMENT_QR_URL="https://your-public-payment-qr-url"
+
+   # Auth
+   ALLOWED_SIGNIN_EMAIL_DOMAIN="ust.edu.ph"
 
    # Email (Brevo)
    BREVO_API_KEY="your-brevo-api-key"
@@ -137,6 +142,10 @@ css-apply/
 | `npm run build` | Build the application for production    |
 | `npm run start` | Start the production server             |
 | `npm run lint`  | Run ESLint for code quality             |
+| `npm run lint:fix` | Run ESLint with auto-fix             |
+| `npx prisma generate` | Regenerate Prisma client         |
+| `npx prisma db push` | Push schema changes to database   |
+| `npx prisma studio` | Open Prisma Studio GUI             |
 
 ---
 
@@ -162,6 +171,26 @@ css-apply/
 
 ---
 
+## Admin Features
+
+### Super Admin Dashboard
+
+The Super Admin dashboard provides comprehensive system management:
+
+- **User Database (user_db)**: View, search, and manage all users. Assign EB (Executive Board) profiles, change roles (user/admin/super_admin), and view member statistics.
+- **Configuration (config)**: Manage recruitment cycles with start/end dates and active status.
+- **Test Email (email_test)**: Send test emails for all email templates to verify delivery and design.
+
+### EB Profile Management
+
+Super Admins can assign and manage Executive Board profiles including:
+- Position (President, Secretary, Treasurer, etc.)
+- Committees assigned
+- Meeting links for interviews
+- Active/inactive status
+
+---
+
 ## Security Features
 
 - **Authentication**: NextAuth.js with multiple providers
@@ -181,11 +210,13 @@ CSSApply uses **Brevo** (formerly Sendinblue) for email communications:
 - **Application Confirmations**: Successful submissions
 - **Interview Notifications**: Schedule confirmations
 - **Admin Alerts**: System notifications
+- **Test Emails**: Super Admins can send test emails to verify templates
 
 ### Email Templates
 
 - Responsive HTML templates
-- Brand-consistent styling
+- Brand-consistent styling with blue theme colors
+- Clean design with logo instead of text
 - Multi-language support ready
 
 ---
@@ -206,6 +237,31 @@ CSSApply uses **Brevo** (formerly Sendinblue) for email communications:
 - **Migrations**: Version-controlled schema changes
 - **Relationships**: Proper foreign key constraints
 - **Indexing**: Optimized query performance
+
+---
+
+## Performance Optimization
+
+CSSApply uses several techniques to ensure fast performance:
+
+### SWR Caching
+
+- Client-side data caching with SWR (Stale-While-Revalidate)
+- EB profiles and schedule data are cached for 5 minutes
+- Eliminates loading spinners on return visits
+- Automatic revalidation disabled to reduce server load
+
+### Loading States
+
+- All admin and user pages show loading spinners during data fetches
+- Prevents "flash" of empty content when loading
+- Consistent UX across all pages
+
+### Database Optimization
+
+- Prisma queries optimized with proper `select` statements
+- Pagination implemented for large datasets
+- Indexes on frequently queried columns
 
 ---
 

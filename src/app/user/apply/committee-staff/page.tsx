@@ -35,9 +35,9 @@ export default function StaffApplication() {
       router.push(
         `/user/apply/committee-staff/${appStatus.committeeId}/progress`,
       );
-    } else if (appStatus.hasEAApplication && appStatus.ebRole) {
+    } else if (appStatus.hasExecutiveAssociateApplication && appStatus.ebRole) {
       router.push(
-        `/user/apply/executive-assistant/${appStatus.ebRole}/progress`,
+        `/user/apply/executive-associate/${appStatus.ebRole}/progress`,
       );
     }
   }, [appStatus, status, router]);
@@ -55,7 +55,7 @@ export default function StaffApplication() {
     appStatus &&
     (appStatus.hasMemberApplication ||
       appStatus.hasCommitteeApplication ||
-      appStatus.hasEAApplication)
+      appStatus.hasExecutiveAssociateApplication)
   ) {
     return <LoadingScreen />;
   }
@@ -63,34 +63,34 @@ export default function StaffApplication() {
   const getCommitteeImage = (committeeId: string) => {
     const imageMap: { [key: string]: string } = {
       academics:
-        "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_ACADEMICS.png",
+        "/assets/css-apply-static-images/assets/committee_test/CSAR_ACADEMICS.webp",
       community:
-        "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_COMMDEV.png",
+        "/assets/css-apply-static-images/assets/committee_test/CSAR_COMMDEV.webp",
       creatives:
-        "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_CREATIVES.png",
+        "/assets/css-apply-static-images/assets/committee_test/CSAR_CREATIVES.webp",
       documentation:
-        "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_DOCU.png",
+        "/assets/css-apply-static-images/assets/committee_test/CSAR_DOCU.webp",
       external:
-        "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_EXTERNALS.png",
+        "/assets/css-apply-static-images/assets/committee_test/CSAR_EXTERNALS.webp",
       finance:
-        "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_FINANCE.png",
+        "/assets/css-apply-static-images/assets/committee_test/CSAR_FINANCE.webp",
       logistics:
-        "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_LOGISTICS.png",
+        "/assets/css-apply-static-images/assets/committee_test/CSAR_LOGISTICS.webp",
       publicity:
-        "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_PUBLICITY.png",
+        "/assets/css-apply-static-images/assets/committee_test/CSAR_PUBLICITY.webp",
       sports:
-        "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_SPOTA.png",
+        "/assets/css-apply-static-images/assets/committee_test/CSAR_SPOTA.webp",
       technology:
-        "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/CSAR_TECHDEV.png",
+        "/assets/css-apply-static-images/assets/committee_test/CSAR_TECHDEV.webp",
     };
     return (
       imageMap[committeeId] ||
-      "https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/Questions CSAR.png"
+      "/assets/css-apply-static-images/assets/committee_test/Questions%20CSAR.webp"
     );
   };
 
   return (
-    <div className="min-h-screen bg-white sm:bg-[rgb(243,243,253)] sm:bg-[url('https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/pictures/background.png')] sm:bg-cover  sm:bg-no-repeat  flex flex-col justify-between">
+    <div className="min-h-screen bg-white sm:bg-[rgb(243,243,253)] sm:bg-[url('/assets/css-apply-static-images/assets/pictures/background.webp')] sm:bg-cover  sm:bg-no-repeat  flex flex-col justify-between">
       <Header />
 
       <section className="flex flex-col items-center justify-center sm:my-12 lg:my-28">
@@ -265,7 +265,7 @@ export default function StaffApplication() {
                       </div>
                       <div className="w-full lg:w-2/5 h-80 overflow-hidden relative">
                         <Image
-                          src="https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/committee_test/Questions CSAR.png"
+                          src="/assets/css-apply-static-images/assets/committee_test/Questions%20CSAR.webp"
                           alt="Select a committee"
                           fill
                           sizes="(max-width: 1024px) 100vw, 40vw"

@@ -59,7 +59,7 @@ node send-css-group-reminder.js
 
 The email includes:
 
-- Professional CSS Apply branding
+- Professional CSSApply branding
 - Personalized greeting with user's name
 - Clear call-to-action to join the CSS Group
 - Facebook group link: `https://fb.me/g/6WRg4o62h/xpTx6zKB`

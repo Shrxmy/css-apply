@@ -3,11 +3,12 @@
 import { useSession } from "next-auth/react";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import useSWR from "swr";
 import Footer from "@/components/Footer";
 import LoadingScreen from "@/components/LoadingScreen";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import Header from "@/components/Header";
 import { useApplicationStatus } from "@/lib/useApplicationStatus";
+import { useApplicationsOpenState } from "@/lib/useApplicationsOpen";
 import {
   Users,
   ClipboardEdit,
@@ -16,7 +17,31 @@ import {
   ChevronRight,
 } from "lucide-react";
 
-const swrFetcher = (url: string) => fetch(url).then((r) => r.json());
+function DashboardSessionLoading() {
+  return (
+    <section className="flex min-h-screen flex-col bg-[#F3F3FD] bg-[url('/assets/css-apply-static-images/assets/pictures/background.webp')] bg-cover bg-repeat">
+      <Header />
+      <main className="flex flex-1 flex-col items-center px-4 pt-12 sm:px-6 sm:pt-14 lg:pt-20">
+        <div className="inline-flex items-center gap-3 rounded-lg bg-[#044FAF] px-5 py-3 text-white sm:px-7">
+          <span className="font-poppins text-base font-medium sm:text-lg">
+            Welcome,
+          </span>
+          <LoadingSpinner
+            label="Loading your name"
+            size="sm"
+            className="border-white border-t-transparent"
+          />
+          <span aria-hidden="true">👋</span>
+        </div>
+        <div className="mt-8 flex items-center gap-3 text-[#134687]">
+          <LoadingSpinner label="Loading your dashboard" />
+          <span className="font-inter text-sm">Loading your dashboard...</span>
+        </div>
+      </main>
+      <Footer />
+    </section>
+  );
+}
 
 export default function UserDashboard() {
   const { data: session, status } = useSession();
@@ -30,40 +55,20 @@ export default function UserDashboard() {
     hasAnyApplication,
   } = useApplicationStatus(status === "authenticated");
 
-  // Check if applications are open (active cycle with interview period not ended)
-  const { data: cycleData } = useSWR<{
-    activeCycle: { interviewEnd: string } | null;
-  }>(
-    status === "authenticated" ? "/api/admin/recruitment-cycle" : null,
-    swrFetcher,
-    { revalidateOnFocus: false },
-  );
+  const {
+    isOpen: applicationsOpen,
+    isLoading: isApplicationsLoading,
+  } = useApplicationsOpenState();
 
-  const activeCycle = cycleData?.activeCycle ?? null;
-  const interviewEnded = activeCycle
-    ? new Date(activeCycle.interviewEnd) < new Date()
-    : true;
-  const applicationsOpen = !!activeCycle && !interviewEnded;
-
-  // Redirect to /user if applications are closed and user tries to access them
   useEffect(() => {
-    if (cycleData && !applicationsOpen && !hasAnyApplication) {
-      // Already on /user, just show the closed message
+    if (status === "unauthenticated") {
+      router.replace("/");
     }
-  }, [cycleData, applicationsOpen, hasAnyApplication]);
+  }, [status, router]);
 
   // Redirect authenticated users with existing applications to their progress page
   useEffect(() => {
     if (status !== "authenticated" || !session || !appStatus) return;
-
-    if (
-      session.user.email.match(/\.cics@ust\.edu\.ph$/) &&
-      session.user.role !== "admin" &&
-      session.user.role !== "super_admin"
-    ) {
-      router.push("/");
-      return;
-    }
 
     if (!hasAnyApplication) return;
 
@@ -73,21 +78,24 @@ export default function UserDashboard() {
       router.push(
         `/user/apply/committee-staff/${appStatus.committeeId}/progress`,
       );
-    } else if (appStatus.hasEAApplication && appStatus.ebRole) {
+    } else if (appStatus.hasExecutiveAssociateApplication && appStatus.ebRole) {
       router.push(
-        `/user/apply/executive-assistant/${appStatus.ebRole}/progress`,
+        `/user/apply/executive-associate/${appStatus.ebRole}/progress`,
       );
     }
   }, [status, session, appStatus, hasAnyApplication, router]);
 
   // Show loading while session, app check, or redirect is pending
-  if (status === "loading" || isAppLoading) {
-    return <LoadingScreen />;
+  if (status === "loading") {
+    return <DashboardSessionLoading />;
+  }
+
+  if (isAppLoading || isApplicationsLoading) {
+    return <LoadingScreen message="Loading your dashboard" />;
   }
 
   if (status === "unauthenticated") {
-    router.push("/");
-    return null;
+    return <LoadingScreen message="Redirecting to sign in" />;
   }
 
   if (!session) return null;
@@ -106,19 +114,19 @@ export default function UserDashboard() {
 
   return (
     <div>
-      <section className="min-h-screen bg-[#F3F3FD] bg-[url('https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/pictures/background.png')] flex flex-col justify-between relative bg-cover bg-repeat">
+      <section className="min-h-screen bg-[#F3F3FD] bg-[url('/assets/css-apply-static-images/assets/pictures/background.webp')] flex flex-col justify-between relative bg-cover bg-repeat">
         <Header />
 
-        <div className="flex flex-col justify-center items-center mt-14 lg:mt-20 w-full mb-10 lg:mb-16">
-          <div className="flex flex-col justify-center items-center gap-7">
-            <div className="flex flex-col justify-center items-center gap-2 lg:gap-5">
-              <div className="rounded-[45px] text-white text-lg lg:text-4xl font-poppins font-medium px-0 py-2 lg:py-4 text-center [background:linear-gradient(90deg,#2F7EE3_0%,#0349A2_100%)] w-fit lg:px-12">
+        <main className="flex flex-1 flex-col items-center w-full px-4 sm:px-6 pt-12 sm:pt-14 lg:pt-20 pb-12 lg:pb-16">
+          <div className="flex w-full flex-col items-center gap-6 lg:gap-7">
+            <div className="flex w-full flex-col items-center gap-2 lg:gap-5">
+              <div className="max-w-full rounded-lg bg-[#044FAF] px-5 py-2.5 text-center font-poppins text-base font-medium text-white break-words sm:px-7 sm:text-lg lg:px-12 lg:py-4 lg:text-4xl">
                 Welcome, {firstName} 👋
               </div>
             </div>
 
             {!applicationsOpen ? (
-              <div className="bg-white rounded-2xl border border-[#005FD9]/10 p-8 lg:p-12 max-w-md text-center shadow-sm">
+              <div className="w-full max-w-md bg-white rounded-2xl p-6 sm:p-8 lg:p-12 text-center shadow-sm">
                 <div className="text-2xl lg:text-3xl font-poppins font-semibold text-[#134687] mb-3">
                   Applications Closed
                 </div>
@@ -238,7 +246,7 @@ export default function UserDashboard() {
                           </div>
                         </div>
                       </div>
-                      {/* Slide 3 - Executive Assistant */}
+                      {/* Slide 3 - Executive Associate */}
                       <div className="min-w-full flex justify-center">
                         <div className="relative flex flex-col w-64 h-110 md:w-80 md:h-120 rounded-[28px] border-2 border-[#005FD9] bg-white shadow-[0_8px_13px_0_rgba(0,0,0,0.25)] items-center justify-center">
                           <Briefcase
@@ -248,7 +256,7 @@ export default function UserDashboard() {
                           />
 
                           <div className="text-base md:text-lg text-[#134687] flex flex-col font-poppins items-center text-center w-full">
-                            Executive Assistant
+                            Executive Associate
                             <div className="text-black text-[10px] sm:text-[10px] md:text-[13px] text-justify font-inter font-light border-2 border-[#D1D1D1] bg-[#ECECEC] rounded-lg mt-4 h-60 w-50 md:mt-5 md:h-67.5 md:w-70 p-4 flex flex-col justify-between overflow-hidden">
                               <ul className="list-disc list-outside space-y-1 flex-1 overflow-y-auto pl-4">
                                 <li>
@@ -267,10 +275,10 @@ export default function UserDashboard() {
                                 </li>
                               </ul>
                               <a
-                                href="/user/apply/executive-assistant"
+                                href="/user/apply/executive-associate"
                                 className="whitespace-nowrap bg-[#044FAF] font-inter text-[10px] md:text-sm text-white px-3 py-2 md:px-4 md:py-3 rounded-md hover:bg-[#04387B] transition-all duration-300 ease-in-out text-center mt-2 shrink-0 shadow-md hover:shadow-lg"
                               >
-                                Apply as Executive Assistant
+                                Apply as Executive Associate
                               </a>
                             </div>
                           </div>
@@ -368,7 +376,7 @@ export default function UserDashboard() {
                     />
 
                     <div className="text-base xl:text-lg text-[#134687] flex flex-col font-poppins items-center text-center w-full">
-                      Executive Assistant
+                      Executive Associate
                       <div className="text-black lg:text-[10px] xl:text-[12px] text-justify font-inter font-light border-2 border-[#D1D1D1] bg-[#ECECEC] rounded-lg mt-4 xl:mt-5 h-55 xl:h-67.5 w-55 xl:w-70 p-4 flex flex-col justify-between overflow-hidden">
                         <ul className="list-disc list-outside space-y-2 flex-1 overflow-y-auto pl-4">
                           <li>
@@ -385,10 +393,10 @@ export default function UserDashboard() {
                           </li>
                         </ul>
                         <a
-                          href="/user/apply/executive-assistant"
+                          href="/user/apply/executive-associate"
                           className="whitespace-nowrap bg-[#044FAF] font-inter text-xs xl:text-sm text-white px-4 xl:px-6 py-2.5 xl:py-3 rounded-md hover:bg-[#04387B] transition-all duration-300 ease-in-out text-center mt-2 shrink-0 shadow-md hover:shadow-lg"
                         >
-                          Apply as Executive Assistant
+                          Apply as Executive Associate
                         </a>
                       </div>
                     </div>
@@ -397,7 +405,7 @@ export default function UserDashboard() {
               </div>
             )}
           </div>
-        </div>
+        </main>
 
         <Footer />
       </section>

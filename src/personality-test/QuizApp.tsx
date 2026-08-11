@@ -2,7 +2,7 @@
 
 // STEP 1: Correct the import to use the .module.css file
 import styles from "./quiz-styles.module.css";
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   questions,
   OPTIONS,
@@ -16,10 +16,34 @@ interface QuizAppProps {
   onGoHome: () => void;
 }
 
+const QUIZ_ATTEMPT_STORAGE_KEY = "css-apply-quiz-attempt-id";
+
+const createAttemptId = () => crypto.randomUUID();
+
+const getStoredAttemptId = () => {
+  if (typeof window === "undefined") return createAttemptId();
+
+  const existingAttemptId = window.sessionStorage.getItem(
+    QUIZ_ATTEMPT_STORAGE_KEY,
+  );
+
+  if (existingAttemptId) return existingAttemptId;
+
+  const nextAttemptId = createAttemptId();
+  window.sessionStorage.setItem(QUIZ_ATTEMPT_STORAGE_KEY, nextAttemptId);
+  return nextAttemptId;
+};
+
+const resetStoredAttemptId = () => {
+  const nextAttemptId = createAttemptId();
+  window.sessionStorage.setItem(QUIZ_ATTEMPT_STORAGE_KEY, nextAttemptId);
+  return nextAttemptId;
+};
 const QuizApp: React.FC<QuizAppProps> = ({ onGoHome }) => {
   const [currentPage, setCurrentPage] = useState(0);
   const [answers, setAnswers] = useState<Answers>({});
   const [showResults, setShowResults] = useState(false);
+  const [attemptId, setAttemptId] = useState(getStoredAttemptId);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -33,6 +57,7 @@ const QuizApp: React.FC<QuizAppProps> = ({ onGoHome }) => {
     setAnswers({});
     setCurrentPage(0);
     setShowResults(false);
+    setAttemptId(resetStoredAttemptId());
   };
 
   const currentQuestions = questions.slice(
@@ -71,8 +96,13 @@ const QuizApp: React.FC<QuizAppProps> = ({ onGoHome }) => {
   let firstUnansweredFound = false;
 
   if (showResults) {
-    // Remember to convert ResultsPage.tsx in the same way!
-    return <ResultsPage answers={answers} onRetake={handleReset} />;
+    return (
+      <ResultsPage
+        answers={answers}
+        attemptId={attemptId}
+        onRetake={handleReset}
+      />
+    );
   }
 
   // STEP 2: Convert all class names to use the styles object

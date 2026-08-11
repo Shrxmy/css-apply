@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import MobileSidebar from "@/components/AdminMobileSB";
 import SidebarContent from "@/components/AdminSidebar";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import useSWR from "swr";
 
 // import {
@@ -48,6 +49,11 @@ const Schedule = () => {
       meetingLink: string;
     }>
   >([]);
+
+  const shouldShowCalendar =
+    showCalendar ||
+    unavailableTimeSlots.length > 0 ||
+    interviewSlots.length > 0;
   const [calendarEvents, setCalendarEvents] = useState<
     Array<{
       id: string;
@@ -134,13 +140,13 @@ const Schedule = () => {
   }, []);
 
   // SWR for EB profile data - caches for 5 minutes
-  const { data: ebData } = useSWR(
+  const { data: ebData, isLoading: isEbLoading } = useSWR(
     session?.user?.dbId ? `/api/admin/eb-profiles/${session.user.dbId}` : null,
     swrFetcher,
     {
-      revalidateOnFocus: false,
-      dedupingInterval: 30000,
-    }
+      revalidateOnFocus: true,
+      dedupingInterval: 0,
+    },
   );
 
   // Update ebProfile when EB data changes
@@ -156,23 +162,35 @@ const Schedule = () => {
   }, [ebData]);
 
   // SWR for unavailable slots - uses ebData position to avoid circular dependency
-  const { data: unavailableData, isLoading: isUnavailableLoading } = useSWR(
-    ebData?.ebProfile?.position ? `/api/admin/unavailable-slots/${ebData.ebProfile.position}` : null,
+  const {
+    data: unavailableData,
+    isLoading: isUnavailableLoading,
+    mutate: mutateUnavailable,
+  } = useSWR(
+    ebData?.ebProfile?.position
+      ? `/api/admin/unavailable-slots/${encodeURIComponent(ebData.ebProfile.position)}`
+      : null,
     swrFetcher,
     {
-      revalidateOnFocus: false,
-      dedupingInterval: 30000,
-    }
+      revalidateOnFocus: true,
+      dedupingInterval: 0,
+    },
   );
 
   // SWR for interview slots - uses ebData position to avoid circular dependency
-  const { data: interviewData, isLoading: isInterviewLoading } = useSWR(
-    ebData?.ebProfile?.position ? `/api/admin/interview-slots/${ebData.ebProfile.position}` : null,
+  const {
+    data: interviewData,
+    isLoading: isInterviewLoading,
+    mutate: mutateInterviews,
+  } = useSWR(
+    ebData?.ebProfile?.position
+      ? `/api/admin/interview-slots/${encodeURIComponent(ebData.ebProfile.position)}`
+      : null,
     swrFetcher,
     {
-      revalidateOnFocus: false,
-      dedupingInterval: 30000,
-    }
+      revalidateOnFocus: true,
+      dedupingInterval: 0,
+    },
   );
 
   // Update slots when SWR data changes
@@ -185,14 +203,11 @@ const Schedule = () => {
     } else if (interviewData) {
       setInterviewSlots([]);
     }
-    // Show calendar if we have data (either empty or with slots)
-    if (!isUnavailableLoading && !isInterviewLoading) {
-      setShowCalendar(true);
-    }
-  }, [unavailableData, interviewData, isUnavailableLoading, isInterviewLoading]);
+  }, [unavailableData, interviewData]);
 
-  // Combined loading state
-  const isSlotsLoading = isUnavailableLoading || isInterviewLoading;
+  // Combined loading state including EB profile load
+  const isSlotsLoading =
+    isEbLoading || isUnavailableLoading || isInterviewLoading;
 
   // FullCalendar event handlers
   const handleDateSelect = (selectInfo: { start: Date; end: Date }) => {
@@ -408,17 +423,9 @@ const Schedule = () => {
 
   // Refresh function - use SWR mutate to trigger revalidation
   const refreshSchedule = useCallback(() => {
-    if (ebData?.ebProfile?.position) {
-      const pos = ebData.ebProfile.position;
-      // Trigger revalidation of both endpoints
-      Promise.all([
-        fetch(`/api/admin/unavailable-slots/${pos}`),
-        fetch(`/api/admin/interview-slots/${pos}`),
-      ]).then(() => {
-        // After manual fetch, SWR will pick up fresh data on next render
-      });
-    }
-  }, [ebData]);
+    mutateUnavailable();
+    mutateInterviews();
+  }, [mutateUnavailable, mutateInterviews]);
 
   // SWR automatically loads data, no need for manual fetch
   // The useEffect above updates slots when SWR data changes
@@ -460,14 +467,9 @@ const Schedule = () => {
       // Reset form and close calendar
       setShowCalendar(false);
       setShowConfirmModal(false);
-      // Trigger refresh to reload data
-      if (ebData?.ebProfile?.position) {
-        const pos = ebData.ebProfile.position;
-        Promise.all([
-          fetch(`/api/admin/unavailable-slots/${pos}`),
-          fetch(`/api/admin/interview-slots/${pos}`),
-        ]);
-      }
+      // Trigger refresh to reload data via SWR mutate
+      mutateUnavailable();
+      mutateInterviews();
       toast.success("Unavailable time slots saved successfully!");
     } catch (error) {
       console.error("Error creating unavailable slots:", error);
@@ -480,7 +482,7 @@ const Schedule = () => {
   // Show loading for session only
   if (status === "loading") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F3F3FD] bg-[url('https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/pictures/background.png')] bg-cover bg-repeat">
+      <div className="min-h-screen flex items-center justify-center bg-[#F3F3FD] bg-[url('/assets/css-apply-static-images/assets/pictures/background.webp')] bg-cover bg-repeat">
         <div className="flex flex-col items-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#044FAF]"></div>
           <p className="mt-4 text-[#134687]">Loading session...</p>
@@ -490,7 +492,7 @@ const Schedule = () => {
   }
 
   return (
-    <div className="min-h-screen flex bg-[#F3F3FD] bg-[url('https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/pictures/background.png')] bg-cover bg-repeat overflow-x-hidden">
+    <div className="min-h-screen flex bg-[#F3F3FD] bg-[url('/assets/css-apply-static-images/assets/pictures/background.webp')] bg-cover bg-repeat overflow-x-hidden">
       {/* Sidebar Navigation */}
       <MobileSidebar>
         <SidebarContent activePage="schedule" />
@@ -500,8 +502,18 @@ const Schedule = () => {
       <div className="flex-1 p-6 md:p-8 pt-16 md:pt-12 overflow-y-auto h-screen">
         {/* PAGE HEADER */}
         <div className="mb-6 mt-8 md:mb-8 md:mt-8 text-center md:text-left">
-          <div className="rounded-[45px] text-white text-lg lg:text-4xl font-poppins font-medium px-6 py-2 lg:py-4 text-center [background:linear-gradient(90deg,_#2F7EE3_0%,_#0349A2_100%)] w-fit mb-4">
-            Welcome, {ebProfile?.position} 👋
+          <div className="inline-flex min-h-12 items-center gap-2 rounded-[45px] text-white text-lg lg:text-4xl font-poppins font-medium px-6 py-2 lg:py-4 text-center [background:linear-gradient(90deg,_#2F7EE3_0%,_#0349A2_100%)] w-fit mb-4">
+            <span>Welcome,</span>
+            {isEbLoading ? (
+              <LoadingSpinner
+                label="Loading position"
+                size="md"
+                className="border-white border-t-transparent"
+              />
+            ) : (
+              <span>{ebData?.ebProfile?.position ?? ebProfile?.position ?? "Admin"}</span>
+            )}
+            <span aria-hidden="true">👋</span>
           </div>
           <p className="text-black text-xs lg:text-lg font-Inter font-light leading-5 mb-4 md:mb-6">
             Stay organized and guide applicants through their journey with CSS
@@ -528,19 +540,16 @@ const Schedule = () => {
               disabled={isSlotsLoading}
               className="flex items-center space-x-1 px-3 py-1.5 text-xs font-medium text-[#134687] bg-white border-2 border-[#005FD9] rounded-md hover:bg-[#F3F3FD] hover:text-[#044FAF] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
             >
-              <svg
-                className="w-3 h-3"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                />
-              </svg>
+              <div
+                className="w-3 h-3 bg-current"
+                style={{
+                  maskImage: "url(/icons/refresh.svg)",
+                  WebkitMaskImage: "url(/icons/refresh.svg)",
+                  maskSize: "contain",
+                  maskRepeat: "no-repeat",
+                  maskPosition: "center",
+                }}
+              />
               <span>Refresh</span>
             </button>
           </div>
@@ -551,13 +560,11 @@ const Schedule = () => {
             style={{ minHeight: "calc(100vh - 400px)" }}
           >
             {isSlotsLoading ? (
-              <div className="flex flex-col items-center justify-center h-full px-2">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#044FAF] mb-4"></div>
-                <p className="text-sm text-[#134687]">
-                  Loading schedule data...
-                </p>
+              <div className="flex flex-col items-center justify-center gap-4 h-full px-2 text-sm text-[#134687]">
+                <LoadingSpinner label="Loading schedule data" size="lg" />
+                <p>Loading schedule data...</p>
               </div>
-            ) : !showCalendar ? (
+            ) : !shouldShowCalendar ? (
               <div className="flex flex-col items-center justify-center h-full px-2">
                 {/* big calendar icon */}
                 <div className="w-16 h-16 md:w-24 md:h-24 mb-4 md:mb-6">

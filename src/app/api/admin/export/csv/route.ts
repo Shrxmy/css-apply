@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getDisplayMemberId } from "@/lib/member-id";
+
+async function getActiveCycleId() {
+  const activeCycle = await prisma.recruitmentCycle.findFirst({
+    where: { isActive: true },
+    select: { id: true },
+  });
+  return activeCycle?.id ?? "__no_active_cycle__";
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -44,9 +53,9 @@ export async function GET(request: NextRequest) {
         filename = `accepted-committee-applications-${committee || "all"}-${new Date().toISOString().split("T")[0]}.csv`;
         break;
 
-      case "ea":
-        csvData = await exportEAApplications(status);
-        filename = `accepted-ea-applications-${new Date().toISOString().split("T")[0]}.csv`;
+      case "executive-associate":
+        csvData = await exportExecutiveAssociateApplications(status);
+        filename = `accepted-executive-associate-applications-${new Date().toISOString().split("T")[0]}.csv`;
         break;
 
       default:
@@ -72,8 +81,10 @@ export async function GET(request: NextRequest) {
 }
 
 async function exportMemberApplications(_status: string | null) {
+  const activeCycleId = await getActiveCycleId();
   const whereClause: Record<string, unknown> = {
     hasAccepted: true, // Only export accepted member applications
+    recruitmentCycleId: activeCycleId,
   };
 
   // Note: For member applications, we only export accepted ones
@@ -89,6 +100,14 @@ async function exportMemberApplications(_status: string | null) {
           email: true,
           studentNumber: true,
           section: true,
+          age: true,
+          dateOfBirth: true,
+          isOldCssMember: true,
+          memberships: {
+            where: { recruitmentCycleId: activeCycleId },
+            select: { memberId: true },
+            take: 1,
+          },
         },
       },
     },
@@ -100,6 +119,9 @@ async function exportMemberApplications(_status: string | null) {
     "Email",
     "Student Number",
     "Section",
+    "Age",
+    "Birthday",
+    "Old CSS Member",
     "Member ID",
     "Status",
     "Payment Proof",
@@ -107,12 +129,15 @@ async function exportMemberApplications(_status: string | null) {
     "Updated Date",
   ];
 
-  const rows = applications.map((app: typeof applications[number]) => [
+  const rows = applications.map((app: (typeof applications)[number]) => [
     app.user.name,
     app.user.email,
     app.user.studentNumber || "",
     app.user.section || "",
-    app.user.id.slice(-7).toUpperCase(), // Truncated Member ID
+    app.user.age?.toString() || "",
+    formatDate(app.user.dateOfBirth),
+    formatBoolean(app.user.isOldCssMember),
+    getDisplayMemberId(app.user),
     "Accepted", // All member applications in CSV are accepted
     app.paymentProof || "",
     app.createdAt.toISOString().split("T")[0],
@@ -126,7 +151,10 @@ async function exportCommitteeApplications(
   committee: string | null,
   _status: string | null,
 ) {
-  const whereClause: Record<string, unknown> = {};
+  const activeCycleId = await getActiveCycleId();
+  const whereClause: Record<string, unknown> = {
+    recruitmentCycleId: activeCycleId,
+  };
 
   if (committee && committee !== "all") {
     // For committee-specific exports, we need to be more precise about what to include:
@@ -180,6 +208,14 @@ async function exportCommitteeApplications(
           email: true,
           studentNumber: true,
           section: true,
+          age: true,
+          dateOfBirth: true,
+          isOldCssMember: true,
+          memberships: {
+            where: { recruitmentCycleId: activeCycleId },
+            select: { memberId: true },
+            take: 1,
+          },
         },
       },
     },
@@ -191,6 +227,9 @@ async function exportCommitteeApplications(
     "Email",
     "Student Number",
     "Section",
+    "Age",
+    "Birthday",
+    "Old CSS Member",
     "Member ID",
     "First Option Committee",
     "Second Option Committee",
@@ -203,12 +242,15 @@ async function exportCommitteeApplications(
     "Updated Date",
   ];
 
-  const rows = applications.map((app: typeof applications[number]) => [
+  const rows = applications.map((app: (typeof applications)[number]) => [
     app.user.name,
     app.user.email,
     app.user.studentNumber || "",
     app.user.section || "",
-    app.user.id.slice(-7).toUpperCase(), // Truncated Member ID
+    app.user.age?.toString() || "",
+    formatDate(app.user.dateOfBirth),
+    formatBoolean(app.user.isOldCssMember),
+    getDisplayMemberId(app.user),
     app.firstOptionCommittee || "",
     app.secondOptionCommittee || "",
     app.redirection ? "Redirected" : app.hasAccepted ? "Accepted" : "Pending",
@@ -223,16 +265,18 @@ async function exportCommitteeApplications(
   return generateCSV(headers, rows);
 }
 
-async function exportEAApplications(_status: string | null) {
+async function exportExecutiveAssociateApplications(_status: string | null) {
+  const activeCycleId = await getActiveCycleId();
   const whereClause: Record<string, unknown> = {
     hasAccepted: true, // Only export accepted EA applications
     redirection: null, // Exclude redirected applications
+    recruitmentCycleId: activeCycleId,
   };
 
   // Note: For EA applications, we only export accepted ones that were NOT redirected
   // Redirected EA applications should not be included in EA CSV
 
-  const applications = await prisma.eAApplication.findMany({
+  const applications = await prisma.executiveAssociateApplication.findMany({
     where: whereClause,
     include: {
       user: {
@@ -242,6 +286,14 @@ async function exportEAApplications(_status: string | null) {
           email: true,
           studentNumber: true,
           section: true,
+          age: true,
+          dateOfBirth: true,
+          isOldCssMember: true,
+          memberships: {
+            where: { recruitmentCycleId: activeCycleId },
+            select: { memberId: true },
+            take: 1,
+          },
         },
       },
     },
@@ -253,6 +305,9 @@ async function exportEAApplications(_status: string | null) {
     "Email",
     "Student Number",
     "Section",
+    "Age",
+    "Birthday",
+    "Old CSS Member",
     "Member ID",
     "EB Role",
     "First Option EB",
@@ -266,12 +321,15 @@ async function exportEAApplications(_status: string | null) {
     "Updated Date",
   ];
 
-  const rows = applications.map((app: typeof applications[number]) => [
+  const rows = applications.map((app: (typeof applications)[number]) => [
     app.user.name,
     app.user.email,
     app.user.studentNumber || "",
     app.user.section || "",
-    app.user.id.slice(-7).toUpperCase(), // Truncated Member ID
+    app.user.age?.toString() || "",
+    formatDate(app.user.dateOfBirth),
+    formatBoolean(app.user.isOldCssMember),
+    getDisplayMemberId(app.user),
     app.ebRole || "",
     app.firstOptionEb || "",
     app.secondOptionEb || "",
@@ -285,6 +343,15 @@ async function exportEAApplications(_status: string | null) {
   ]);
 
   return generateCSV(headers, rows);
+}
+
+function formatDate(date: Date | null) {
+  return date ? date.toISOString().split("T")[0] : "";
+}
+
+function formatBoolean(value: boolean | null) {
+  if (value === null) return "";
+  return value ? "Yes" : "No";
 }
 
 function generateCSV(headers: string[], rows: string[][]) {

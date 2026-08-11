@@ -2,6 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { committeeRoles } from "@/data/committeeRoles";
+
+const normalizeCommitteeId = (value: string) => {
+  const normalizedValue = value.toLowerCase().replace(/&/g, "and");
+  const committee = committeeRoles.find(
+    ({ id, title }) =>
+      id.toLowerCase() === normalizedValue ||
+      title.toLowerCase().replace(/&/g, "and") === normalizedValue,
+  );
+
+  return committee?.id ?? value;
+};
 
 export async function POST(request: NextRequest) {
   try {
@@ -32,21 +44,41 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create or update EB profile
+    const normalizedCommittees = Array.isArray(committees)
+      ? Array.from(
+          new Set(
+            committees
+              .filter(
+                (committee): committee is string =>
+                  typeof committee === "string",
+              )
+              .map(normalizeCommitteeId),
+          ),
+        )
+      : [];
+
+    const activeCycle = await prisma.recruitmentCycle.findFirst({
+      where: { isActive: true },
+      select: { id: true },
+    });
+
+    // Create or update EB profile for the current active academic year
     const ebProfile = await prisma.eBProfile.upsert({
       where: { userId },
       update: {
         position,
-        committees: committees || [],
+        committees: normalizedCommittees,
         isActive: isActive ?? true,
         meetingLink: meetingLink ?? null,
+        recruitmentCycleId: activeCycle?.id ?? null,
       },
       create: {
         userId,
         position,
-        committees: committees || [],
+        committees: normalizedCommittees,
         isActive: isActive ?? true,
         meetingLink: meetingLink ?? null,
+        recruitmentCycleId: activeCycle?.id ?? null,
       },
     });
 

@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
     const cutoff = new Date(Date.now() - maxAgeHours * 60 * 60 * 1000);
 
     const [eaApps, committeeApps] = await Promise.all([
-      prisma.eAApplication.findMany({
+      prisma.executiveAssociateApplication.findMany({
         select: {
           supabaseFilePath: true,
           cv: true,
@@ -118,9 +118,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const buckets = ["ea-applications", "committee-applications"];
+    const buckets = ["executive-associate-applications", "committee-applications"];
     const candidatesByBucket: Record<string, string[]> = {
-      "ea-applications": [],
+      "executive-associate-applications": [],
       "committee-applications": [],
     };
 
@@ -151,7 +151,7 @@ export async function POST(request: NextRequest) {
     }
 
     const deletedByBucket: Record<string, string[]> = {
-      "ea-applications": [],
+      "executive-associate-applications": [],
       "committee-applications": [],
     };
 
@@ -182,11 +182,11 @@ export async function POST(request: NextRequest) {
       cutoffIso: cutoff.toISOString(),
       referencedPathCount: referencedPaths.size,
       candidates: {
-        ea: candidatesByBucket["ea-applications"].length,
+        ea: candidatesByBucket["executive-associate-applications"].length,
         committee: candidatesByBucket["committee-applications"].length,
       },
       deleted: {
-        ea: deletedByBucket["ea-applications"].length,
+        ea: deletedByBucket["executive-associate-applications"].length,
         committee: deletedByBucket["committee-applications"].length,
       },
       details: {

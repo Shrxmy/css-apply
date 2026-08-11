@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const applicationId = searchParams.get("applicationId");
     const type = searchParams.get("type"); // 'cv' or 'portfolio'
-    const applicationType = searchParams.get("applicationType"); // 'ea' or 'committee'
+    const applicationType = searchParams.get("applicationType"); // 'executive-associate' or 'committee'
 
     if (!applicationId || !type || !applicationType) {
       return NextResponse.json(
@@ -41,8 +41,8 @@ export async function GET(request: NextRequest) {
     let fileName: string;
 
     // Get application data based on type
-    if (applicationType === "ea") {
-      application = await prisma.eAApplication.findUnique({
+    if (applicationType === "executive-associate") {
+      application = await prisma.executiveAssociateApplication.findUnique({
         where: { id: applicationId },
         include: {
           user: {
@@ -136,8 +136,8 @@ export async function GET(request: NextRequest) {
       } else {
         // It's just a file path, determine bucket based on application type
         bucketName =
-          applicationType === "ea"
-            ? "ea-applications"
+          applicationType === "executive-associate"
+            ? "executive-associate-applications"
             : "committee-applications";
         filePath = supabaseFilePath;
       }
