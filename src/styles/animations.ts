@@ -3,7 +3,7 @@
 export const getScrollAnimationClasses = (
   isVisible: boolean,
   direction: "left" | "right" | "up" | "down" = "up",
-  baseClasses: string = ""
+  baseClasses: string = "",
 ) => {
   const directionClasses = {
     left: isVisible
@@ -20,13 +20,13 @@ export const getScrollAnimationClasses = (
       : "opacity-0 transform -translate-y-8 sm:-translate-y-12",
   };
 
-  return `${baseClasses} transition-all duration-800 sm:duration-1000 ease-out will-change-transform ${directionClasses[direction]}`;
+  return `${baseClasses} transition-all duration-700 sm:duration-1000 ease-out will-change-transform ${directionClasses[direction]}`;
 };
 
 export const getScrollAnimationStyles = (
   isVisible: boolean,
   direction: "left" | "right" | "up" | "down" = "up",
-  delay: string = "0s"
+  delay: string = "0s",
 ) => {
   const directionStyles = {
     left: {
@@ -57,7 +57,7 @@ export const getScrollAnimationStyles = (
 export const getStaggeredAnimationStyles = (
   isVisible: boolean,
   index: number,
-  baseDelay: number = 0.1
+  baseDelay: number = 0.1,
 ) => {
   const delay = `${baseDelay + index * 0.1}s`;
   return {
@@ -73,20 +73,15 @@ export const getStaggeredAnimationStyles = (
 // Image carousel scroll animation
 export const getImageScrollAnimationClasses = (
   duration: number = 20,
-  direction: "left" | "right" = "left"
+  direction: "left" | "right" = "left",
 ) => {
-  const directionClass =
-    direction === "left" ? "animate-scroll-left" : "animate-scroll-right";
-  return `${directionClass} transition-transform duration-${
-    duration * 1000
-  } linear infinite`;
+  return `animate-scroll-${direction} transition-transform duration-[${duration * 1000}ms] linear infinite`;
 };
 
 export const getImageScrollAnimationStyles = (
   duration: number = 20,
-  direction: "left" | "right" = "left"
+  direction: "left" | "right" = "left",
 ) => {
-  const translateX = direction === "left" ? "-50%" : "50%";
   return {
     animation: `scroll-${direction} ${duration}s linear infinite`,
     willChange: "transform",

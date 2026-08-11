@@ -10,76 +10,133 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 model User {
-  id            String   @id @default(cuid())
-  email         String   @unique
-  name          String
-  studentNumber String?  @unique @db.VarChar(10)
-  section       String?
-  role          String   @default("user") // user, admin, super_admin
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id             String    @id @default(cuid())
+  email          String    @unique
+  name           String
+  image          String?
+  studentNumber  String?   @unique @db.VarChar(10)
+  section        String?
+  age            Int?
+  dateOfBirth    DateTime?
+  isOldCssMember Boolean?
+  role           String    @default("user") // user, admin, super_admin
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   // Relationships
-  memberApplication    MemberApplication?
-  eaApplication        EAApplication?
-  committeeApplication CommitteeApplication?
-  ebProfile            EBProfile?
+  memberApplications             MemberApplication[]
+  executiveAssociateApplications ExecutiveAssociateApplication[]
+  committeeApplications          CommitteeApplication[]
+  ebProfile                      EBProfile?
+  memberships                    Membership[]
+
+  @@index([role])
 }
 
 model MemberApplication {
-  id            String   @id @default(cuid())
-  studentNumber String   @unique
-  user          User     @relation(fields: [studentNumber], references: [studentNumber], onDelete: Cascade)
-  paymentProof  String
-  hasAccepted   Boolean  @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                 String            @id @default(cuid())
+  studentNumber      String
+  user               User              @relation(fields: [studentNumber], references: [studentNumber], onDelete: Cascade)
+  recruitmentCycleId String?
+  recruitmentCycle   RecruitmentCycle? @relation(fields: [recruitmentCycleId], references: [id], onDelete: SetNull)
+  paymentProof       String
+  hasAccepted        Boolean           @default(false)
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  @@unique([studentNumber, recruitmentCycleId])
+  @@index([hasAccepted])
+  @@index([recruitmentCycleId])
 }
 
-model EAApplication {
-  id                     String   @id @default(cuid())
-  studentNumber          String   @unique
-  user                   User     @relation(fields: [studentNumber], references: [studentNumber], onDelete: Cascade)
-  ebRole                 String   
+model Membership {
+  id                 String           @id @default(cuid())
+  userId             String
+  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recruitmentCycleId String
+  recruitmentCycle   RecruitmentCycle @relation(fields: [recruitmentCycleId], references: [id], onDelete: Cascade)
+  memberId           String           @unique
+  memberSequence     Int
+  createdAt          DateTime         @default(now())
+
+  @@unique([userId, recruitmentCycleId])
+  @@unique([recruitmentCycleId, memberSequence])
+  @@index([recruitmentCycleId])
+  @@index([userId])
+}
+
+model MembershipCounter {
+  id                 String           @id @default(cuid())
+  recruitmentCycleId String           @unique
+  recruitmentCycle   RecruitmentCycle @relation(fields: [recruitmentCycleId], references: [id], onDelete: Cascade)
+  nextSequence       Int              @default(0)
+  updatedAt          DateTime         @updatedAt
+}
+
+model ExecutiveAssociateApplication {
+  id                     String            @id @default(cuid())
+  studentNumber          String
+  user                   User              @relation(fields: [studentNumber], references: [studentNumber], onDelete: Cascade)
+  recruitmentCycleId     String?
+  recruitmentCycle       RecruitmentCycle? @relation(fields: [recruitmentCycleId], references: [id], onDelete: SetNull)
+  ebRole                 String
   firstOptionEb          String
   secondOptionEb         String
   cv                     String
+  paymentProof           String?
   supabaseFilePath       String?
   interviewSlotDay       String?
   interviewSlotTimeStart String?
   interviewSlotTimeEnd   String?
-  hasFinishedInterview   Boolean  @default(false)
-  status                 String?  // passed, failed, redirected
+  interviewBy            String?
+  hasFinishedInterview   Boolean           @default(false)
+  status                 String? // passed, failed, redirected
   redirection            String?
-  hasAccepted            Boolean  @default(false)
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
+  hasAccepted            Boolean           @default(false)
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
 
+  @@unique([studentNumber, recruitmentCycleId])
+  @@index([status])
+  @@index([interviewBy])
+  @@index([hasAccepted])
+  @@index([hasFinishedInterview])
+  @@index([recruitmentCycleId])
+  @@map("EAApplication")
 }
 
 model CommitteeApplication {
-  id                     String   @id @default(cuid())
-  studentNumber          String   @unique
-  user                   User     @relation(fields: [studentNumber], references: [studentNumber], onDelete: Cascade)
+  id                     String            @id @default(cuid())
+  studentNumber          String
+  user                   User              @relation(fields: [studentNumber], references: [studentNumber], onDelete: Cascade)
+  recruitmentCycleId     String?
+  recruitmentCycle       RecruitmentCycle? @relation(fields: [recruitmentCycleId], references: [id], onDelete: SetNull)
   firstOptionCommittee   String
   secondOptionCommittee  String
   portfolioLink          String?
   cv                     String
+  paymentProof           String?
   supabaseFilePath       String?
   interviewSlotDay       String?
   interviewSlotTimeStart String?
   interviewSlotTimeEnd   String?
-  hasFinishedInterview   Boolean  @default(false)
-  status                 String?  // passed, failed, redirected
+  hasFinishedInterview   Boolean           @default(false)
+  interviewBy            String?
+  status                 String? // passed, failed, redirected
   redirection            String?
-  hasAccepted            Boolean  @default(false)
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
+  hasAccepted            Boolean           @default(false)
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
 
+  @@unique([studentNumber, recruitmentCycleId])
+  @@index([status])
+  @@index([interviewBy])
+  @@index([hasAccepted])
+  @@index([hasFinishedInterview])
+  @@index([recruitmentCycleId])
 }
 
 model AvailableEBInterviewTime {
@@ -92,15 +149,53 @@ model AvailableEBInterviewTime {
   currentSlots Int      @default(0)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  @@index([eb])
+  @@index([day])
 }
 
 model EBProfile {
-  id          String   @id @default(cuid())
-  userId      String   @unique
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  position    String
-  committees  String[] 
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
+  id                 String            @id @default(cuid())
+  userId             String            @unique
+  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recruitmentCycleId String?
+  recruitmentCycle   RecruitmentCycle? @relation(fields: [recruitmentCycleId], references: [id], onDelete: SetNull)
+  position           String
+  committees         String[]
+  meetingLink        String?
+  isActive           Boolean           @default(true)
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  @@index([position])
+  @@index([recruitmentCycleId])
+  @@index([isActive])
+}
+
+model SystemConfig {
+  key         String   @unique
+  value       String
+  description String?
   updatedAt   DateTime @updatedAt
+
+  @@index([key])
+}
+
+model RecruitmentCycle {
+  id                             String                          @id @default(cuid())
+  schoolYear                     String                          @unique // e.g. "2025-2026"
+  applicationStart               DateTime
+  interviewStart                 DateTime
+  interviewEnd                   DateTime
+  isActive                       Boolean                         @default(false)
+  createdAt                      DateTime                        @default(now())
+  updatedAt                      DateTime                        @updatedAt
+  ebProfiles                     EBProfile[]
+  memberApplications             MemberApplication[]
+  executiveAssociateApplications ExecutiveAssociateApplication[]
+  committeeApplications          CommitteeApplication[]
+  memberships                    Membership[]
+  membershipCounters             MembershipCounter[]
+
+  @@index([isActive])
 }

@@ -23,10 +23,10 @@ function CommitteeSchedulePage() {
   );
 }
 
-// 3. Executive Assistant application protection
+// 3. Executive Associate application protection
 function EASchedulePage() {
   return (
-    <ApplicationGuard applicationType="ea">
+    <ApplicationGuard applicationType="executive-associate">
       <div>EA Schedule Page Content</div>
     </ApplicationGuard>
   );
@@ -35,8 +35,8 @@ function EASchedulePage() {
 // 4. Custom redirect path
 function CustomRedirectPage() {
   return (
-    <ApplicationGuard 
-      applicationType="member" 
+    <ApplicationGuard
+      applicationType="member"
       redirectPath="/custom/redirect/path"
     >
       <div>Custom Redirect Page Content</div>
@@ -48,5 +48,5 @@ export {
   MemberSchedulePage,
   CommitteeSchedulePage,
   EASchedulePage,
-  CustomRedirectPage
+  CustomRedirectPage,
 };

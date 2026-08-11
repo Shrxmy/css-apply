@@ -1,5 +1,5 @@
-// src/types/next-auth.d.ts
-import NextAuth from "next-auth";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import type NextAuth from "next-auth";
 
 declare module "next-auth" {
   interface Session {
@@ -15,11 +15,22 @@ declare module "next-auth" {
       updatedAt: Date;
       hasCompletedProfile: boolean;
       hasMemberApplication: boolean;
-      memberApplication?: any;
-      hasEAApplication: boolean;
-      eaApplication?: any;
+      memberApplication?: {
+        id: string;
+        hasAccepted: boolean;
+        paymentProof?: string;
+        createdAt: Date;
+      };
+      hasExecutiveAssociateApplication: boolean;
+      executiveAssociateApplication?: { id: string; hasAccepted: boolean; status: string };
       hasCommitteeApplication: boolean;
-      committeeApplication?: any;
+      committeeApplication?: {
+        id: string;
+        hasAccepted: boolean;
+        status: string;
+      };
+      ebRole?: string;
+      committeeId?: string;
       applicationStatus: {
         member: {
           hasApplication: boolean;

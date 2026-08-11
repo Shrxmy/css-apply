@@ -1,103 +1,114 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
 import LoadingScreen from "@/components/LoadingScreen";
+import { useApplicationStatus } from "@/lib/useApplicationStatus";
 
 interface ApplicationGuardProps {
   children: React.ReactNode;
-  applicationType: "member" | "committee" | "ea";
+  applicationType: "member" | "committee" | "executive-associate";
   redirectPath?: string;
 }
 
-export default function ApplicationGuard({ 
-  children, 
-  applicationType, 
-  redirectPath 
+const DEFAULT_REDIRECTS: Record<string, string> = {
+  member: "/user/apply/member",
+  committee: "/user/apply/committee-staff",
+  ea: "/user/apply/executive-associate",
+};
+
+/**
+ * ApplicationGuard
+ *
+ * Enforces two rules:
+ *  1. The user must be authenticated (redirect to "/" if not).
+ *  2. On non-transition pages, the user must have the required application type.
+ *
+ * "Transition pages" (schedule, success) skip the application-type check entirely.
+ * These pages are reached immediately after submission, so SWR might still hold
+ * stale data. Checking on those pages causes race-condition redirects back to apply.
+ * Security for those pages is enforced at the API level, not the guard.
+ */
+export default function ApplicationGuard({
+  children,
+  applicationType,
+  redirectPath,
 }: ApplicationGuardProps) {
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const router = useRouter();
-  const [isChecking, setIsChecking] = useState(true);
-  const [hasApplication, setHasApplication] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const pathname = usePathname();
+
+  const {
+    data: appStatus,
+    isLoading,
+    error,
+  } = useApplicationStatus(status === "authenticated");
+
+  // Schedule and success pages are reached right after submission.
+  // SWR may still hold stale "no application" data — skip the application check.
+  const isTransitionPage =
+    pathname?.includes("/schedule") || pathname?.includes("/success");
+
+  const hasRequired = appStatus
+    ? applicationType === "member"
+      ? appStatus.hasMemberApplication
+      : applicationType === "committee"
+        ? appStatus.hasCommitteeApplication
+        : appStatus.hasExecutiveAssociateApplication
+    : false;
 
   useEffect(() => {
-    if (status === "loading") return;
-
-    if (!session) {
+    // Rule 1: must be authenticated
+    if (status === "unauthenticated") {
       router.push("/");
       return;
     }
 
-    setIsLoading(false);
-  }, [session, status, router]);
+    if (status !== "authenticated") return;
 
-  useEffect(() => {
-    if (status === "authenticated" && !isLoading) {
-      checkApplication();
+    // Rule 2 is skipped on transition pages
+    if (isTransitionPage) return;
+
+    // Wait until SWR has settled before potentially redirecting
+    if (isLoading || !appStatus) return;
+
+    if (!hasRequired) {
+      const target =
+        redirectPath || DEFAULT_REDIRECTS[applicationType] || "/user";
+      router.push(target);
     }
-  }, [status, isLoading]);
+  }, [
+    status,
+    appStatus,
+    isLoading,
+    hasRequired,
+    applicationType,
+    redirectPath,
+    router,
+    isTransitionPage,
+  ]);
 
-  const checkApplication = async () => {
-    try {
-      const response = await fetch("/api/applications/check-existing");
-      if (response.ok) {
-        const data = await response.json();
-        
-        let hasRequiredApplication = false;
-        let defaultRedirectPath = "";
+  // ── Render decisions ────────────────────────────────────────────────────────
 
-        switch (applicationType) {
-          case "member":
-            hasRequiredApplication = data.hasMemberApplication;
-            defaultRedirectPath = "/user/apply/member";
-            break;
-          case "committee":
-            hasRequiredApplication = data.hasCommitteeApplication;
-            defaultRedirectPath = "/user/apply/committee-staff";
-            break;
-          case "ea":
-            hasRequiredApplication = data.hasEAApplication;
-            defaultRedirectPath = "/user/apply/executive-assistant";
-            break;
-        }
+  // Session still loading
+  if (status === "loading") return <LoadingScreen />;
 
-        if (!hasRequiredApplication) {
-          // Redirect to appropriate application page
-          const targetPath = redirectPath || defaultRedirectPath;
-          router.push(targetPath);
-          return;
-        }
+  // Not logged in — render nothing while redirect fires
+  if (status === "unauthenticated") return null;
 
-        setHasApplication(true);
-      }
-    } catch (error) {
-      console.error("Error checking application:", error);
-      // On error, redirect to user dashboard
-      router.push("/user");
-    } finally {
-      setIsChecking(false);
-    }
-  };
+  // Transition pages (schedule / success): only require auth, skip application check
+  if (isTransitionPage) return <>{children}</>;
 
-  // Show loading screen while checking authentication or application
-  if (isLoading || status === "loading" || isChecking) {
-    return <LoadingScreen />;
-  }
+  // SWR is still fetching on a guarded page — show spinner, don't redirect yet
+  if (isLoading || !appStatus) return <LoadingScreen />;
 
-  // If no session, don't render anything (redirect will happen)
-  if (!session) {
-    return null;
-  }
+  // SWR errored — let the page render and handle the failure itself
+  if (error) return <>{children}</>;
 
-  // If no application found, don't render anything (redirect will happen)
-  if (!hasApplication) {
-    return null;
-  }
+  // No application found — show spinner while the redirect useEffect fires
+  // (avoids a jarring blank flash before navigation happens)
+  if (!hasRequired) return <LoadingScreen />;
 
-  // Render the protected content
   return <>{children}</>;
 }

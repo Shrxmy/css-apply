@@ -10,7 +10,14 @@ export type Answers = {
   [key: number]: number;
 };
 
-export type CommitteeName = 
-  'Academics' | 'Community Development' | 'Creatives & Technical' | 'Documentation' |
-  'External Affairs' | 'Finance' | 'Logistics' | 'Publicity' | 'Sports & Talent' |
-  'Technology Development';
+export type CommitteeName =
+  | "Academics"
+  | "Community Development"
+  | "Creatives & Technical"
+  | "Documentation"
+  | "External Affairs"
+  | "Finance"
+  | "Logistics"
+  | "Publicity"
+  | "Sports & Talent"
+  | "Technology Development";

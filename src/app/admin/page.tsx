@@ -1,25 +1,35 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
 import MobileSidebar from "@/components/AdminMobileSB";
 import SidebarContent from "@/components/AdminSidebar";
+import LoadingSpinner from "@/components/LoadingSpinner";
+import useSWR from "swr";
 
+// import {
+//   addUnavailableSlot,
+//   removeUnavailableSlot,
+// } from "@/data/unavailableSlots";
 import {
-  addUnavailableSlot,
-  removeUnavailableSlot,
-} from "@/data/unavailableSlots";
-import { CalendarPlus, Calendar, Clock, X } from "lucide-react";
+  CalendarPlus,
+  Calendar,
+  Clock,
+  X,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
+import { toast } from "sonner";
 import FullCalendar from "@fullcalendar/react";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 
+const swrFetcher = (url: string) => fetch(url).then((r) => r.json());
+
 const Schedule = () => {
   const { data: session, status } = useSession();
-  const router = useRouter();
-  const [loading, setLoading] = useState(true);
   const [showCalendar, setShowCalendar] = useState(false);
+  const [showUnavailableBlocks, setShowUnavailableBlocks] = useState(false);
   const [unavailableTimeSlots, setUnavailableTimeSlots] = useState<
     Array<{
       id: string;
@@ -29,13 +39,79 @@ const Schedule = () => {
       endTime: string;
     }>
   >([]);
-  const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
+  const [interviewSlots, setInterviewSlots] = useState<
+    Array<{
+      id: string;
+      day: string;
+      timeStart: string;
+      timeEnd: string;
+      name: string;
+      meetingLink: string;
+    }>
+  >([]);
+
+  const shouldShowCalendar =
+    showCalendar ||
+    unavailableTimeSlots.length > 0 ||
+    interviewSlots.length > 0;
+  const [calendarEvents, setCalendarEvents] = useState<
+    Array<{
+      id: string;
+      title: string;
+      start: Date;
+      end: Date;
+      backgroundColor: string;
+      borderColor: string;
+      textColor: string;
+      display: string;
+      classNames: string;
+    }>
+  >([]);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [ebProfile, setEbProfile] = useState<{
+    userId: string;
+    position: string;
+    committees: string[];
+    isActive: boolean;
+  } | null>(null);
+  const [calendarRange, setCalendarRange] = useState({
+    start: new Date().toISOString().split("T")[0],
+    end: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .split("T")[0],
+  });
   const calendarRef = useRef<FullCalendar>(null);
 
-  // Helper function to format date and time for display
-  const formatDateTime = (dateStr: string, timeSlot: string) => {
+  // Fetch recruitment cycle dates for calendar range
+  useEffect(() => {
+    const fetchCycle = async () => {
+      try {
+        const res = await fetch("/api/admin/recruitment-cycle");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.activeCycle) {
+            setCalendarRange({
+              start:
+                data.activeCycle.interviewStart?.split("T")[0] ??
+                new Date().toISOString().split("T")[0],
+              end:
+                data.activeCycle.interviewEnd?.split("T")[0] ??
+                new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)
+                  .toISOString()
+                  .split("T")[0],
+            });
+          }
+        }
+      } catch {
+        // Keep defaults
+      }
+    };
+    fetchCycle();
+  }, []);
+
+  // Memoized helper function to format date and time for display
+  const formatDateTime = useCallback((dateStr: string, timeSlot: string) => {
     const date = new Date(dateStr);
     const dayName = date.toLocaleDateString("en-US", { weekday: "short" });
     const monthDay = date.toLocaleDateString("en-US", {
@@ -61,29 +137,80 @@ const Schedule = () => {
       startTime: formatTime(startTime),
       endTime: formatTime(endTime),
     };
-  };
+  }, []);
 
+  // SWR for EB profile data - caches for 5 minutes
+  const { data: ebData, isLoading: isEbLoading } = useSWR(
+    session?.user?.dbId ? `/api/admin/eb-profiles/${session.user.dbId}` : null,
+    swrFetcher,
+    {
+      revalidateOnFocus: true,
+      dedupingInterval: 0,
+    },
+  );
+
+  // Update ebProfile when EB data changes
   useEffect(() => {
-    if (status === "loading") return;
-
-    if (status === "unauthenticated") {
-      router.push("/auth/signin");
-      return;
+    if (ebData?.ebProfile) {
+      setEbProfile({
+        userId: ebData.ebProfile.userId,
+        position: ebData.ebProfile.position,
+        committees: ebData.ebProfile.committees,
+        isActive: ebData.ebProfile.isActive,
+      });
     }
+  }, [ebData]);
 
-    if (
-      session?.user?.role !== "admin" &&
-      session?.user?.role !== "super_admin"
-    ) {
-      router.push("/user");
-      return;
+  // SWR for unavailable slots - uses ebData position to avoid circular dependency
+  const {
+    data: unavailableData,
+    isLoading: isUnavailableLoading,
+    mutate: mutateUnavailable,
+  } = useSWR(
+    ebData?.ebProfile?.position
+      ? `/api/admin/unavailable-slots/${encodeURIComponent(ebData.ebProfile.position)}`
+      : null,
+    swrFetcher,
+    {
+      revalidateOnFocus: true,
+      dedupingInterval: 0,
+    },
+  );
+
+  // SWR for interview slots - uses ebData position to avoid circular dependency
+  const {
+    data: interviewData,
+    isLoading: isInterviewLoading,
+    mutate: mutateInterviews,
+  } = useSWR(
+    ebData?.ebProfile?.position
+      ? `/api/admin/interview-slots/${encodeURIComponent(ebData.ebProfile.position)}`
+      : null,
+    swrFetcher,
+    {
+      revalidateOnFocus: true,
+      dedupingInterval: 0,
+    },
+  );
+
+  // Update slots when SWR data changes
+  useEffect(() => {
+    if (unavailableData) {
+      setUnavailableTimeSlots(unavailableData.unavailableSlotsData || []);
     }
+    if (interviewData?.success && interviewData.slots) {
+      setInterviewSlots(interviewData.slots);
+    } else if (interviewData) {
+      setInterviewSlots([]);
+    }
+  }, [unavailableData, interviewData]);
 
-    fetchSlots();
-  }, [status, session, router]);
+  // Combined loading state including EB profile load
+  const isSlotsLoading =
+    isEbLoading || isUnavailableLoading || isInterviewLoading;
 
   // FullCalendar event handlers
-  const handleDateSelect = (selectInfo: any) => {
+  const handleDateSelect = (selectInfo: { start: Date; end: Date }) => {
     const start = selectInfo.start;
     const end = selectInfo.end;
 
@@ -163,24 +290,47 @@ const Schedule = () => {
     }
   };
 
-  const handleEventClick = (clickInfo: any) => {
-    // Remove unavailable slot if clicked
+  const handleEventClick = (clickInfo: {
+    event: {
+      id: string;
+      extendedProps?: { fullName?: string; timeSlot?: string };
+    };
+  }) => {
+    // Only allow removal of unavailable slots, not interview slots
     const eventId = clickInfo.event.id;
 
+    // Check if this is an interview slot (starts with "interview-")
+    if (eventId.startsWith("interview-")) {
+      const fullName = clickInfo.event.extendedProps?.fullName;
+      const timeSlot = clickInfo.event.extendedProps?.timeSlot;
+      if (fullName) {
+        toast.info(`Interview: ${timeSlot}\nApplicant: ${fullName}`);
+      } else {
+        toast.info(
+          "Interview slots cannot be removed directly. They are managed through applications.",
+        );
+      }
+      return;
+    }
+
+    // Remove unavailable slot if clicked
+    const actualSlotId = eventId.replace("unavailable-", "");
     setCalendarEvents((prev) => prev.filter((event) => event.id !== eventId));
     setUnavailableTimeSlots((prev) =>
-      prev.filter((slot) => slot.id !== eventId)
+      prev.filter((slot) => slot.id !== actualSlotId),
     );
   };
 
-  const generateCalendarEvents = () => {
+  const generateCalendarEvents = useCallback(() => {
+    const events = [];
+
     // Convert unavailable time slots to FullCalendar events
-    const events = unavailableTimeSlots.map((slot) => {
+    const unavailableEvents = unavailableTimeSlots.map((slot) => {
       const startDateTime = new Date(`${slot.date}T${slot.startTime}:00`);
       const endDateTime = new Date(`${slot.date}T${slot.endTime}:00`);
 
       return {
-        id: slot.id,
+        id: `unavailable-${slot.id}`,
         title: "Unavailable", // Show text
         start: startDateTime,
         end: endDateTime,
@@ -192,126 +342,239 @@ const Schedule = () => {
       };
     });
 
-    setCalendarEvents(events);
-  };
+    // Convert interview slots to FullCalendar events
+    const interviewEvents = interviewSlots
+      .map(
+        (slot: {
+          id: string;
+          day: string;
+          name: string;
+          timeStart: string;
+          timeEnd: string;
+          meetingLink?: string;
+        }) => {
+          // Ensure we have valid date and time data
+          if (!slot.day || !slot.timeStart || !slot.timeEnd) {
+            console.warn(`Invalid slot data for ${slot.name}:`, slot);
+            return null;
+          }
 
+          // Parse dates more carefully to avoid timezone issues
+          const startDateTime = new Date(`${slot.day}T${slot.timeStart}:00`);
+          const endDateTime = new Date(`${slot.day}T${slot.timeEnd}:00`);
+
+          // Validate the parsed dates
+          if (isNaN(startDateTime.getTime()) || isNaN(endDateTime.getTime())) {
+            console.warn(`Invalid date parsing for ${slot.name}:`, {
+              day: slot.day,
+              timeStart: slot.timeStart,
+              timeEnd: slot.timeEnd,
+              startDateTime,
+              endDateTime,
+            });
+            return null;
+          }
+
+          // Create a shorter title to prevent overflow
+          const shortName =
+            slot.name.length > 15
+              ? `${slot.name.substring(0, 12)}...`
+              : slot.name;
+          const timeSlot = `${slot.timeStart}-${slot.timeEnd}`;
+          const title = shortName; // Just show the name, FullCalendar handles the time display
+
+          return {
+            id: `interview-${slot.id}`,
+            title: title,
+            start: startDateTime,
+            end: endDateTime,
+            backgroundColor: "#dc2626", // Red color for interviews
+            borderColor: "#b91c1c",
+            textColor: "white",
+            display: "block",
+            classNames: "interview-event", // Add custom class
+            extendedProps: {
+              fullName: slot.name, // Store full name for tooltip
+              timeSlot: timeSlot,
+            },
+          };
+        },
+      )
+      .filter((event): event is NonNullable<typeof event> => event !== null); // Remove any null events
+
+    events.push(...unavailableEvents, ...interviewEvents);
+
+    // Debug: Log all events being passed to calendar
+
+    setCalendarEvents(events);
+  }, [unavailableTimeSlots, interviewSlots]);
+
+  // Memoized calendar events to prevent unnecessary re-renders
+  const memoizedCalendarEvents = useMemo(() => {
+    return calendarEvents;
+  }, [calendarEvents]);
+
+  // Optimized effect for calendar events
   useEffect(() => {
-    if (unavailableTimeSlots.length > 0) {
+    if (unavailableTimeSlots.length > 0 || interviewSlots.length > 0) {
       generateCalendarEvents();
     }
-  }, [unavailableTimeSlots]);
+  }, [unavailableTimeSlots, interviewSlots, generateCalendarEvents]);
 
-  const fetchSlots = async () => {
-    try {
-      setLoading(true);
-      // Initialize with empty slots for now
-    } catch (error) {
-      console.error("Error generating slots:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Refresh function - use SWR mutate to trigger revalidation
+  const refreshSchedule = useCallback(() => {
+    mutateUnavailable();
+    mutateInterviews();
+  }, [mutateUnavailable, mutateInterviews]);
 
-  const handleCreateSlot = () => {
+  // SWR automatically loads data, no need for manual fetch
+  // The useEffect above updates slots when SWR data changes
+
+  const handleCreateSlot = async () => {
     if (unavailableTimeSlots.length === 0) {
-      alert("Please select time slots to mark as unavailable");
+      toast.error("Please select time slots to mark as unavailable");
       return;
     }
+
     setShowConfirmModal(true);
   };
 
   const handleConfirmSave = async () => {
+    if (!ebProfile) return;
+
     try {
       setIsSaving(true);
 
-      // Mark selected time slots as unavailable
-      for (const slot of unavailableTimeSlots) {
-        // Create a unique slot ID that includes the date and time range
-        const slotId = `${slot.date}-${slot.startTime}-${slot.endTime}`;
+      const unavailableSlots = unavailableTimeSlots.map((slot) => ({
+        id: `${slot.date}-${slot.startTime}-${slot.endTime}`,
+        eb: ebProfile.position,
+        day: slot.date,
+        timeStart: slot.startTime,
+        timeEnd: slot.endTime,
+      }));
+      const response = await fetch("/api/admin/unavailable-slots", {
+        method: "POST",
+        body: JSON.stringify(unavailableSlots),
+      });
 
-        // Add to unavailable slots
-        addUnavailableSlot(slotId);
+      const res = await response.json();
+      if (!res.success) {
+        console.error("Error creating unavailable slots:", res.error);
+        toast.error(res.message);
+        throw new Error(res.message);
       }
 
       // Reset form and close calendar
       setShowCalendar(false);
-      setUnavailableTimeSlots([]);
-      setCalendarEvents([]);
       setShowConfirmModal(false);
-      await fetchSlots();
-      alert("Unavailable time slots saved successfully!");
+      // Trigger refresh to reload data via SWR mutate
+      mutateUnavailable();
+      mutateInterviews();
+      toast.success("Unavailable time slots saved successfully!");
     } catch (error) {
       console.error("Error creating unavailable slots:", error);
-      alert("Failed to save unavailable time slots");
+      toast.error("Failed to save unavailable time slots");
     } finally {
       setIsSaving(false);
     }
   };
 
-  if (status === "loading" || loading) {
+  // Show loading for session only
+  if (status === "loading") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-[#F3F3FD] bg-[url('/assets/css-apply-static-images/assets/pictures/background.webp')] bg-cover bg-repeat">
         <div className="flex flex-col items-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-          <p className="mt-4 text-gray-600">Loading schedule...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#044FAF]"></div>
+          <p className="mt-4 text-[#134687]">Loading session...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div
-      className="min-h-screen flex font-inter"
-      style={{ backgroundColor: "#f6f6fe" }}
-    >
+    <div className="min-h-screen flex bg-[#F3F3FD] bg-[url('/assets/css-apply-static-images/assets/pictures/background.webp')] bg-cover bg-repeat overflow-x-hidden">
       {/* Sidebar Navigation */}
       <MobileSidebar>
         <SidebarContent activePage="schedule" />
       </MobileSidebar>
 
       {/* MAIN CONTENT */}
-      <div className="flex-1 p-6 md:p-8 pt-16 md:pt-12">
+      <div className="flex-1 p-6 md:p-8 pt-16 md:pt-12 overflow-y-auto h-screen">
         {/* PAGE HEADER */}
         <div className="mb-6 mt-8 md:mb-8 md:mt-8 text-center md:text-left">
-          <h1
-            className="text-xl md:text-4xl font-bold text-gray-800 mb-2 flex items-center justify-center md:justify-start"
-            style={{ fontFamily: "var(--font-raleway)" }}
-          >
-            Welcome, {"{replace with name}"} 👋
-          </h1>
-          <p className="text-xs md:text-base text-gray-600 italic mb-4 md:mb-6">
-            Stay organized and guide applicants through their journey.
+          <div className="inline-flex min-h-12 items-center gap-2 rounded-[45px] text-white text-lg lg:text-4xl font-poppins font-medium px-6 py-2 lg:py-4 text-center [background:linear-gradient(90deg,_#2F7EE3_0%,_#0349A2_100%)] w-fit mb-4">
+            <span>Welcome,</span>
+            {isEbLoading ? (
+              <LoadingSpinner
+                label="Loading position"
+                size="md"
+                className="border-white border-t-transparent"
+              />
+            ) : (
+              <span>{ebData?.ebProfile?.position ?? ebProfile?.position ?? "Admin"}</span>
+            )}
+            <span aria-hidden="true">👋</span>
+          </div>
+          <p className="text-black text-xs lg:text-lg font-Inter font-light leading-5 mb-4 md:mb-6">
+            Stay organized and guide applicants through their journey with CSS
+            Apply.
           </p>
-          <hr className="border-gray-300" />
+          <hr className="border-[#005FD9]" />
         </div>
 
         {/* MAIN SHAPE */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6 mb-6 min-h-[calc(100vh-200px)] md:min-h-[calc(100vh-280px)]">
+        <div className="bg-white rounded-xl border border-[#005FD9]/10 p-4 md:p-6 mb-6 min-h-[calc(100vh-200px)] md:min-h-[calc(100vh-280px)]">
           {/* schedule header */}
-          <div className="flex items-center justify-center md:justify-start mb-4 md:mb-6 space-x-2">
-            {/* schedule icon */}
-            <Calendar className="w-4 h-4 md:w-6 md:h-6 text-gray-700" />
-            <h2 className="text-base md:text-xl font-semibold text-gray-800">
-              Your Schedule
-            </h2>
+          <div className="flex items-center justify-between mb-4 md:mb-6">
+            <div className="flex items-center space-x-2">
+              {/* schedule icon */}
+              <Calendar className="w-4 h-4 md:w-6 md:h-6 text-[#134687]" />
+              <h2 className="text-base md:text-xl font-semibold text-[#134687]">
+                Your Schedule
+              </h2>
+            </div>
+
+            {/* Refresh button */}
+            <button
+              onClick={refreshSchedule}
+              disabled={isSlotsLoading}
+              className="flex items-center space-x-1 px-3 py-1.5 text-xs font-medium text-[#134687] bg-white border-2 border-[#005FD9] rounded-md hover:bg-[#F3F3FD] hover:text-[#044FAF] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+            >
+              <div
+                className="w-3 h-3 bg-current"
+                style={{
+                  maskImage: "url(/icons/refresh.svg)",
+                  WebkitMaskImage: "url(/icons/refresh.svg)",
+                  maskSize: "contain",
+                  maskRepeat: "no-repeat",
+                  maskPosition: "center",
+                }}
+              />
+              <span>Refresh</span>
+            </button>
           </div>
 
           {/* INNER SHAPE */}
           <div
-            className="bg-gray-50 rounded-lg border border-gray-200 p-4 md:p-8"
+            className="bg-[#F3F3FD] border border-[#005FD9]/10 rounded-lg p-4 md:p-8"
             style={{ minHeight: "calc(100vh - 400px)" }}
           >
-            {!showCalendar ? (
+            {isSlotsLoading ? (
+              <div className="flex flex-col items-center justify-center gap-4 h-full px-2 text-sm text-[#134687]">
+                <LoadingSpinner label="Loading schedule data" size="lg" />
+                <p>Loading schedule data...</p>
+              </div>
+            ) : !shouldShowCalendar ? (
               <div className="flex flex-col items-center justify-center h-full px-2">
                 {/* big calendar icon */}
                 <div className="w-16 h-16 md:w-24 md:h-24 mb-4 md:mb-6">
-                  <CalendarPlus className="w-full h-full text-gray-400" />
+                  <CalendarPlus className="w-full h-full text-[#134687]" />
                 </div>
 
-                <h3 className="text-base md:text-xl font-semibold text-gray-600 mb-2 md:mb-3 text-center">
+                <h3 className="text-base md:text-xl font-semibold text-[#134687] mb-2 md:mb-3 text-center">
                   Set Your Schedule
                 </h3>
-                <p className="text-xs md:text-base text-gray-500 text-center mb-6 md:mb-8 max-w-sm md:max-w-md">
+                <p className="text-xs md:text-base text-[#134687] text-center mb-6 md:mb-8 max-w-sm md:max-w-md">
                   Click the button below to mark your unavailable times. You can
                   select single time blocks or drag across multiple days to
                   create continuous unavailable periods.
@@ -319,51 +582,136 @@ const Schedule = () => {
 
                 <button
                   onClick={() => setShowCalendar(true)}
-                  className="text-xs md:text-sm font-medium py-2 px-6 md:py-3 md:px-10 rounded-full bg-[#134687] text-white hover:bg-[#0f3a6b] transition-all duration-300 transform hover:scale-[1.02] hover:shadow-md"
+                  className="text-xs md:text-sm font-medium py-2 px-6 md:py-3 md:px-10 rounded-full bg-[#044FAF] text-white hover:bg-[#0349A2] transition-colors"
                 >
                   Set Unavailable Times
                 </button>
               </div>
             ) : (
               <div className="space-y-4 md:space-y-6">
+                {interviewSlots.length > 0 && (
+                  <div className="flex">
+                    <h4 className="text-xs md:text-sm font-semibold text-[#134687] mb-1">
+                      Meeting Link: {interviewSlots[0].meetingLink}
+                    </h4>
+                  </div>
+                )}
                 {/* Guide Message */}
-                <div className="bg-white border border-gray-200 rounded-lg p-3 md:p-4">
+                <div className="bg-white rounded-lg p-3 md:p-4">
                   <div className="flex items-start gap-2 md:gap-3">
                     <div className="flex-shrink-0">
-                      <div className="w-5 h-5 md:w-6 md:h-6 bg-gray-100 rounded-full flex items-center justify-center">
-                        <span className="text-gray-600 text-xs md:text-sm font-semibold">
+                      <div className="w-5 h-5 md:w-6 md:h-6 bg-[#044FAF] rounded-full flex items-center justify-center">
+                        <span className="text-white text-xs md:text-sm font-semibold">
                           i
                         </span>
                       </div>
                     </div>
                     <div className="flex-1">
-                      <h4 className="text-xs md:text-sm font-semibold text-gray-900 mb-1">
-                        How to mark unavailable times:
+                      <h4 className="text-xs md:text-sm font-semibold text-[#134687] mb-1">
+                        How to use the schedule calendar:
                       </h4>
-                      <ul className="text-xs text-gray-700 space-y-1">
+                      <ul className="text-xs text-[#134687] space-y-1">
+                        <li>
+                          • <strong>View:</strong> Blue blocks show unavailable
+                          times, red blocks show scheduled interviews
+                        </li>
                         <li>
                           • <strong>Single day:</strong> Click and drag to
-                          select a time range
+                          select a time range as unavailable
                         </li>
                         <li>
                           • <strong>Multiple days:</strong> Drag from one day to
-                          another to mark entire days
+                          another to mark entire days as unavailable
                         </li>
                         <li>
-                          • <strong>Remove selection:</strong> Click on any
-                          selected time block to remove it
+                          • <strong>Remove unavailable times:</strong> Click on
+                          blue blocks to remove them
                         </li>
                         <li>
-                          • <strong>Save:</strong> Click "Save Unavailable
-                          Times" when done
+                          • <strong>Save:</strong> Click &quot;Save Unavailable
+                          Times&quot; when done
                         </li>
                       </ul>
                     </div>
                   </div>
                 </div>
 
+                {/* Legend */}
+                <div className="bg-white border border-gray-200 rounded-lg p-3 md:p-4 mb-4">
+                  <h4 className="text-xs md:text-sm font-semibold text-gray-700 mb-2">
+                    Calendar Legend:
+                  </h4>
+                  <div className="flex flex-wrap gap-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 bg-[#134687] rounded border border-[#0f3a6b]"></div>
+                      <span className="text-xs text-[#134687]">
+                        Unavailable Times
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 bg-[#dc2626] rounded border border-[#b91c1c]"></div>
+                      <span className="text-xs text-[#134687]">
+                        Scheduled Interviews
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
                 {/* FullCalendar Component */}
-                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <div className="rounded-lg overflow-hidden">
+                  <style jsx global>{`
+                    .fc-event {
+                      border-radius: 3px;
+                      margin: 1px 0;
+                      min-height: 20px;
+                      font-size: 9px !important;
+                    }
+                    .fc-event-title-container {
+                      overflow: hidden;
+                      display: flex;
+                      flex-direction: column;
+                      align-items: flex-start;
+                    }
+                    .fc-event-time {
+                      font-size: 9px !important;
+                      font-weight: normal !important;
+                      margin-bottom: 0px !important;
+                      line-height: 1.1 !important;
+                    }
+                    .fc-event-title {
+                      font-size: 9px !important;
+                      margin-top: 0px !important;
+                      line-height: 1.1 !important;
+                      font-weight: normal !important;
+                    }
+                    .fc-event-main {
+                      font-size: 9px !important;
+                    }
+                    .fc-event-content {
+                      font-size: 9px !important;
+                    }
+                    .fc-event-body {
+                      font-size: 9px !important;
+                    }
+                    .interview-event .fc-event-title {
+                      overflow: hidden;
+                      text-overflow: ellipsis;
+                      white-space: nowrap;
+                      font-size: 9px !important;
+                      line-height: 1.1 !important;
+                      padding: 1px 3px;
+                      margin-top: 0px !important;
+                    }
+                    .unavailable-event .fc-event-title {
+                      overflow: hidden;
+                      text-overflow: ellipsis;
+                      white-space: nowrap;
+                      font-size: 9px !important;
+                      line-height: 1.1 !important;
+                      padding: 1px 3px;
+                      margin-top: 0px !important;
+                    }
+                  `}</style>
                   <FullCalendar
                     ref={calendarRef}
                     plugins={[timeGridPlugin, interactionPlugin]}
@@ -384,17 +732,23 @@ const Schedule = () => {
                     selectMirror={true}
                     dayMaxEvents={true}
                     moreLinkClick="popover"
-                    events={calendarEvents}
+                    events={memoizedCalendarEvents}
                     select={handleDateSelect}
                     eventClick={handleEventClick}
                     selectOverlap={false}
+                    eventDisplay="block"
+                    eventTimeFormat={{
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      hour12: false,
+                    }}
                     selectConstraint={{
-                      start: "2025-09-16",
-                      end: "2025-09-27",
+                      start: calendarRange.start,
+                      end: calendarRange.end,
                     }}
                     validRange={{
-                      start: "2025-09-16",
-                      end: "2025-09-27",
+                      start: calendarRange.start,
+                      end: calendarRange.end,
                     }}
                     eventOverlap={false}
                     nowIndicator={true}
@@ -404,7 +758,6 @@ const Schedule = () => {
                       startTime: "07:00",
                       endTime: "21:00",
                     }}
-                    eventDisplay="block"
                     eventTextColor="white"
                     eventBackgroundColor="#134687"
                     eventBorderColor="#0f3a6b"
@@ -414,11 +767,6 @@ const Schedule = () => {
                       month: "short",
                     }}
                     slotLabelFormat={{
-                      hour: "numeric",
-                      minute: "2-digit",
-                      hour12: true,
-                    }}
-                    eventTimeFormat={{
                       hour: "numeric",
                       minute: "2-digit",
                       hour12: true,
@@ -434,44 +782,59 @@ const Schedule = () => {
                 {/* Selected Unavailable Time Slots */}
                 {unavailableTimeSlots.length > 0 && (
                   <div>
-                    <h4 className="text-xs md:text-sm font-medium text-gray-700 mb-2">
-                      Selected Unavailable Time Blocks (
-                      {unavailableTimeSlots.length})
-                    </h4>
-                    <div className="flex flex-wrap gap-1.5 md:gap-2 overflow-hidden">
-                      {unavailableTimeSlots.map((slot) => {
-                        const formatted = formatDateTime(
-                          slot.date,
-                          slot.timeSlot
-                        );
-                        return (
-                          <div
-                            key={slot.id}
-                            className="time-block flex items-center gap-1 md:gap-2 bg-[#134687] text-white px-2 md:px-3 py-1.5 md:py-2 rounded-lg text-xs shadow-sm"
-                          >
-                            <Clock className="w-2.5 h-2.5 md:w-3 md:h-3 text-blue-200 flex-shrink-0" />
-                            <div className="time-block-text flex flex-col min-w-0 flex-1">
-                              <span className="font-medium text-xs">
-                                {formatted.dayName}, {formatted.monthDay}
-                              </span>
-                              <span className="text-blue-100 text-xs">
-                                {formatted.startTime} - {formatted.endTime}
-                              </span>
-                            </div>
-                            <button
-                              onClick={() =>
-                                setUnavailableTimeSlots((prev) =>
-                                  prev.filter((s) => s.id !== slot.id)
-                                )
-                              }
-                              className="ml-1 hover:bg-[#0f3a6b] rounded-full p-0.5 md:p-1 transition-colors flex-shrink-0"
+                    <button
+                      onClick={() =>
+                        setShowUnavailableBlocks(!showUnavailableBlocks)
+                      }
+                      className="flex items-center justify-between w-full text-left mb-2 hover:bg-gray-50 rounded-md p-2 -m-2 transition-colors"
+                    >
+                      <h4 className="text-xs md:text-sm font-medium text-gray-700">
+                        Selected Unavailable Time Blocks (
+                        {unavailableTimeSlots.length})
+                      </h4>
+                      {showUnavailableBlocks ? (
+                        <ChevronUp className="w-4 h-4 text-gray-500" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-gray-500" />
+                      )}
+                    </button>
+
+                    {showUnavailableBlocks && (
+                      <div className="flex flex-wrap gap-1.5 md:gap-2 overflow-hidden">
+                        {unavailableTimeSlots.map((slot) => {
+                          const formatted = formatDateTime(
+                            slot.date,
+                            slot.timeSlot,
+                          );
+                          return (
+                            <div
+                              key={slot.id}
+                              className="time-block flex items-center gap-1 md:gap-2 bg-[#134687] text-white px-2 md:px-3 py-1.5 md:py-2 rounded-lg text-xs shadow-sm"
                             >
-                              <X className="w-2.5 h-2.5 md:w-3 md:h-3" />
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
+                              <Clock className="w-2.5 h-2.5 md:w-3 md:h-3 text-blue-200 flex-shrink-0" />
+                              <div className="time-block-text flex flex-col min-w-0 flex-1">
+                                <span className="font-medium text-xs">
+                                  {formatted.dayName}, {formatted.monthDay}
+                                </span>
+                                <span className="text-blue-100 text-xs">
+                                  {formatted.startTime} - {formatted.endTime}
+                                </span>
+                              </div>
+                              <button
+                                onClick={() =>
+                                  setUnavailableTimeSlots((prev) =>
+                                    prev.filter((s) => s.id !== slot.id),
+                                  )
+                                }
+                                className="ml-1 hover:bg-[#0f3a6b] rounded-full p-0.5 md:p-1 transition-colors flex-shrink-0"
+                              >
+                                <X className="w-2.5 h-2.5 md:w-3 md:h-3" />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -535,7 +898,6 @@ const Schedule = () => {
                   Note:
                 </p>
                 <ul className="list-disc pl-4 sm:pl-5 space-y-1 text-xs sm:text-sm text-black font-inter">
-                  <li>Once confirmed, your schedule cannot be edited.</li>
                   <li>Double-check your selected time slots before saving.</li>
                   <li>Ensure availability to avoid missed interviews.</li>
                 </ul>
