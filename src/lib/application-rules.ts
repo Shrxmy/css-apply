@@ -358,6 +358,12 @@ export async function validateAndLockInterviewSlot(
       position: true,
       committees: true,
       meetingLink: true,
+      user: {
+        select: {
+          name: true,
+          email: true,
+        },
+      },
     },
   });
 

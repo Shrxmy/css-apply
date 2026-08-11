@@ -2,13 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
-import {
-  emailTemplates,
-  sendEmailWithValidation,
-  getEBEmail,
-} from "@/lib/email";
-import { getRoleId } from "@/lib/eb-mapping";
-import { roles } from "@/data/ebRoles";
+import { emailTemplates, sendEmailWithValidation } from "@/lib/email";
 import { eaScheduleSchema } from "@/lib/schemas";
 import {
   getActiveCycle,
@@ -49,8 +43,8 @@ export async function POST(request: NextRequest) {
       if (!application) throw new Error("EA_APPLICATION_NOT_FOUND");
       if (application.hasAccepted) throw new Error("APPLICATION_ALREADY_ACCEPTED");
       if (
-        getRoleId(slot.ebRole) !== getRoleId(application.ebRole) ||
-        getRoleId(application.firstOptionEb) !== getRoleId(application.ebRole)
+        slot.ebRole !== application.ebRole ||
+        application.firstOptionEb !== application.ebRole
       ) {
         throw new Error("EA_ROLE_MISMATCH");
       }
@@ -96,8 +90,7 @@ export async function POST(request: NextRequest) {
         "Executive Associate applicant confirmation",
       );
 
-      const roleId = getRoleId(result.profile.position);
-      const ebName = roles.find((role) => role.id === roleId)?.ebName || result.profile.position;
+      const ebName = result.profile.user.name || result.profile.position;
       const ebTemplate = emailTemplates.ebInterviewNotificationEA(
         ebName,
         result.user.name || "Applicant",
@@ -111,7 +104,7 @@ export async function POST(request: NextRequest) {
         result.profile.meetingLink || undefined,
       );
       await sendEmailWithValidation(
-        getEBEmail(roleId, "Executive Associate interview notification"),
+        result.profile.user.email,
         ebTemplate.subject,
         ebTemplate.html,
         "Executive Associate interviewer notification",

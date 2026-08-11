@@ -1,9 +1,4 @@
 import { BrevoClient } from "@getbrevo/brevo";
-import {
-    getEBEmailWithFallback,
-    ADMIN_EMAILS,
-    validateAllEmailMappings,
-} from "@/data/emailMappings";
 
 const brevo = new BrevoClient({
     apiKey: process.env.BREVO_API_KEY || "",
@@ -52,58 +47,13 @@ export const sendEmail = async (to: string, subject: string, html: string) => {
             to: [{ email: to }],
         });
 
-        console.log("Email sent successfully:", result);
         return { success: true, messageId: result.messageId };
     } catch (error) {
-        console.error("Error sending email:", error);
-        return { success: false, error: error };
-    }
-};
-
-// Get EB email address by EB role ID with comprehensive error handling
-export const getEBEmail = (ebRoleId: string, context?: string): string => {
-    try {
-        return getEBEmailWithFallback(ebRoleId, context);
-    } catch (error) {
-        console.error(`Failed to get email for role ID: ${ebRoleId}`, error);
         console.error(
-            `CRITICAL: Email lookup failed for ${ebRoleId}. Using fallback email.`,
+            "Email delivery failed",
+            error instanceof Error ? error.name : "UnknownError",
         );
-
-        // For interview notifications, we need to ensure the email is sent
-        // Use President's email as fallback but log this as a critical issue
-        console.error(
-            `FALLBACK: Using President's email for ${ebRoleId} due to lookup failure`,
-        );
-        return ADMIN_EMAILS.PRESIDENT;
-    }
-};
-
-// Legacy function for backward compatibility - now uses new system
-export const getEBEmailLegacy = (ebRoleId: string): string => {
-    try {
-        return getEBEmailWithFallback(ebRoleId, "legacy-compatibility");
-    } catch {
-        console.warn(
-            `Legacy email lookup failed for ${ebRoleId}, using President as fallback`,
-        );
-        return ADMIN_EMAILS.PRESIDENT;
-    }
-};
-
-// Validate all email mappings on startup
-export const validateEmailMappings = (): boolean => {
-    try {
-        const validation = validateAllEmailMappings();
-        if (!validation.valid) {
-            console.error("Email mapping validation failed:", validation.errors);
-            return false;
-        }
-        console.log("✅ All email mappings validated successfully");
-        return true;
-    } catch (error) {
-        console.error("Error validating email mappings:", error);
-        return false;
+        return { success: false, error };
     }
 };
 
@@ -121,18 +71,18 @@ export const sendEmailWithValidation = async (
             throw new Error(`Invalid email address: ${to}`);
         }
 
-        console.log(`Sending email to: ${to}${context ? ` (${context})` : ""}`);
         const result = await sendEmail(to, subject, html);
 
-        if (result.success) {
-            console.log(`✅ Email sent successfully to ${to}: ${result.messageId}`);
-        } else {
-            console.error(`❌ Failed to send email to ${to}:`, result.error);
+        if (!result.success) {
+            console.error("Email delivery returned an error", context || "unspecified");
         }
 
         return result;
     } catch (error) {
-        console.error(`❌ Email sending failed for ${to}:`, error);
+        console.error(
+            "Email validation or delivery failed",
+            context || (error instanceof Error ? error.name : "UnknownError"),
+        );
         return { success: false, error };
     }
 };

@@ -2,13 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
-import {
-  emailTemplates,
-  sendEmailWithValidation,
-  getEBEmail,
-} from "@/lib/email";
-import { getRoleId } from "@/lib/eb-mapping";
-import { roles } from "@/data/ebRoles";
+import { emailTemplates, sendEmailWithValidation } from "@/lib/email";
 import { scheduleSchema } from "@/lib/schemas";
 import {
   getActiveCycle,
@@ -88,8 +82,7 @@ export async function POST(request: NextRequest) {
         "Committee Staff applicant confirmation",
       );
 
-      const roleId = getRoleId(result.profile.position);
-      const ebName = roles.find((role) => role.id === roleId)?.ebName || result.profile.position;
+      const ebName = result.profile.user.name || result.profile.position;
       const ebTemplate = emailTemplates.ebInterviewNotificationCommittee(
         ebName,
         result.user.name || "Applicant",
@@ -103,7 +96,7 @@ export async function POST(request: NextRequest) {
         result.profile.meetingLink || undefined,
       );
       await sendEmailWithValidation(
-        getEBEmail(roleId, "Committee Staff interview notification"),
+        result.profile.user.email,
         ebTemplate.subject,
         ebTemplate.html,
         "Committee Staff interviewer notification",
