@@ -147,11 +147,11 @@ export default function StaffApplication() {
             </div>
 
             {/* Application Form */}
-            <div className="flex flex-col lg:flex-row justify-center lg:gap-8 mt-5 lg:mt-8">
+            <div className="flex flex-col justify-center lg:mt-8 lg:flex-row lg:gap-8">
               {/* Left Column - Scrollable Role List / Mobile Dropdown */}
               <div className="">
                 {/* Mobile Dropdown (below lg) */}
-                <div className="lg:hidden relative mt-6">
+                <div className="relative z-[60] mt-6 lg:hidden">
                   <button
                     onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                     className="w-full px-5 border h-9 border-gray-300 rounded-lg bg-white flex items-center justify-between"
@@ -168,7 +168,7 @@ export default function StaffApplication() {
                     </span>
                   </button>
                   {isDropdownOpen && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-80 overflow-y-auto">
+                    <div className="absolute z-[70] mt-2 max-h-80 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-xl">
                       {committeeRolesRequirements.map((role) => (
                         <div
                           key={role.id}
@@ -217,12 +217,12 @@ export default function StaffApplication() {
               </div>
 
               {/* Right Column - Role Information */}
-              <div className="w-full lg:w-2/3 max-w-2xl mt-4 lg:mt-0">
+              <div className="relative z-0 mt-5 flex w-full flex-col items-center justify-center lg:mt-0 lg:w-[80%]">
                 {selectedRole ? (
-                  <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                    <div className="flex flex-col lg:flex-row">
+                  <div className="w-full overflow-hidden rounded-lg border border-gray-200 bg-white">
+                    <div className="flex flex-col lg:flex-row lg:items-center">
                       {/* Left side - Text content */}
-                      <div className="w-full lg:w-3/5 p-6">
+                      <div className="order-2 w-full p-4 lg:order-1 lg:w-[64%]">
                         {(() => {
                           const role = committeeRolesRequirements.find(
                             (r) => r.id === selectedRole,
@@ -232,7 +232,7 @@ export default function StaffApplication() {
                               <h4 className="text-xl font-inter font-bold text-black mb-4">
                                 {role.title}
                               </h4>
-                              <p className="text-[10px] lg:text-[13px] pr-4 font-normal font-inter text-black lg:mb-6 leading-relaxed text-justify max-h-48 overflow-y-auto">
+                              <p className="max-h-36 overflow-y-auto pr-4 text-justify text-[10px] font-normal leading-relaxed text-black font-inter lg:mb-6 lg:text-[13px]">
                                 {role.description}
                               </p>
                             </>
@@ -240,7 +240,7 @@ export default function StaffApplication() {
                         })()}
                       </div>
                       {/* Right side - Committee picture */}
-                      <div className="hidden w-2/5 lg:block lg:h-80 overflow-hidden border border-gray-200 bg-linear-to-b from-blue-900 via-blue-90 to-[#2F7EE3] relative">
+                      <div className="relative order-1 h-64 w-full overflow-hidden border-b border-gray-200 bg-[#134687] lg:order-2 lg:h-80 lg:w-[36%] lg:border-b-0 lg:border-l">
                         <Image
                           src={getCommitteeImage(selectedRole)}
                           alt={
@@ -250,7 +250,7 @@ export default function StaffApplication() {
                           }
                           fill
                           sizes="(max-width: 1024px) 100vw, 40vw"
-                          className="object-cover"
+                          className="object-contain p-5"
                         />
                       </div>
                     </div>

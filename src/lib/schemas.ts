@@ -25,6 +25,7 @@ const applicantProfileSchema = {
     .min(1, "Age is required")
     .max(120, "Enter a valid age"),
   dateOfBirth: dateOfBirthSchema,
+  sex: z.enum(["M", "F"], { error: "Sex is required" }),
   isOldCssMember: z.boolean(),
 };
 

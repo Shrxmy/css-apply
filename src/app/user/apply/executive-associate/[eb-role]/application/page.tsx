@@ -13,6 +13,7 @@ import { useApplicationsOpen } from "@/lib/useApplicationsOpen";
 import LoadingScreen from "@/components/LoadingScreen";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import FormProcessingOverlay from "@/components/FormProcessingOverlay";
+import DateOfBirthInput from "@/components/DateOfBirthInput";
 
 export default function ExecutiveAssistantApplication() {
   const router = useRouter();
@@ -48,6 +49,7 @@ export default function ExecutiveAssistantApplication() {
     section: "",
     age: "",
     dateOfBirth: "",
+    sex: "",
     isOldCssMember: false,
     secondOptionEb: "",
     cv: "",
@@ -104,6 +106,10 @@ export default function ExecutiveAssistantApplication() {
             updates.dateOfBirth = data.user.dateOfBirth.slice(0, 10);
           }
 
+          if (!formData.sex && data.user?.sex) {
+            updates.sex = data.user.sex;
+          }
+
           if (data.user?.isOldCssMember !== null && data.user?.isOldCssMember !== undefined) {
             updates.isOldCssMember = data.user.isOldCssMember;
           }
@@ -135,6 +141,7 @@ export default function ExecutiveAssistantApplication() {
     formData.section,
     formData.age,
     formData.dateOfBirth,
+    formData.sex,
     formData.cv,
     formData.secondOptionEb,
   ]);
@@ -224,8 +231,8 @@ export default function ExecutiveAssistantApplication() {
       return;
     }
 
-    if (!formData.age || !formData.dateOfBirth) {
-      setError("Please enter your age and date of birth");
+    if (!formData.age || !formData.dateOfBirth || !formData.sex) {
+      setError("Please enter your age, date of birth, and sex");
       setLoading(false);
       return;
     }
@@ -278,6 +285,7 @@ export default function ExecutiveAssistantApplication() {
           section: formData.section,
           age: Number(formData.age),
           dateOfBirth: formData.dateOfBirth,
+          sex: formData.sex,
           isOldCssMember: formData.isOldCssMember,
           ebRole: ebId,
           firstOptionEb: ebId,
@@ -437,8 +445,8 @@ export default function ExecutiveAssistantApplication() {
             )}
 
             {/* Application Form */}
-            <div className="flex flex-col lg:flex-row justify-center lg:gap-8 mt-5 lg:mt-8">
-              <div className="flex flex-col gap-4 lg:gap-6">
+            <div className="mx-auto mt-5 flex w-full flex-col lg:mt-8 lg:w-fit lg:flex-row lg:items-start lg:gap-12">
+              <div className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1 lg:gap-2">
                   <div className="text-black text-xs lg:text-sm font-Inter font-normal">
                     Student Number *
@@ -577,7 +585,27 @@ export default function ExecutiveAssistantApplication() {
                   </div>
                   <div className="flex flex-col gap-1 lg:gap-2">
                     <div className="text-black text-xs lg:text-sm font-Inter font-normal">Date of Birth *</div>
-                    <input type="date" name="dateOfBirth" value={formData.dateOfBirth} onChange={handleInputChange} required className="w-44 lg:w-60 h-9 lg:h-12 rounded-md border-2 border-[#CDCECF] focus:border-[#044FAF] focus:outline-none bg-white px-4 py-3 text-sm lg:text-base" />
+                    <DateOfBirthInput value={formData.dateOfBirth} onChange={handleInputChange} className="h-10 w-48 rounded-md border-2 border-[#CDCECF] bg-white px-4 py-2 text-sm focus:border-[#044FAF] focus:outline-none lg:h-12 lg:w-60 lg:text-base" />
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1 lg:gap-2">
+                  <div className="text-black text-xs font-normal font-Inter lg:text-sm">Sex *</div>
+                  <div className="flex gap-6 text-sm text-black font-Inter">
+                    {(["M", "F"] as const).map((sex) => (
+                      <label key={sex} className="flex cursor-pointer items-center gap-2">
+                        <input
+                          type="radio"
+                          name="sex"
+                          value={sex}
+                          checked={formData.sex === sex}
+                          onChange={handleInputChange}
+                          required
+                          className="h-4 w-4 accent-[#134687]"
+                        />
+                        {sex}
+                      </label>
+                    ))}
                   </div>
                 </div>
 
@@ -679,7 +707,7 @@ export default function ExecutiveAssistantApplication() {
               </div>
 
               <div className="hidden lg:flex justify-center">
-                <div className="w-80 h-96 rounded-lg overflow-hidden border border-gray-200 bg-linear-to-b from-blue-900 via-blue-90 to-[#2F7EE3] flex items-center justify-center">
+                <div className="flex h-96 w-80 items-center justify-center overflow-hidden rounded-lg border border-[#134687]/20 bg-[#134687]">
                   <span className="text-white text-lg font-semibold text-center px-4">
                     {selectedRole?.title || "EB Role"}
                   </span>

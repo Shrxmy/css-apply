@@ -20,6 +20,7 @@ model User {
   studentNumber  String?   @unique @db.VarChar(10)
   section        String?
   age            Int?
+  sex            String?   @db.VarChar(1)
   dateOfBirth    DateTime?
   isOldCssMember Boolean?
   role           String    @default("user") // user, admin, super_admin

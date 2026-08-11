@@ -121,11 +121,11 @@ export default function AssistantApplication() {
             </div>
 
             {/* Application Form */}
-            <div className="flex flex-col lg:flex-row justify-center lg:gap-8 lg:mt-8">
+            <div className="flex flex-col justify-center lg:mt-8 lg:flex-row lg:gap-8">
               {/* Left Column - Scrollable Role List / Mobile Dropdown */}
               <div className="">
                 {/* Mobile Dropdown (below lg) */}
-                <div className="lg:hidden relative mt-6">
+                <div className="relative z-[60] mt-6 lg:hidden">
                   <button
                     onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                     className="w-full px-5 border h-9 border-gray-300 rounded-lg bg-white flex items-center justify-between"
@@ -140,7 +140,7 @@ export default function AssistantApplication() {
                     </span>
                   </button>
                   {isDropdownOpen && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-80 overflow-y-auto">
+                    <div className="absolute z-[70] mt-2 max-h-80 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-xl">
                       {roles.map((role) => (
                         <div
                           key={role.id}
@@ -180,9 +180,9 @@ export default function AssistantApplication() {
               </div>
 
               {/* Right Column - Role Information */}
-              <div className="lg:w-[80%] flex flex-col items-center justify-center">
+              <div className="relative z-0 mt-5 flex w-full flex-col items-center justify-center lg:mt-0 lg:w-[80%]">
                 {selectedRole ? (
-                  <div className="overflow-hidden rounded-lg bg-white lg:border lg:border-gray-200">
+                  <div className="w-full overflow-hidden rounded-lg border border-gray-200 bg-white">
                     <div className="flex flex-col lg:flex-row lg:items-center">
                       {/* Left side - Text content */}
                       <div className="order-2 w-full p-4 lg:order-1 lg:w-[64%]">
@@ -190,7 +190,7 @@ export default function AssistantApplication() {
                           const role = roles.find((r) => r.id === selectedRole);
                           return role ? (
                             <>
-                              <div className="flex items-center gap-5 mt-5 lg:mt-0">
+                              <div className="mt-5 flex items-center gap-5 lg:mt-0">
                                 <div>
                                   <div className="text-[10px] lg:text-xs font-inter text-[#7a7a7a] lg:mb-1">
                                     <p>Be an Executive Associate of</p>
@@ -218,7 +218,7 @@ export default function AssistantApplication() {
                       {(() => {
                         const role = roles.find((r) => r.id === selectedRole);
                         return (
-                          <div className="relative order-1 flex h-64 w-full items-center justify-center overflow-hidden border-b border-gray-200 bg-[#102E57] lg:order-2 lg:h-80 lg:w-[36%] lg:border-b-0 lg:border-l">
+                          <div className="relative order-1 flex h-64 w-full items-center justify-center overflow-hidden border-b border-gray-200 bg-[#134687] lg:order-2 lg:h-80 lg:w-[36%] lg:border-b-0 lg:border-l">
                             {role?.imageUrl ? (
                               <>
                                 <Image
@@ -229,7 +229,7 @@ export default function AssistantApplication() {
                                   sizes="(max-width: 1024px) 80vw, 32vw"
                                   className="scale-110 object-cover object-center opacity-35 blur-xl"
                                 />
-                                <div className="absolute inset-0 bg-[#102E57]/20" />
+                                <div className="absolute inset-0 bg-[#134687]/20" />
                                 <Image
                                   src={role.imageUrl}
                                   alt={`${role.ebName || role.title} — ${role.title}`}
@@ -280,7 +280,7 @@ export default function AssistantApplication() {
                       `/user/apply/executive-associate/${selectedRole}/application`,
                     )
                   }
-                  className="cursor-pointer bg-[#044FAF] text-white px-15 py-3 rounded-lg font-inter font-normal text-sm hover:bg-[#04387B] transition-colors"
+                  className="cursor-pointer rounded-lg bg-[#044FAF] px-15 py-3 text-sm font-normal text-white transition-colors font-inter hover:bg-[#04387B]"
                 >
                   Apply
                 </button>

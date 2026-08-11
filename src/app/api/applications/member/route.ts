@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
     }
 
     const cycle = await getOpenApplicationCycle();
-    const { studentNumber, section, age, dateOfBirth, isOldCssMember } =
+    const { studentNumber, section, age, sex, dateOfBirth, isOldCssMember } =
       parsed.data;
 
     const result = await prisma.$transaction(async (tx) => {
@@ -53,6 +53,7 @@ export async function POST(request: NextRequest) {
           studentNumber,
           section,
           age,
+          sex,
           dateOfBirth: new Date(`${dateOfBirth}T00:00:00Z`),
           isOldCssMember,
         },
@@ -164,6 +165,7 @@ export async function GET() {
         name: user.name,
         section: user.section,
         age: user.age,
+        sex: user.sex,
         dateOfBirth: user.dateOfBirth,
         isOldCssMember: user.isOldCssMember,
         memberships: user.memberships,

@@ -10,6 +10,7 @@ import Header from "@/components/Header";
 import LoadingScreen from "@/components/LoadingScreen";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import FormProcessingOverlay from "@/components/FormProcessingOverlay";
+import DateOfBirthInput from "@/components/DateOfBirthInput";
 import { parseFullName } from "@/lib/name-parsing";
 import { useFormPersistence } from "@/lib/useFormPersistence";
 import { useApplicationStatus } from "@/lib/useApplicationStatus";
@@ -37,6 +38,7 @@ export default function MemberApplication() {
     section: "",
     age: "",
     dateOfBirth: "",
+    sex: "",
     isOldCssMember: false,
     firstName: "",
     lastName: "",
@@ -99,6 +101,10 @@ export default function MemberApplication() {
             updates.dateOfBirth = data.user.dateOfBirth.slice(0, 10);
           }
 
+          if (!formData.sex && data.user?.sex) {
+            updates.sex = data.user.sex;
+          }
+
           if (data.user?.isOldCssMember !== null && data.user?.isOldCssMember !== undefined) {
             updates.isOldCssMember = data.user.isOldCssMember;
           }
@@ -126,6 +132,7 @@ export default function MemberApplication() {
     formData.section,
     formData.age,
     formData.dateOfBirth,
+    formData.sex,
   ]);
 
   // Early returns AFTER all hooks
@@ -162,6 +169,7 @@ export default function MemberApplication() {
       section: formData.section,
       age: formData.age,
       dateOfBirth: formData.dateOfBirth,
+      sex: formData.sex,
       isOldCssMember: formData.isOldCssMember,
     });
 
@@ -188,6 +196,7 @@ export default function MemberApplication() {
           section: formData.section,
           age: Number(formData.age),
           dateOfBirth: formData.dateOfBirth,
+          sex: formData.sex,
           isOldCssMember: formData.isOldCssMember,
         }),
       });
@@ -245,8 +254,8 @@ export default function MemberApplication() {
           )}
 
           <hr className="my-8 border-t-1 border-[#717171]" />
-          <div className="flex flex-col lg:flex-row gap-20">
-            <div className="flex flex-col gap-6">
+          <div className="mx-auto flex w-full flex-col lg:w-fit lg:flex-row lg:items-start lg:gap-12">
+            <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-2">
                 <div className="text-black text-xs lg:text-sm font-Inter font-normal">
                   Student Number *
@@ -318,14 +327,33 @@ export default function MemberApplication() {
                 </div>
                 <div className="flex flex-col gap-2">
                   <div className="text-black text-xs lg:text-sm font-Inter font-normal">Date of Birth *</div>
-                  <input
-                    type="date"
-                    name="dateOfBirth"
+                  <DateOfBirthInput
                     value={formData.dateOfBirth}
                     onChange={handleInputChange}
-                    required
-                    className="w-44 lg:w-56 h-9 lg:h-12 rounded-md border-2 border-[#CDCECF] focus:border-2 focus:border-[#044FAF] focus:outline-none bg-white px-4 py-3 text-sm lg:text-base"
+                    className="h-10 w-48 rounded-md border-2 border-[#CDCECF] bg-white px-4 py-2 text-sm focus:border-[#044FAF] focus:outline-none lg:h-12 lg:w-56 lg:text-base"
                   />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <div className="text-black text-xs font-normal font-Inter lg:text-sm">
+                  Sex *
+                </div>
+                <div className="flex gap-6 text-sm text-black font-Inter">
+                  {(["M", "F"] as const).map((sex) => (
+                    <label key={sex} className="flex cursor-pointer items-center gap-2">
+                      <input
+                        type="radio"
+                        name="sex"
+                        value={sex}
+                        checked={formData.sex === sex}
+                        onChange={handleInputChange}
+                        required
+                        className="h-4 w-4 accent-[#134687]"
+                      />
+                      {sex}
+                    </label>
+                  ))}
                 </div>
               </div>
 
@@ -397,13 +425,13 @@ export default function MemberApplication() {
             </div>
 
             <div className="hidden lg:flex justify-center items-center mt-8">
-              <div className="relative w-[300px] h-[360px]">
+              <div className="relative h-[360px] w-[300px] overflow-hidden rounded-lg bg-[#134687]">
                 <Image
                   src="/assets/css-apply-static-images/assets/pictures/MemberImage1.webp"
                   alt="Member"
                   fill
                   sizes="300px"
-                  className="object-cover shadow-md border border-[#2F7EE3] rounded-lg"
+                  className="rounded-lg border border-[#134687]/20 object-contain p-5 shadow-md"
                 />
               </div>
             </div>
@@ -425,7 +453,8 @@ export default function MemberApplication() {
                 formData.studentNumber.length !== 10 ||
                 !formData.section ||
                 !formData.age ||
-                !formData.dateOfBirth
+                !formData.dateOfBirth ||
+                !formData.sex
               }
               className="whitespace-nowrap font-inter text-sm font-semibold text-white px-12 py-3 rounded-lg bg-[#134687] hover:bg-[#0d3569] disabled:opacity-50"
             >
