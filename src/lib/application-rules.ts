@@ -104,7 +104,7 @@ export async function lockApplicantCycle(
   recruitmentCycleId: string,
 ) {
   const lockKey = `application:${recruitmentCycleId}:${applicantEmail.toLowerCase()}`;
-  await tx.$queryRaw(Prisma.sql`
+  await tx.$executeRaw(Prisma.sql`
     SELECT pg_advisory_xact_lock(hashtext(${lockKey}))
   `);
 }
@@ -389,7 +389,7 @@ export async function validateAndLockInterviewSlot(
   }
 
   const slotLockKey = `interview:${cycle.id}:${profile.position.toLowerCase()}:${input.day}:${input.start}:${input.end}`;
-  await tx.$queryRaw(Prisma.sql`
+  await tx.$executeRaw(Prisma.sql`
     SELECT pg_advisory_xact_lock(hashtext(${slotLockKey}))
   `);
 

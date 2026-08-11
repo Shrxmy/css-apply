@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
     const cycle = await prisma.$transaction(async (tx) => {
       // Serialize activation changes so concurrent requests cannot leave two
       // recruitment cycles active.
-      await tx.$queryRaw(Prisma.sql`
+      await tx.$executeRaw(Prisma.sql`
         SELECT pg_advisory_xact_lock(hashtext('active-recruitment-cycle'))
       `);
 
