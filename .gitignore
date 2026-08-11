@@ -9,12 +9,15 @@
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
+package-lock.json
 
 # testing
 /coverage
+/backup/
 
 # next.js
 /.next/
+/.next-dev/
 /out/
 
 # production
@@ -39,3 +42,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# prisma migration
+/prisma/migrations
+
+# agents
+AGENTS.md

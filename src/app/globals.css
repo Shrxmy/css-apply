@@ -1,6 +1,631 @@
 @import "tailwindcss";
 
+/* Prevent horizontal scrolling */
+html,
+body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
 @theme {
   --font-family-inter: var(--font-inter), system-ui, sans-serif;
   --font-family-jetbrains: var(--font-jetbrains-mono), monospace;
+}
+
+/* Map Next.js font variables to convenient utility classes */
+.font-inter {
+  font-family: var(--font-inter), system-ui, sans-serif;
+}
+.font-raleway {
+  font-family: var(--font-raleway), system-ui, sans-serif;
+}
+.font-poppins {
+  font-family: var(--font-poppins), system-ui, sans-serif;
+}
+
+/* Back-compat alias used in components */
+.font-family-inter {
+  font-family: var(--font-inter), system-ui, sans-serif;
+}
+/* Custom scroll animations for image carousel using Tailwind arbitrary values */
+@keyframes scroll-left {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes scroll-right {
+  0% {
+    transform: translateX(-50%);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+/* Hero section animations */
+@keyframes fade-in-up {
+  0% {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.8s ease-out forwards;
+}
+
+.animate-delay-200 {
+  animation-delay: 0.2s;
+  opacity: 0;
+}
+
+.animate-delay-400 {
+  animation-delay: 0.4s;
+  opacity: 0;
+}
+
+/* Slideshow animations */
+@keyframes slideshow1 {
+  0% {
+    opacity: 1;
+  }
+  20% {
+    opacity: 1;
+  }
+  25% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes slideshow2 {
+  0% {
+    opacity: 0;
+  }
+  20% {
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+  40% {
+    opacity: 1;
+  }
+  45% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes slideshow3 {
+  0% {
+    opacity: 0;
+  }
+  40% {
+    opacity: 0;
+  }
+  45% {
+    opacity: 1;
+  }
+  60% {
+    opacity: 1;
+  }
+  65% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes slideshow4 {
+  0% {
+    opacity: 0;
+  }
+  60% {
+    opacity: 0;
+  }
+  65% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes slideshow5 {
+  0% {
+    opacity: 0;
+  }
+  80% {
+    opacity: 0;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.animate-slideshow {
+  animation: slideshow1 10s infinite;
+}
+
+.animation-delay-2s {
+  animation: slideshow2 10s infinite;
+}
+
+.animation-delay-4s {
+  animation: slideshow3 10s infinite;
+}
+
+.animation-delay-6s {
+  animation: slideshow4 10s infinite;
+}
+
+.animation-delay-8s {
+  animation: slideshow5 10s infinite;
+}
+
+/* FullCalendar Custom Styles */
+.fc {
+  font-family: var(--font-inter), system-ui, sans-serif;
+}
+
+.fc-theme-standard .fc-scrollgrid {
+  border: 1px solid #e5e7eb;
+}
+
+.fc-theme-standard .fc-scrollgrid-sync-table {
+  border: 1px solid #e5e7eb;
+}
+
+.fc-theme-standard td,
+.fc-theme-standard th {
+  border: 1px solid #e5e7eb;
+}
+
+.fc-theme-standard .fc-scrollgrid-sync-table {
+  border: 1px solid #e5e7eb;
+}
+
+.fc-col-header-cell {
+  background-color: #f9fafb;
+  font-weight: 600;
+  color: #374151;
+  padding: 12px 8px;
+}
+
+.fc-timegrid-slot {
+  height: 2.5rem;
+  border-bottom: 1px solid #f3f4f6;
+  border-right: 1px solid #e5e7eb;
+}
+
+.fc-timegrid-slot:hover {
+  background-color: #f3f4f6;
+}
+
+.fc-timegrid-slot-label {
+  font-size: 0.7rem;
+  color: #6b7280;
+  padding: 2px 8px;
+  font-weight: 500;
+}
+
+/* Style every other time slot differently for better visibility */
+.fc-timegrid-slot:nth-child(odd) {
+  background-color: #fafbfc;
+}
+
+.fc-timegrid-slot:nth-child(even) {
+  background-color: #ffffff;
+}
+
+.fc-timegrid-axis {
+  background-color: #f9fafb;
+  border-right: 1px solid #e5e7eb;
+}
+
+.fc-timegrid-event {
+  border-radius: 6px;
+  border: none;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  min-height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fc-timegrid-event:hover {
+  opacity: 0.8;
+  transform: scale(1.02);
+  transition: all 0.2s ease;
+}
+
+/* Show event text */
+.fc-timegrid-event .fc-event-title {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  font-size: 0.7rem !important;
+  line-height: 1.2 !important;
+  font-weight: 600 !important;
+  color: white !important;
+  text-align: center !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+/* Custom styling for unavailable events */
+.unavailable-event {
+  background-color: #134687 !important;
+  border-color: #0f3a6b !important;
+  border-radius: 6px !important;
+  box-shadow: 0 1px 3px rgba(19, 70, 135, 0.3) !important;
+}
+
+.unavailable-event:hover {
+  background-color: #0f3a6b !important;
+  box-shadow: 0 2px 6px rgba(19, 70, 135, 0.4) !important;
+}
+
+.fc-button {
+  background: linear-gradient(135deg, #134687 0%, #0f3a6b 100%);
+  border: none;
+  color: white;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  box-shadow: 0 2px 4px rgba(19, 70, 135, 0.2);
+  transition: all 0.2s ease;
+  text-transform: none;
+  letter-spacing: 0.025em;
+}
+
+.fc-button:hover {
+  background: linear-gradient(135deg, #0f3a6b 0%, #0a2d4a 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(19, 70, 135, 0.3);
+}
+
+.fc-button:focus {
+  box-shadow: 0 0 0 3px rgba(19, 70, 135, 0.2);
+  outline: none;
+}
+
+.fc-button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(19, 70, 135, 0.2);
+}
+
+.fc-button-primary:not(:disabled):active {
+  background: linear-gradient(135deg, #0f3a6b 0%, #0a2d4a 100%);
+}
+
+.fc-button-primary:not(:disabled).fc-button-active {
+  background: linear-gradient(135deg, #0f3a6b 0%, #0a2d4a 100%);
+  box-shadow: 0 4px 8px rgba(19, 70, 135, 0.3);
+}
+
+.fc-button-group .fc-button {
+  margin-right: 4px;
+}
+
+.fc-button-group .fc-button:last-child {
+  margin-right: 0;
+}
+
+/* Enhanced navigation buttons (prev/next) */
+.fc-button-group .fc-button {
+  background: linear-gradient(135deg, #134687 0%, #0f3a6b 100%) !important;
+  border: none !important;
+  color: white !important;
+  font-weight: 600 !important;
+  padding: 10px 16px !important;
+  border-radius: 12px !important;
+  font-size: 0.875rem !important;
+  box-shadow: 0 3px 6px rgba(19, 70, 135, 0.25) !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  text-transform: none !important;
+  letter-spacing: 0.025em !important;
+  min-width: 44px !important;
+  height: 44px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.fc-button-group .fc-button:hover {
+  background: linear-gradient(135deg, #0f3a6b 0%, #0a2d4a 100%) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 12px rgba(19, 70, 135, 0.4) !important;
+}
+
+.fc-button-group .fc-button:active {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 8px rgba(19, 70, 135, 0.3) !important;
+}
+
+.fc-button-group .fc-button:focus {
+  box-shadow: 0 0 0 3px rgba(19, 70, 135, 0.3) !important;
+  outline: none !important;
+}
+
+.fc-button-group .fc-button:disabled {
+  background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%) !important;
+  transform: none !important;
+  box-shadow: 0 2px 4px rgba(156, 163, 175, 0.2) !important;
+  cursor: not-allowed !important;
+}
+
+/* Specific styling for prev/next buttons */
+.fc-button-group .fc-button:first-child {
+  margin-right: 8px !important;
+}
+
+.fc-button-group .fc-button:last-child {
+  margin-left: 0 !important;
+}
+
+.fc-toolbar-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.fc-daygrid-day-number {
+  color: #374151;
+  font-weight: 600;
+  padding: 8px;
+}
+
+.fc-daygrid-day:hover {
+  background-color: #f9fafb;
+}
+
+.fc-timegrid-now-indicator-line {
+  border-color: #ef4444;
+  border-width: 2px;
+}
+
+.fc-timegrid-now-indicator-arrow {
+  border-color: #ef4444;
+}
+
+/* Selection styling for unavailable slots */
+.fc-highlight {
+  background-color: rgba(19, 70, 135, 0.1) !important;
+  border: 1px solid #134687 !important;
+}
+
+.fc-select-mirror {
+  background-color: rgba(19, 70, 135, 0.1) !important;
+  border: 1px solid #134687 !important;
+}
+
+/* Vertical grid lines for FullCalendar */
+.fc-timegrid .fc-scrollgrid-sync-table td {
+  border-right: 2px solid #9ca3af !important;
+  border-bottom: 1px solid #f1f5f9 !important;
+}
+
+.fc-timegrid .fc-scrollgrid-sync-table td:last-child {
+  border-right: none !important;
+}
+
+.fc-timegrid .fc-timegrid-body .fc-timegrid-slot-lane {
+  border-right: 2px solid #9ca3af !important;
+}
+
+.fc-timegrid .fc-timegrid-body .fc-timegrid-slot-lane:last-child {
+  border-right: none !important;
+}
+
+/* Mobile responsiveness for FullCalendar */
+@media (max-width: 768px) {
+  .fc-toolbar {
+    padding: 0.5rem 0;
+    margin-bottom: 1rem;
+  }
+
+  .fc-toolbar-chunk {
+    gap: 4px;
+  }
+
+  .fc-button-group .fc-button {
+    min-width: 36px !important;
+    height: 36px !important;
+    padding: 6px 12px !important;
+    font-size: 0.75rem !important;
+  }
+
+  .fc-timegrid-slot {
+    height: 1.2rem !important;
+  }
+
+  .fc-timegrid-slot-label {
+    font-size: 0.6rem !important;
+    padding: 1px 4px !important;
+  }
+
+  .fc-col-header-cell {
+    padding: 6px 4px !important;
+    font-size: 0.7rem !important;
+  }
+
+  .fc-timegrid-event {
+    font-size: 0.6rem !important;
+    padding: 1px 4px !important;
+    min-height: 16px !important;
+  }
+}
+
+/* Time block text overflow fixes */
+.time-block {
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.time-block-text {
+  min-width: 0;
+  flex: 1;
+}
+
+.time-block-text span {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Prevent event overlapping */
+.fc-timegrid-event-container {
+  position: relative;
+}
+
+.fc-timegrid-event {
+  position: absolute !important;
+  z-index: 1;
+}
+
+/* Better day headers */
+.fc-col-header-cell {
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-bottom: 2px solid #e2e8f0;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.75rem;
+  padding: 12px 8px;
+}
+
+/* Style the day header content */
+.fc-col-header-cell .fc-col-header-cell-cushion {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+/* Make the month (September) more prominent */
+.fc-col-header-cell .fc-col-header-cell-cushion .fc-daygrid-day-number {
+  font-size: 0.6rem;
+  color: #6b7280;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0.025em;
+}
+
+/* Improve toolbar */
+.fc-toolbar {
+  margin-bottom: 1.5rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid #e5e7eb;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-radius: 12px 12px 0 0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* Toolbar button group container */
+.fc-toolbar-chunk {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fc-toolbar-title {
+  display: none !important;
+}
+
+/* Hide the center title area completely */
+.fc-toolbar-chunk:nth-child(2) {
+  display: none !important;
+}
+
+/* Sonner toast theming — CSSApply blue palette */
+[data-sonner-toaster] {
+  --normal-bg: #ffffff;
+  --normal-text: #134687;
+  --normal-border: #005fd920;
+}
+
+/* Success toasts — blue theme */
+[data-sonner-toast][data-type="success"] {
+  background: #e8f2ff !important;
+  border-color: #005fd930 !important;
+  color: #044faf !important;
+}
+[data-sonner-toast][data-type="success"] [data-icon] {
+  color: #044faf !important;
+}
+[data-sonner-toast][data-type="success"] [data-title] {
+  color: #044faf !important;
+  font-weight: 600;
+}
+[data-sonner-toast][data-type="success"] [data-description] {
+  color: #13468780 !important;
+}
+
+/* Error toasts — muted red */
+[data-sonner-toast][data-type="error"] {
+  background: #fef2f2 !important;
+  border-color: #dc262620 !important;
+  color: #991b1b !important;
+}
+[data-sonner-toast][data-type="error"] [data-icon] {
+  color: #dc2626 !important;
+}
+[data-sonner-toast][data-type="error"] [data-title] {
+  color: #991b1b !important;
+  font-weight: 600;
+}
+[data-sonner-toast][data-type="error"] [data-description] {
+  color: #991b1b80 !important;
+}
+
+/* Info toasts */
+[data-sonner-toast][data-type="info"] {
+  background: #f3f3fd !important;
+  border-color: #005fd920 !important;
+  color: #134687 !important;
+}
+[data-sonner-toast][data-type="info"] [data-icon] {
+  color: #134687 !important;
+}
+
+/* Close button styling */
+[data-sonner-toast] button[data-close-button] {
+  color: #13468780 !important;
+}
+[data-sonner-toast] button[data-close-button]:hover {
+  color: #044faf !important;
+}
+
+/* Toast description text (subtle) */
+.css-apply-toast [data-description] {
+  font-size: 0.75rem !important;
 }
