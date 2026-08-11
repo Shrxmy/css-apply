@@ -2,6 +2,7 @@
 "use client";
 
 import LoadingSpinner from "@/components/LoadingSpinner";
+import FormProcessingOverlay from "@/components/FormProcessingOverlay";
 
 import { useEffect } from "react";
 import Image from "next/image";
@@ -24,7 +25,7 @@ export default function ConfirmationModal({
   // Handle escape key to close modal
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isOpen) {
+      if (e.key === "Escape" && isOpen && !isLoading) {
         onClose();
       }
     };
@@ -38,7 +39,7 @@ export default function ConfirmationModal({
       document.removeEventListener("keydown", handleEscape);
       document.body.style.overflow = "unset";
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, isLoading, onClose]);
 
   if (!isOpen) return null;
 
@@ -50,13 +51,22 @@ export default function ConfirmationModal({
         backdropFilter: "blur(8px)",
         WebkitBackdropFilter: "blur(8px)",
       }}
-      onClick={onClose}
+      onClick={() => {
+        if (!isLoading) onClose();
+      }}
     >
       <div
-        className="bg-white rounded-2xl p-4 sm:p-6 lg:p-10 max-w-xl w-full shadow-2xl border-[#FFBC2B] border-2 sm:border-4 max-h-[90vh] overflow-y-auto"
+        aria-busy={isLoading}
+        className="relative max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl border-2 border-[#FFBC2B] bg-white p-4 shadow-2xl sm:border-4 sm:p-6 lg:p-10"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="text-center">
+        <FormProcessingOverlay
+          active={isLoading}
+          label="Submitting interview schedule..."
+        />
+        <div
+          className={`text-center transition duration-200 ${isLoading ? "opacity-45 grayscale" : "opacity-100"}`}
+        >
           {/* Header section with icon and title */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6 mb-4 sm:mb-6">
             <div className="p-2 sm:p-3 flex items-center justify-center h-12 w-12 sm:h-15 sm:w-15 rounded-full bg-[#FFE7B4] shrink-0">

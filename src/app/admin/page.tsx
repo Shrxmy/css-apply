@@ -26,6 +26,15 @@ import interactionPlugin from "@fullcalendar/interaction";
 
 const swrFetcher = (url: string) => fetch(url).then((r) => r.json());
 
+// FullCalendar treats range.end as exclusive, while recruitment-cycle end
+// dates are inclusive. Advancing by one day keeps the configured last day
+// visible and selectable without timezone-sensitive Date parsing.
+const toExclusiveEndDate = (dateValue: string) => {
+  const [year, month, day] = dateValue.slice(0, 10).split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day + 1));
+  return date.toISOString().slice(0, 10);
+};
+
 const Schedule = () => {
   const { data: session, status } = useSession();
   const [showCalendar, setShowCalendar] = useState(false);
@@ -95,11 +104,11 @@ const Schedule = () => {
               start:
                 data.activeCycle.interviewStart?.split("T")[0] ??
                 new Date().toISOString().split("T")[0],
-              end:
-                data.activeCycle.interviewEnd?.split("T")[0] ??
-                new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)
-                  .toISOString()
-                  .split("T")[0],
+              end: data.activeCycle.interviewEnd
+                ? toExclusiveEndDate(data.activeCycle.interviewEnd)
+                : new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)
+                    .toISOString()
+                    .split("T")[0],
             });
           }
         }

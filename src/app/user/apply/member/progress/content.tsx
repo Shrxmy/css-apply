@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Header from "@/components/Header";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import LoadingScreen from "@/components/LoadingScreen";
+import FormProcessingOverlay from "@/components/FormProcessingOverlay";
 import Footer from "@/components/Footer";
 import { useSession } from "next-auth/react";
 import { usePaymentQr } from "@/lib/usePaymentQr";
@@ -101,15 +103,7 @@ export default function MemberProgressPageContent() {
   }, []);
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-[rgb(243,243,253)] flex flex-col">
-        <Header />
-        <div className="grow flex items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#134687]"></div>
-        </div>
-        <Footer />
-      </div>
-    );
+    return <LoadingScreen message="Loading your application" />;
   }
 
   if (!applicationData || !applicationData.hasApplication) {
@@ -271,8 +265,17 @@ export default function MemberProgressPageContent() {
                   {!hasPaymentProof ? (
                     <form
                       onSubmit={handlePaymentProofSubmit}
-                      className="space-y-3 mb-4 sm:mb-6"
+                      aria-busy={submittingPaymentProof}
+                      className="relative mb-4 sm:mb-6"
                     >
+                      <FormProcessingOverlay
+                        active={submittingPaymentProof}
+                        label="Submitting payment proof..."
+                      />
+                      <fieldset
+                        disabled={submittingPaymentProof}
+                        className={`space-y-3 border-0 p-0 transition duration-200 ${submittingPaymentProof ? "opacity-45 grayscale" : "opacity-100"}`}
+                      >
                       <input
                         type="url"
                         value={paymentProof}
@@ -300,6 +303,7 @@ export default function MemberProgressPageContent() {
                           "Submit Payment Proof"
                         )}
                       </button>
+                      </fieldset>
                     </form>
                   ) : (
                     <p className="text-green-700 text-center text-sm font-semibold mb-4 sm:mb-6">

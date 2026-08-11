@@ -9,6 +9,7 @@ import Image from "next/image";
 import Header from "@/components/Header";
 import LoadingScreen from "@/components/LoadingScreen";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import FormProcessingOverlay from "@/components/FormProcessingOverlay";
 import { parseFullName } from "@/lib/name-parsing";
 import { useFormPersistence } from "@/lib/useFormPersistence";
 import { useApplicationStatus } from "@/lib/useApplicationStatus";
@@ -206,6 +207,8 @@ export default function MemberApplication() {
     }
   };
 
+  const isProcessing = loading;
+
   return (
     <div className="min-h-screen md:bg-[rgb(243,243,253)] md:bg-[url('/assets/css-apply-static-images/assets/pictures/background.webp')] flex flex-col justify-between bg-cover bg-repeat">
       <Header />
@@ -213,8 +216,17 @@ export default function MemberApplication() {
       <section className="flex flex-col justify-between items-center px-20 py-10 lg:px-50 lg:py-20">
         <form
           onSubmit={handleSubmit}
-          className="rounded-[24px]  md:bg-white lg:shadow-[0_4px_4px_0_rgba(0,0,0,0.31)] md:p-20 lg:p-28"
+          aria-busy={isProcessing}
+          className="relative rounded-[24px] md:bg-white md:p-20 lg:p-28 lg:shadow-[0_4px_4px_0_rgba(0,0,0,0.31)]"
         >
+          <FormProcessingOverlay
+            active={isProcessing}
+            label="Submitting member application..."
+          />
+          <fieldset
+            disabled={isProcessing}
+            className={`min-w-0 border-0 p-0 transition duration-200 ${isProcessing ? "opacity-45 grayscale" : "opacity-100"}`}
+          >
           <div className="text-2xl lg:text-4xl font-raleway font-semibold mb-2 lg:mb-4">
             <span className="text-black">Apply as </span>
             <span className="text-[#134687]">Member</span>
@@ -427,6 +439,7 @@ export default function MemberApplication() {
               )}
             </button>
           </div>
+          </fieldset>
         </form>
       </section>
 

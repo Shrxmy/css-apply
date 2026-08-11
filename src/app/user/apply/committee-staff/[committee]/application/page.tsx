@@ -9,6 +9,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import LoadingScreen from "@/components/LoadingScreen";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import FormProcessingOverlay from "@/components/FormProcessingOverlay";
 import { parseFullName } from "@/lib/name-parsing";
 import { useFormPersistence } from "@/lib/useFormPersistence";
 import { useApplicationStatus } from "@/lib/useApplicationStatus";
@@ -429,6 +430,11 @@ export default function CommitteeApplication() {
     );
   }
 
+  const isProcessing = loading || uploading.cv || uploading.portfolio;
+  const processingLabel = uploading.cv || uploading.portfolio
+    ? "Uploading application files..."
+    : "Submitting committee application...";
+
   return (
     <div className="min-h-screen bg-white sm:bg-[rgb(243,243,253)] sm:bg-[url('/assets/css-apply-static-images/assets/pictures/background.webp')] sm:bg-cover  sm:bg-no-repeat flex flex-col justify-between">
       <Header />
@@ -437,8 +443,17 @@ export default function CommitteeApplication() {
         <div className="w-[80%] flex flex-col justify-center items-center">
           <form
             onSubmit={handleSubmit}
-            className="rounded-3xl sm:bg-white sm:shadow-[0_4px_4px_0_rgba(0,0,0,0.31)] p-10 md:p-16 lg:py-20 lg:px-24"
+            aria-busy={isProcessing}
+            className="relative rounded-3xl p-10 sm:bg-white sm:shadow-[0_4px_4px_0_rgba(0,0,0,0.31)] md:p-16 lg:px-24 lg:py-20"
           >
+            <FormProcessingOverlay
+              active={isProcessing}
+              label={processingLabel}
+            />
+            <fieldset
+              disabled={isProcessing}
+              className={`min-w-0 border-0 p-0 transition duration-200 ${isProcessing ? "opacity-45 grayscale" : "opacity-100"}`}
+            >
             <div className="text-3xl lg:text-4xl font-raleway font-semibold mb-2 lg:mb-4">
               <span className="text-black">Apply for </span>
               <span className="text-[#134687]">
@@ -845,6 +860,7 @@ export default function CommitteeApplication() {
                 )}
               </button>
             </div>
+            </fieldset>
           </form>
         </div>
       </section>
