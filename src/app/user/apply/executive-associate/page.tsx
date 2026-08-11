@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import Image from "next/image";
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
 import LoadingScreen from "@/components/LoadingScreen";
@@ -181,10 +182,10 @@ export default function AssistantApplication() {
               {/* Right Column - Role Information */}
               <div className="lg:w-[80%] flex flex-col items-center justify-center">
                 {selectedRole ? (
-                  <div className="lg:bg-white rounded-lg lg:border lg:border-gray-200">
-                    <div className="flex overflow-hidden items-center">
+                  <div className="overflow-hidden rounded-lg bg-white lg:border lg:border-gray-200">
+                    <div className="flex flex-col lg:flex-row lg:items-center">
                       {/* Left side - Text content */}
-                      <div className="lg:w-3/5  lg:p-4">
+                      <div className="order-2 w-full p-4 lg:order-1 lg:w-[64%]">
                         {(() => {
                           const role = roles.find((r) => r.id === selectedRole);
                           return role ? (
@@ -214,16 +215,37 @@ export default function AssistantApplication() {
                       </div>
 
                       {/* Right side - EB picture */}
-                      <div className="hidden w-2/5 lg:flex lg:h-80 overflow-hidden border border-gray-200 bg-linear-to-b from-blue-900 via-blue-90 to-[#2F7EE3] items-center justify-center">
-                        <span className="text-white font-poppins text-lg font-semibold text-center px-4">
-                          {(() => {
-                            const role = roles.find(
-                              (r) => r.id === selectedRole,
-                            );
-                            return role?.title || "EB Role";
-                          })()}
-                        </span>
-                      </div>
+                      {(() => {
+                        const role = roles.find((r) => r.id === selectedRole);
+                        return (
+                          <div className="relative order-1 flex h-64 w-full items-center justify-center overflow-hidden border-b border-gray-200 bg-[#102E57] lg:order-2 lg:h-80 lg:w-[36%] lg:border-b-0 lg:border-l">
+                            {role?.imageUrl ? (
+                              <>
+                                <Image
+                                  src={role.imageUrl}
+                                  alt=""
+                                  aria-hidden="true"
+                                  fill
+                                  sizes="(max-width: 1024px) 80vw, 32vw"
+                                  className="scale-110 object-cover object-center opacity-35 blur-xl"
+                                />
+                                <div className="absolute inset-0 bg-[#102E57]/20" />
+                                <Image
+                                  src={role.imageUrl}
+                                  alt={`${role.ebName || role.title} — ${role.title}`}
+                                  fill
+                                  sizes="(max-width: 1024px) 80vw, 32vw"
+                                  className="z-10 object-contain object-center"
+                                />
+                              </>
+                            ) : (
+                              <span className="px-4 text-center font-poppins text-lg font-semibold text-white">
+                                {role?.title || "EB Role"}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 ) : (

@@ -1,0 +1,2 @@
+ALTER TABLE "EBProfile"
+ADD COLUMN IF NOT EXISTS "imagePath" TEXT;

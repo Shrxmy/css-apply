@@ -4,6 +4,7 @@ import { swrFetcher } from "@/lib/swr-fetcher";
 
 type EbRole = (typeof fallbackRoles)[number] & {
   meetingLink?: string | null;
+  imageUrl?: string | null;
   schoolYear?: string | null;
 };
 
@@ -17,9 +18,10 @@ export function useEbRoles() {
     "/api/eb-roles",
     (url: string) => swrFetcher(url) as Promise<EbRolesResponse>,
   );
+  const roles: EbRole[] = data?.roles ?? fallbackRoles;
 
   return {
-    roles: data?.roles ?? fallbackRoles,
+    roles,
     activeCycle: data?.activeCycle ?? null,
     error,
     isLoading,

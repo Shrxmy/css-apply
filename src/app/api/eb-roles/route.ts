@@ -22,6 +22,7 @@ export async function GET() {
     let ebProfiles: Array<{
       position: string;
       meetingLink: string | null;
+      imagePath: string | null;
       user: { name: string };
     }>;
 
@@ -34,6 +35,7 @@ export async function GET() {
         select: {
           position: true,
           meetingLink: true,
+          imagePath: true,
           user: { select: { name: true } },
         },
       });
@@ -52,6 +54,7 @@ export async function GET() {
           select: {
             position: true,
             meetingLink: true,
+            imagePath: true,
             user: { select: { name: true } },
           },
         });
@@ -79,6 +82,9 @@ export async function GET() {
         ...role,
         ebName: profile?.user.name ? toTitleCase(profile.user.name) : "-",
         meetingLink: profile?.meetingLink || null,
+        imageUrl: profile?.imagePath
+          ? `/api/eb-roles/${encodeURIComponent(role.id)}/image?v=${encodeURIComponent(profile.imagePath)}`
+          : null,
         schoolYear: activeCycle?.schoolYear || null,
       };
     });

@@ -10,6 +10,7 @@ import useSWR from "swr";
 import { roles as ebRoles } from "@/data/ebRoles";
 import { committeeRoles } from "@/data/committeeRoles";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import FormProcessingOverlay from "@/components/FormProcessingOverlay";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -61,6 +62,14 @@ interface RecruitmentCycle {
   interviewStart: string;
   interviewEnd: string;
   isActive: boolean;
+}
+
+interface ActiveEbPictureProfile {
+  userId: string;
+  position: string;
+  roleId: string;
+  userName: string;
+  imageUrl: string | null;
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -133,6 +142,7 @@ function RoleDropdown({
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0 });
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const display = pendingRole || role;
 
   useEffect(() => {
@@ -143,9 +153,11 @@ function RoleDropdown({
   }, [open]);
 
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (buttonRef.current && !buttonRef.current.contains(e.target as Node))
-        setOpen(false);
+    const handler = (event: MouseEvent) => {
+      const target = event.target as Node;
+      const clickedButton = buttonRef.current?.contains(target);
+      const clickedMenu = menuRef.current?.contains(target);
+      if (!clickedButton && !clickedMenu) setOpen(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -162,6 +174,7 @@ function RoleDropdown({
     <>
       <button
         ref={buttonRef}
+        type="button"
         onClick={() => setOpen(!open)}
         className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-full transition-colors ${color[display] ?? color.user} ${pendingRole ? "ring-2 ring-[#FFBC2B]" : ""}`}
       >
@@ -180,12 +193,16 @@ function RoleDropdown({
       {open &&
         createPortal(
           <div
+            ref={menuRef}
+            role="menu"
             style={{ position: "fixed", top: pos.top, left: pos.left }}
-            className="z-[9999] min-w-30 rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+            className="z-[9999] min-w-30 rounded-lg bg-white py-1 shadow-lg"
           >
             {ROLE_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
+                type="button"
+                role="menuitem"
                 onClick={() => {
                   onChange(opt.value);
                   setOpen(false);
@@ -235,7 +252,7 @@ function UserAvatar({
 
   return (
     <div
-      className={`${sizeClass} rounded-full [background:linear-gradient(135deg,#044FAF,#134687)] flex items-center justify-center text-white font-bold shrink-0 font-mono`}
+      className={`${sizeClass} flex shrink-0 items-center justify-center rounded-full bg-[#134687] font-mono font-bold text-white`}
     >
       {name[0]?.toUpperCase() || "U"}
     </div>
@@ -336,7 +353,7 @@ export default function SuperAdminDashboard() {
       <div className="space-y-5">
         <div className="bg-white border border-[#005FD9]/10 rounded-xl p-6">
           <div className="flex items-center gap-3 mb-4">
-            <div className="h-10 w-10 rounded-lg [background:linear-gradient(135deg,#044FAF,#134687)] flex items-center justify-center">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#134687]">
               <div
                 className="w-5 h-5 text-white bg-current"
                 style={{
@@ -382,7 +399,7 @@ export default function SuperAdminDashboard() {
                 disabled={sending}
                 className="flex items-center gap-3 p-4 border border-[#005FD9]/15 rounded-lg hover:bg-[#F3F3FD] transition-colors text-left disabled:opacity-50"
               >
-                <div className="h-8 w-8 rounded-md [background:linear-gradient(135deg,#2F7EE3,#0349A2)] flex items-center justify-center shrink-0">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[#134687]">
                   <div
                     className="w-4 h-4 text-white bg-current"
                     style={{
@@ -425,12 +442,12 @@ export default function SuperAdminDashboard() {
     return null;
 
   return (
-    <div className="min-h-screen bg-[#F3F3FD] bg-[url('/assets/css-apply-static-images/assets/pictures/background.webp')] bg-cover bg-fixed">
+    <div className="min-h-screen bg-[#F4F7FB]">
       {/* Header */}
-      <div className="bg-white/80 backdrop-blur-sm border-b border-[#005FD9]/10 sticky top-0 z-30">
+      <div className="sticky top-0 z-30 bg-white/95 shadow-sm backdrop-blur-sm">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div className="rounded-[45px] text-white text-lg lg:text-2xl font-poppins font-medium px-6 py-2 text-center [background:linear-gradient(90deg,#2F7EE3_0%,#0349A2_100%)] w-fit">
+            <div className="w-fit rounded-xl bg-[#134687] px-5 py-2 text-center text-lg font-medium text-white font-poppins lg:text-2xl">
               Super Admin
             </div>
             <div className="flex items-center gap-4">
@@ -449,7 +466,7 @@ export default function SuperAdminDashboard() {
                   className="h-8 w-8 rounded-full object-cover border border-[#005FD9]/15"
                 />
               ) : (
-                <div className="h-8 w-8 rounded-full [background:linear-gradient(135deg,#044FAF,#134687)] flex items-center justify-center text-white text-xs font-bold">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#134687] text-xs font-bold text-white">
                   {session.user?.name?.[0]?.toUpperCase() || "A"}
                 </div>
               )}
@@ -465,10 +482,10 @@ export default function SuperAdminDashboard() {
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
-                className={`px-4 py-2 text-sm font-mono rounded-t-lg border-b-2 transition-colors ${
+                className={`rounded-lg px-4 py-2 text-sm font-mono transition-colors ${
                   activeTab === tab.key
-                    ? "border-[#044FAF] text-[#044FAF] bg-[#F3F3FD]"
-                    : "border-transparent text-[#134687]/40 hover:text-[#134687]/70 hover:bg-[#F3F3FD]/50"
+                    ? "bg-[#E8F2FF] text-[#134687]"
+                    : "text-[#134687]/45 hover:bg-[#F4F7FB] hover:text-[#134687]"
                 }`}
               >
                 {tab.label}
@@ -515,6 +532,7 @@ function UsersTab() {
   });
   const [pendingChanges, setPendingChanges] = useState<PendingChange[]>([]);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [isApplyingRoles, setIsApplyingRoles] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showEbForm, setShowEbForm] = useState(false);
   const [ebForm, setEbForm] = useState<EBProfileForm>({
@@ -524,6 +542,7 @@ function UsersTab() {
     isActive: true,
     meetingLink: "",
   });
+  const [isSavingEb, setIsSavingEb] = useState(false);
 
   const fetchUsers = useCallback(async (page: number) => {
     setLoading(true);
@@ -590,6 +609,12 @@ function UsersTab() {
     setFilteredUsers(filtered);
   }, [searchTerm, users, searchResults, isGlobalSearch]);
 
+  const closeEbForm = () => {
+    if (isSavingEb) return;
+    setShowEbForm(false);
+    setSelectedUser(null);
+  };
+
   const handleMakeEb = (user: User) => {
     setSelectedUser(user);
     setEbForm({
@@ -606,20 +631,27 @@ function UsersTab() {
 
   const handleSubmitEbProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSavingEb(true);
+
     try {
-      const res = await fetch("/api/admin/eb-profiles", {
+      const profileResponse = await fetch("/api/admin/eb-profiles", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(ebForm),
       });
-      if (res.ok) {
-        toast.success("EB profile saved");
-        setShowEbForm(false);
-        setSelectedUser(null);
-        fetchUsers(currentPage);
-      } else toast.error("Failed to save");
-    } catch {
-      toast.error("Error saving EB profile");
+      const profileResult = await profileResponse.json();
+      if (!profileResponse.ok) {
+        throw new Error(profileResult.error || "Failed to save EB profile");
+      }
+
+      toast.success("EB profile saved");
+      setShowEbForm(false);
+      setSelectedUser(null);
+      await fetchUsers(currentPage);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Error saving EB profile");
+    } finally {
+      setIsSavingEb(false);
     }
   };
 
@@ -645,34 +677,50 @@ function UsersTab() {
     oldRole: string,
     newRole: string,
   ) => {
-    const existing = pendingChanges.findIndex((c) => c.userId === userId);
-    if (existing >= 0) {
-      const updated = [...pendingChanges];
-      updated[existing] = { userId, oldRole, newRole };
-      setPendingChanges(updated);
-    } else {
-      setPendingChanges([...pendingChanges, { userId, oldRole, newRole }]);
-    }
-    setShowConfirmDialog(true);
+    const withoutUser = pendingChanges.filter((change) => change.userId !== userId);
+    const nextChanges =
+      newRole === oldRole
+        ? withoutUser
+        : [...withoutUser, { userId, oldRole, newRole }];
+
+    setPendingChanges(nextChanges);
+    setShowConfirmDialog(nextChanges.length > 0);
   };
 
   const confirmRoleChanges = async () => {
+    if (pendingChanges.length === 0 || isApplyingRoles) return;
+    setIsApplyingRoles(true);
+
     try {
-      await Promise.all(
-        pendingChanges.map((c) =>
+      const responses = await Promise.all(
+        pendingChanges.map((change) =>
           fetch("/api/admin/users/role", {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ userId: c.userId, role: c.newRole }),
+            body: JSON.stringify({
+              userId: change.userId,
+              role: change.newRole,
+            }),
           }),
         ),
       );
-      toast.success("Roles updated");
-      fetchUsers(currentPage);
+
+      const failedResponse = responses.find((response) => !response.ok);
+      if (failedResponse) {
+        const result = await failedResponse.json().catch(() => null);
+        throw new Error(result?.error || "Failed to update user role");
+      }
+
+      await fetchUsers(currentPage);
       setPendingChanges([]);
       setShowConfirmDialog(false);
-    } catch {
-      toast.error("Failed to update roles");
+      toast.success("Roles updated");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to update roles",
+      );
+    } finally {
+      setIsApplyingRoles(false);
     }
   };
 
@@ -693,10 +741,12 @@ function UsersTab() {
             {pendingChanges.length} pending role change(s)
           </span>
           <button
+            type="button"
             onClick={confirmRoleChanges}
-            className="text-xs font-medium text-white bg-[#044FAF] rounded-md px-3 py-1.5 hover:bg-[#0349A2] transition-colors"
+            disabled={isApplyingRoles}
+            className="rounded-md bg-[#134687] px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-[#0F376B] disabled:cursor-wait disabled:opacity-50"
           >
-            Apply
+            {isApplyingRoles ? "Applying..." : "Apply"}
           </button>
           <button
             onClick={() => {
@@ -979,14 +1029,26 @@ function UsersTab() {
       {/* EB Form Modal */}
       {showEbForm && selectedUser && (
         <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl border border-[#005FD9]/10">
+          <div className="relative max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl border border-[#005FD9]/10 bg-white p-6 shadow-xl">
             <h2 className="text-lg font-bold text-[#134687] font-poppins mb-1">
               {selectedUser.ebProfile ? "edit" : "assign"} eb profile
             </h2>
             <p className="text-sm text-[#134687]/50 mb-5 font-mono">
               {selectedUser.name}
             </p>
-            <form onSubmit={handleSubmitEbProfile} className="space-y-4">
+            <form
+              onSubmit={handleSubmitEbProfile}
+              className="relative space-y-4 rounded-lg"
+              aria-busy={isSavingEb}
+            >
+              <FormProcessingOverlay
+                active={isSavingEb}
+                label="Saving EB profile"
+              />
+              <fieldset
+                disabled={isSavingEb}
+                className={`space-y-4 transition ${isSavingEb ? "pointer-events-none opacity-45 grayscale" : ""}`}
+              >
               <div>
                 <label className="block text-xs font-semibold text-[#134687]/60 uppercase tracking-wider font-mono mb-1">
                   Position *
@@ -1075,12 +1137,13 @@ function UsersTab() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowEbForm(false)}
+                  onClick={closeEbForm}
                   className="px-4 py-2 text-sm font-medium text-[#134687] border border-[#005FD9]/15 rounded-lg hover:bg-[#F3F3FD] transition-colors"
                 >
                   cancel
                 </button>
               </div>
+              </fieldset>
             </form>
           </div>
         </div>
@@ -1114,10 +1177,12 @@ function UsersTab() {
             </div>
             <div className="flex gap-2">
               <button
+                type="button"
                 onClick={confirmRoleChanges}
-                className="flex-1 px-4 py-2 text-sm font-medium text-white [background:linear-gradient(90deg,#2F7EE3_0%,#0349A2_100%)] rounded-lg hover:opacity-90 transition-opacity"
+                disabled={isApplyingRoles}
+                className="flex-1 rounded-lg bg-[#134687] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#0F376B] disabled:cursor-wait disabled:opacity-50"
               >
-                Apply
+                {isApplyingRoles ? "Applying..." : "Apply"}
               </button>
               <button
                 onClick={() => {
@@ -1138,7 +1203,11 @@ function UsersTab() {
 
 // ─── Settings Tab ────────────────────────────────────────────────────────────
 
+type SettingsSection = "general" | "executive-board" | "recruitment";
+
 function SettingsTab() {
+  const [settingsSection, setSettingsSection] =
+    useState<SettingsSection>("general");
   const {
     data: cycleData,
     isLoading,
@@ -1170,6 +1239,20 @@ function SettingsTab() {
     { revalidateOnFocus: false },
   );
   const [savingAvailability, setSavingAvailability] = useState(false);
+  const {
+    data: ebPictureData,
+    isLoading: isEbPicturesLoading,
+    mutate: mutateEbPictures,
+  } = useSWR<{
+    profiles: ActiveEbPictureProfile[];
+    activeCycle: { id: string; schoolYear: string } | null;
+  }>("/api/admin/eb-profiles", swrFetcher, { revalidateOnFocus: false });
+  const [selectedEbPictures, setSelectedEbPictures] = useState<
+    Record<string, { file: File; previewUrl: string }>
+  >({});
+  const [savingEbPictureRole, setSavingEbPictureRole] = useState<string | null>(
+    null,
+  );
   const [selectedPaymentQr, setSelectedPaymentQr] = useState<File | null>(null);
   const [savingPaymentQr, setSavingPaymentQr] = useState(false);
   const [selectedReceiptTemplate, setSelectedReceiptTemplate] =
@@ -1313,6 +1396,94 @@ function SettingsTab() {
     }
   };
 
+  const handleEbPictureSelect = (
+    roleId: string,
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      toast.error("Select a JPEG, PNG, or WebP image");
+      event.target.value = "";
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Image must be 10MB or smaller");
+      event.target.value = "";
+      return;
+    }
+
+    const previousPreview = selectedEbPictures[roleId]?.previewUrl;
+    if (previousPreview) URL.revokeObjectURL(previousPreview);
+
+    setSelectedEbPictures((current) => ({
+      ...current,
+      [roleId]: { file, previewUrl: URL.createObjectURL(file) },
+    }));
+  };
+
+  const handleEbPictureUpload = async (profile: ActiveEbPictureProfile) => {
+    const selection = selectedEbPictures[profile.roleId];
+    if (!selection) return;
+
+    setSavingEbPictureRole(profile.roleId);
+    try {
+      const formData = new FormData();
+      formData.append("userId", profile.userId);
+      formData.append("file", selection.file);
+
+      const response = await fetch("/api/admin/eb-profiles/image", {
+        method: "POST",
+        body: formData,
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to upload EB picture");
+      }
+
+      URL.revokeObjectURL(selection.previewUrl);
+      setSelectedEbPictures((current) => {
+        const next = { ...current };
+        delete next[profile.roleId];
+        return next;
+      });
+      await mutateEbPictures();
+      toast.success(`${profile.position} picture updated`);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to upload EB picture",
+      );
+    } finally {
+      setSavingEbPictureRole(null);
+    }
+  };
+
+  const handleEbPictureRemove = async (profile: ActiveEbPictureProfile) => {
+    setSavingEbPictureRole(profile.roleId);
+    try {
+      const response = await fetch("/api/admin/eb-profiles/image", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: profile.userId }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to remove EB picture");
+      }
+
+      await mutateEbPictures();
+      toast.success(`${profile.position} picture removed`);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to remove EB picture",
+      );
+    } finally {
+      setSavingEbPictureRole(null);
+    }
+  };
+
   const handleToggleAvailability = async (roleId: string, enabled: boolean) => {
     const nextAvailability = { ...availability, [roleId]: enabled };
     mutateAvailability({ availability: nextAvailability }, false);
@@ -1414,9 +1585,60 @@ function SettingsTab() {
   const isEditing = !!editingId;
   const todayDate = new Date().toISOString().split("T")[0];
 
+  const settingsSections: Array<{
+    key: SettingsSection;
+    label: string;
+    description: string;
+  }> = [
+    { key: "general", label: "General", description: "Payments and links" },
+    {
+      key: "executive-board",
+      label: "Executive Board",
+      description: "Pictures and EA roles",
+    },
+    {
+      key: "recruitment",
+      label: "Recruitment",
+      description: "Cycles and interview dates",
+    },
+  ];
+
   return (
     <div className="space-y-5">
-      <div className="bg-white border border-[#005FD9]/10 rounded-xl p-6">
+      <nav
+        aria-label="Configuration sections"
+        className="sticky top-[132px] z-20 rounded-2xl bg-white/95 p-2 shadow-sm backdrop-blur-md"
+      >
+        <div className="flex gap-1 overflow-x-auto">
+          {settingsSections.map((section) => {
+            const active = settingsSection === section.key;
+            return (
+              <button
+                key={section.key}
+                type="button"
+                onClick={() => setSettingsSection(section.key)}
+                aria-current={active ? "page" : undefined}
+                className={`min-w-[150px] flex-1 rounded-xl px-4 py-3 text-left transition-colors ${
+                  active
+                    ? "bg-[#E8F2FF] text-[#134687]"
+                    : "text-[#134687]/55 hover:bg-[#F7F9FC] hover:text-[#134687]"
+                }`}
+              >
+                <span className="block text-sm font-semibold font-poppins">
+                  {section.label}
+                </span>
+                <span className="mt-0.5 block text-[10px] font-mono opacity-70">
+                  {section.description}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+
+      {settingsSection === "general" && (
+        <div className="space-y-5">
+      <div className="rounded-2xl bg-white/90 p-5 shadow-sm sm:p-6">
         <h2 className="text-sm font-bold text-[#134687] font-poppins mb-1">
           payment qr
         </h2>
@@ -1426,7 +1648,7 @@ function SettingsTab() {
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-[180px_1fr] gap-5 items-start">
-          <div className="border border-[#005FD9]/10 rounded-lg bg-[#F3F3FD]/40 min-h-[180px] flex items-center justify-center overflow-hidden">
+          <div className="flex min-h-[180px] items-center justify-center overflow-hidden rounded-xl bg-[#F7F9FC]">
             {isPaymentQrLoading ? (
               <LoadingSpinner label="Loading configuration" size="sm" />
             ) : paymentQrData?.url ? (
@@ -1460,7 +1682,7 @@ function SettingsTab() {
             <button
               type="submit"
               disabled={savingPaymentQr || !selectedPaymentQr}
-              className="px-6 py-2 text-sm font-medium text-white [background:linear-gradient(90deg,#2F7EE3_0%,#0349A2_100%)] rounded-lg hover:opacity-90 disabled:opacity-40 transition-opacity font-poppins"
+              className="rounded-lg bg-[#134687] px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-[#0F376B] disabled:opacity-40 font-poppins"
             >
               {savingPaymentQr ? "uploading..." : "upload qr"}
             </button>
@@ -1468,7 +1690,7 @@ function SettingsTab() {
         </div>
       </div>
 
-      <div className="bg-white border border-[#005FD9]/10 rounded-xl p-6">
+      <div className="rounded-2xl bg-white/90 p-5 shadow-sm sm:p-6">
         <h2 className="text-sm font-bold text-[#134687] font-poppins mb-1">
           payment acknowledgement receipt
         </h2>
@@ -1506,14 +1728,14 @@ function SettingsTab() {
           <button
             type="submit"
             disabled={savingReceiptTemplate || !selectedReceiptTemplate}
-            className="px-6 py-2 text-sm font-medium text-white [background:linear-gradient(90deg,#2F7EE3_0%,#0349A2_100%)] rounded-lg hover:opacity-90 disabled:opacity-40 transition-opacity font-poppins"
+            className="rounded-lg bg-[#134687] px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-[#0F376B] disabled:opacity-40 font-poppins"
           >
             {savingReceiptTemplate ? "uploading..." : "upload receipt pdf"}
           </button>
         </form>
       </div>
 
-      <div className="bg-white border border-[#005FD9]/10 rounded-xl p-6">
+      <div className="rounded-2xl bg-white/90 p-5 shadow-sm sm:p-6">
         <h2 className="text-sm font-bold text-[#134687] font-poppins mb-1">
           community link
         </h2>
@@ -1548,7 +1770,7 @@ function SettingsTab() {
               onChange={(e) =>
                 setCommunityForm({ ...communityForm, label: e.target.value })
               }
-              className="w-full border border-[#005FD9]/15 rounded-lg px-3 py-2 text-sm focus:ring-[#044FAF]/20 focus:border-[#044FAF]/40"
+              className="w-full rounded-xl border-0 bg-[#F7F9FC] px-3 py-2 text-sm ring-1 ring-inset ring-[#DCE4EE] outline-none focus:ring-2 focus:ring-[#044FAF]/25"
               placeholder="Join UST CSS Members 26'-27' Group"
             />
           </div>
@@ -1563,21 +1785,158 @@ function SettingsTab() {
               onChange={(e) =>
                 setCommunityForm({ ...communityForm, url: e.target.value })
               }
-              className="w-full border border-[#005FD9]/15 rounded-lg px-3 py-2 text-sm focus:ring-[#044FAF]/20 focus:border-[#044FAF]/40"
+              className="w-full rounded-xl border-0 bg-[#F7F9FC] px-3 py-2 text-sm ring-1 ring-inset ring-[#DCE4EE] outline-none focus:ring-2 focus:ring-[#044FAF]/25"
               placeholder="https://fb.me/g/..."
             />
           </div>
           <button
             type="submit"
             disabled={savingCommunity}
-            className="px-6 py-2 text-sm font-medium text-white [background:linear-gradient(90deg,#2F7EE3_0%,#0349A2_100%)] rounded-lg hover:opacity-90 disabled:opacity-40 transition-opacity font-poppins"
+            className="rounded-lg bg-[#134687] px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-[#0F376B] disabled:opacity-40 font-poppins"
           >
             {savingCommunity ? "saving..." : "save community link"}
           </button>
         </form>
       </div>
+        </div>
+      )}
 
-      <div className="bg-white border border-[#005FD9]/10 rounded-xl p-6">
+      {settingsSection === "executive-board" && (
+        <div className="space-y-5">
+      <div className="rounded-2xl bg-white/90 p-5 shadow-sm sm:p-6">
+        <h2 className="mb-1 text-sm font-bold text-[#134687] font-poppins">
+          executive board pictures
+        </h2>
+        <p className="mb-5 text-xs text-[#134687]/40 font-mono">
+          configure the active Executive Board pictures displayed to Executive
+          Associate applicants
+          {ebPictureData?.activeCycle?.schoolYear
+            ? ` for A.Y. ${ebPictureData.activeCycle.schoolYear}`
+            : ""}
+        </p>
+
+        {isEbPicturesLoading ? (
+          <div className="flex justify-center py-8">
+            <LoadingSpinner label="Loading EB pictures" size="sm" />
+          </div>
+        ) : !ebPictureData?.activeCycle ? (
+          <div className="rounded-xl bg-[#FFF4DA] p-4 text-xs text-[#5B4515]">
+            Create and activate a recruitment cycle before configuring EB
+            pictures.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {ebRoles.map((role) => {
+              const profile = ebPictureData.profiles.find(
+                (item) => item.roleId === role.id,
+              );
+              const selection = selectedEbPictures[role.id];
+              const previewUrl = selection?.previewUrl || profile?.imageUrl;
+              const isSavingPicture = savingEbPictureRole === role.id;
+
+              return (
+                <div
+                  key={role.id}
+                  className="relative overflow-hidden rounded-xl bg-white shadow-sm"
+                  aria-busy={isSavingPicture}
+                >
+                  <FormProcessingOverlay
+                    active={isSavingPicture}
+                    label="Updating picture"
+                  />
+                  <fieldset
+                    disabled={isSavingPicture}
+                    className={`flex min-w-0 gap-3 p-3 transition ${isSavingPicture ? "pointer-events-none opacity-45 grayscale" : ""}`}
+                  >
+                    <div className="relative h-28 w-22 shrink-0 overflow-hidden rounded-lg bg-[#134687]">
+                      {previewUrl ? (
+                        <Image
+                          src={previewUrl}
+                          alt={`${profile?.userName || role.title} picture preview`}
+                          fill
+                          unoptimized
+                          sizes="88px"
+                          className="object-cover object-top"
+                        />
+                      ) : (
+                        <div className="flex h-full items-center justify-center px-2 text-center text-[10px] font-semibold text-white font-poppins">
+                          {role.title}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex min-w-0 flex-1 flex-col justify-between gap-2 py-0.5">
+                      <div>
+                        <p className="line-clamp-2 text-xs font-semibold text-[#134687] font-poppins">
+                          {role.title}
+                        </p>
+                        <p className="truncate text-[10px] text-[#134687]/45 font-mono">
+                          {profile?.userName || "No active EB assigned"}
+                        </p>
+                      </div>
+
+                      {profile ? (
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <label className="inline-flex cursor-pointer rounded-md bg-[#E8F2FF] px-2.5 py-1.5 text-[10px] font-semibold text-[#044FAF] hover:bg-[#D9E9FF] focus-within:ring-2 focus-within:ring-[#044FAF]/30">
+                            choose
+                            <input
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp"
+                              onChange={(event) =>
+                                handleEbPictureSelect(role.id, event)
+                              }
+                              className="sr-only"
+                            />
+                          </label>
+                          {selection && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => handleEbPictureUpload(profile)}
+                                className="rounded-md bg-[#134687] px-2.5 py-1.5 text-[10px] font-semibold text-white hover:bg-[#0F376B]"
+                              >
+                                save
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  URL.revokeObjectURL(selection.previewUrl);
+                                  setSelectedEbPictures((current) => {
+                                    const next = { ...current };
+                                    delete next[role.id];
+                                    return next;
+                                  });
+                                }}
+                                className="rounded-md bg-[#F1F4F8] px-2.5 py-1.5 text-[10px] font-medium text-[#134687] hover:bg-[#E8EDF3]"
+                              >
+                                cancel
+                              </button>
+                            </>
+                          )}
+                          {!selection && profile.imageUrl && (
+                            <button
+                              type="button"
+                              onClick={() => handleEbPictureRemove(profile)}
+                              className="px-1 text-[10px] font-medium text-red-600 hover:text-red-700"
+                            >
+                              remove
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-[10px] leading-4 text-[#134687]/45">
+                          Assign this position in User DB first.
+                        </p>
+                      )}
+                    </div>
+                  </fieldset>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-2xl bg-white/90 p-5 shadow-sm sm:p-6">
         <div className="flex items-start justify-between gap-4 mb-5">
           <div>
             <h2 className="text-sm font-bold text-[#134687] font-poppins mb-1">
@@ -1607,10 +1966,10 @@ function SettingsTab() {
               return (
                 <label
                   key={role.id}
-                  className={`flex items-center justify-between gap-3 border rounded-lg px-4 py-3 cursor-pointer transition-colors ${
+                  className={`flex cursor-pointer items-center justify-between gap-3 rounded-xl px-4 py-3 transition-colors ${
                     enabled
-                      ? "border-[#044FAF]/20 bg-[#E8F2FF]/40"
-                      : "border-[#005FD9]/10 bg-white"
+                      ? "bg-[#E8F2FF]"
+                      : "bg-[#F7F9FC] hover:bg-[#EEF2F7]"
                   }`}
                 >
                   <div className="min-w-0">
@@ -1638,11 +1997,15 @@ function SettingsTab() {
           </div>
         )}
       </div>
+        </div>
+      )}
 
+      {settingsSection === "recruitment" && (
+        <div className="space-y-5">
       {/* Existing Cycles */}
       {allCycles.length > 0 && (
-        <div className="bg-white border border-[#005FD9]/10 rounded-xl overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-3 border-b border-[#005FD9]/10 bg-[#F3F3FD]/50">
+        <div className="overflow-hidden rounded-2xl bg-white/90 shadow-sm">
+          <div className="flex items-center justify-between bg-[#F7F9FC] px-5 py-3">
             <span className="text-xs font-semibold text-[#134687]/50 uppercase tracking-widest font-mono">
               saved_cycles
             </span>
@@ -1696,7 +2059,7 @@ function SettingsTab() {
       )}
 
       {/* Form */}
-      <div className="bg-white border border-[#005FD9]/10 rounded-xl p-6">
+      <div className="rounded-2xl bg-white/90 p-5 shadow-sm sm:p-6">
         <h2 className="text-sm font-bold text-[#134687] font-poppins mb-1">
           {isEditing ? "edit cycle" : "new cycle"}
         </h2>
@@ -1714,7 +2077,7 @@ function SettingsTab() {
               placeholder="e.g. 2025-2026"
               value={form.schoolYear}
               onChange={(e) => setForm({ ...form, schoolYear: e.target.value })}
-              className="w-full border border-[#005FD9]/15 rounded-lg px-3 py-2 text-sm font-mono focus:ring-[#044FAF]/20 focus:border-[#044FAF]/40"
+              className="w-full rounded-xl border-0 bg-[#F7F9FC] px-3 py-2 text-sm ring-1 ring-inset ring-[#DCE4EE] outline-none focus:ring-2 focus:ring-[#044FAF]/25 font-mono"
             />
           </div>
           <div>
@@ -1729,7 +2092,7 @@ function SettingsTab() {
               onChange={(e) =>
                 setForm({ ...form, applicationStart: e.target.value })
               }
-              className="w-full border border-[#005FD9]/15 rounded-lg px-3 py-2 text-sm focus:ring-[#044FAF]/20 focus:border-[#044FAF]/40"
+              className="w-full rounded-xl border-0 bg-[#F7F9FC] px-3 py-2 text-sm ring-1 ring-inset ring-[#DCE4EE] outline-none focus:ring-2 focus:ring-[#044FAF]/25"
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -1745,7 +2108,7 @@ function SettingsTab() {
                 onChange={(e) =>
                   setForm({ ...form, interviewStart: e.target.value })
                 }
-                className="w-full border border-[#005FD9]/15 rounded-lg px-3 py-2 text-sm focus:ring-[#044FAF]/20 focus:border-[#044FAF]/40"
+                className="w-full rounded-xl border-0 bg-[#F7F9FC] px-3 py-2 text-sm ring-1 ring-inset ring-[#DCE4EE] outline-none focus:ring-2 focus:ring-[#044FAF]/25"
               />
             </div>
             <div>
@@ -1760,7 +2123,7 @@ function SettingsTab() {
                 onChange={(e) =>
                   setForm({ ...form, interviewEnd: e.target.value })
                 }
-                className="w-full border border-[#005FD9]/15 rounded-lg px-3 py-2 text-sm focus:ring-[#044FAF]/20 focus:border-[#044FAF]/40"
+                className="w-full rounded-xl border-0 bg-[#F7F9FC] px-3 py-2 text-sm ring-1 ring-inset ring-[#DCE4EE] outline-none focus:ring-2 focus:ring-[#044FAF]/25"
               />
             </div>
           </div>
@@ -1777,7 +2140,7 @@ function SettingsTab() {
             <button
               type="submit"
               disabled={saving}
-              className="px-6 py-2 text-sm font-medium text-white [background:linear-gradient(90deg,#2F7EE3_0%,#0349A2_100%)] rounded-lg hover:opacity-90 disabled:opacity-40 transition-opacity font-poppins"
+              className="rounded-lg bg-[#134687] px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-[#0F376B] disabled:opacity-40 font-poppins"
             >
               {saving ? "saving..." : isEditing ? "update" : "create"}
             </button>
@@ -1785,7 +2148,7 @@ function SettingsTab() {
               <button
                 type="button"
                 onClick={handleNew}
-                className="px-6 py-2 text-sm font-medium text-[#134687] border border-[#005FD9]/15 rounded-lg hover:bg-[#F3F3FD] transition-colors"
+                className="rounded-lg bg-[#F1F4F8] px-6 py-2 text-sm font-medium text-[#134687] transition-colors hover:bg-[#E8EDF3]"
               >
                 cancel
               </button>
@@ -1795,7 +2158,7 @@ function SettingsTab() {
       </div>
 
       {/* Help */}
-      <div className="bg-[#E8F2FF]/50 border border-[#005FD9]/10 rounded-xl p-5">
+      <div className="rounded-2xl bg-[#E8F2FF]/55 p-5">
         <div className="text-xs font-mono text-[#134687]/60 space-y-1">
           <p>
             <span className="text-[#044FAF]">{"// "}</span>
@@ -1815,6 +2178,8 @@ function SettingsTab() {
           </p>
         </div>
       </div>
+        </div>
+      )}
     </div>
   );
 }
