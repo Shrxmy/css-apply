@@ -181,7 +181,7 @@ function RoleDropdown({
         createPortal(
           <div
             style={{ position: "fixed", top: pos.top, left: pos.left }}
-            className="z-9999g-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-30"
+            className="z-[9999] min-w-30 rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
           >
             {ROLE_OPTIONS.map((opt) => (
               <button
