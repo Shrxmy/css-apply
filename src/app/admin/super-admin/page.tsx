@@ -14,6 +14,24 @@ import FormProcessingOverlay from "@/components/FormProcessingOverlay";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+async function readApiResponse(response: Response) {
+  const text = await response.text();
+  if (!text) return {} as Record<string, unknown>;
+
+  try {
+    return JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    if (response.status === 413 || text.startsWith("Request En")) {
+      throw new Error("The selected file is too large for the upload service");
+    }
+    throw new Error("The server returned an invalid response. Please try again.");
+  }
+}
+
+function apiError(result: Record<string, unknown>, fallback: string) {
+  return typeof result.error === "string" ? result.error : fallback;
+}
+
 interface User {
   id: string;
   email: string;
@@ -1430,17 +1448,52 @@ function SettingsTab() {
 
     setSavingEbPictureRole(profile.roleId);
     try {
-      const formData = new FormData();
-      formData.append("userId", profile.userId);
-      formData.append("file", selection.file);
-
-      const response = await fetch("/api/admin/eb-profiles/image", {
+      const prepareResponse = await fetch("/api/admin/eb-profiles/image", {
         method: "POST",
-        body: formData,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "prepare",
+          userId: profile.userId,
+          fileType: selection.file.type,
+          fileSize: selection.file.size,
+        }),
       });
-      const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result.error || "Failed to upload EB picture");
+      const preparation = await readApiResponse(prepareResponse);
+      if (!prepareResponse.ok) {
+        throw new Error(apiError(preparation, "Failed to prepare EB picture upload"));
+      }
+
+      const imagePath = typeof preparation.imagePath === "string" ? preparation.imagePath : "";
+      const signedUrl = typeof preparation.signedUrl === "string" ? preparation.signedUrl : "";
+      if (!imagePath || !signedUrl) {
+        throw new Error("The upload service returned incomplete credentials");
+      }
+
+      const uploadBody = new FormData();
+      uploadBody.append("cacheControl", "3600");
+      uploadBody.append("", selection.file);
+      const uploadResponse = await fetch(signedUrl, {
+        method: "PUT",
+        headers: { "x-upsert": "false" },
+        body: uploadBody,
+      });
+      if (!uploadResponse.ok) {
+        throw new Error("Failed to transfer the EB picture to storage");
+      }
+
+      const completeResponse = await fetch("/api/admin/eb-profiles/image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "complete",
+          userId: profile.userId,
+          imagePath,
+          fileType: selection.file.type,
+        }),
+      });
+      const result = await readApiResponse(completeResponse);
+      if (!completeResponse.ok) {
+        throw new Error(apiError(result, "Failed to save EB picture"));
       }
 
       URL.revokeObjectURL(selection.previewUrl);
@@ -1468,9 +1521,9 @@ function SettingsTab() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: profile.userId }),
       });
-      const result = await response.json();
+      const result = await readApiResponse(response);
       if (!response.ok) {
-        throw new Error(result.error || "Failed to remove EB picture");
+        throw new Error(apiError(result, "Failed to remove EB picture"));
       }
 
       await mutateEbPictures();

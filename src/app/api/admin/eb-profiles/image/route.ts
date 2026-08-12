@@ -11,6 +11,12 @@ const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
 
 type AllowedImageType = (typeof ALLOWED_IMAGE_TYPES)[number];
 
+const EXTENSION_BY_TYPE: Record<AllowedImageType, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
+
 function isSuperAdmin(role?: string) {
   return role === "super_admin" || role === "super-admin";
 }
@@ -111,69 +117,93 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const formData = await request.formData();
-    const userId = formData.get("userId");
-    const file = formData.get("file");
-
-    if (typeof userId !== "string" || !(file instanceof File)) {
-      return NextResponse.json(
-        { error: "User and image are required" },
-        { status: 400 },
-      );
+    const body: unknown = await request.json();
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
 
-    if (!ALLOWED_IMAGE_TYPES.includes(file.type as AllowedImageType)) {
-      return NextResponse.json(
-        { error: "Only JPEG, PNG, and WebP images are allowed" },
-        { status: 400 },
-      );
-    }
-
-    if (file.size === 0 || file.size > MAX_IMAGE_SIZE) {
-      return NextResponse.json(
-        { error: "Image must be 10MB or smaller" },
-        { status: 400 },
-      );
+    const payload = body as Record<string, unknown>;
+    const action = payload.action;
+    const userId = typeof payload.userId === "string" ? payload.userId : "";
+    if (!userId || (action !== "prepare" && action !== "complete")) {
+      return NextResponse.json({ error: "Invalid upload request" }, { status: 400 });
     }
 
     const profile = await prisma.eBProfile.findUnique({
       where: { userId },
       select: { id: true, imagePath: true },
     });
-
     if (!profile) {
       return NextResponse.json({ error: "EB profile not found" }, { status: 404 });
     }
 
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    if (!hasValidImageSignature(bytes, file.type as AllowedImageType)) {
-      return NextResponse.json(
-        { error: "The selected file is not a valid image" },
-        { status: 400 },
-      );
-    }
-
     await ensureBucket();
 
-    const extensionByType: Record<AllowedImageType, string> = {
-      "image/jpeg": "jpg",
-      "image/png": "png",
-      "image/webp": "webp",
-    };
-    const extension = extensionByType[file.type as AllowedImageType];
-    const imagePath = `profiles/${profile.id}/${randomUUID()}.${extension}`;
+    if (action === "prepare") {
+      const fileType = typeof payload.fileType === "string" ? payload.fileType : "";
+      const fileSize = typeof payload.fileSize === "number" ? payload.fileSize : 0;
+      if (!ALLOWED_IMAGE_TYPES.includes(fileType as AllowedImageType)) {
+        return NextResponse.json(
+          { error: "Only JPEG, PNG, and WebP images are allowed" },
+          { status: 400 },
+        );
+      }
+      if (!Number.isSafeInteger(fileSize) || fileSize <= 0 || fileSize > MAX_IMAGE_SIZE) {
+        return NextResponse.json(
+          { error: "Image must be 10MB or smaller" },
+          { status: 400 },
+        );
+      }
 
-    const { error: uploadError } = await supabase.storage
-      .from(BUCKET_NAME)
-      .upload(imagePath, bytes, {
-        cacheControl: "3600",
-        contentType: file.type,
-        upsert: false,
+      const extension = EXTENSION_BY_TYPE[fileType as AllowedImageType];
+      const imagePath = `profiles/${profile.id}/${randomUUID()}.${extension}`;
+      const { data, error } = await supabase.storage
+        .from(BUCKET_NAME)
+        .createSignedUploadUrl(imagePath);
+
+      if (error || !data) {
+        console.error("EB signed upload creation failed");
+        return NextResponse.json(
+          { error: "Unable to prepare image upload" },
+          { status: 500 },
+        );
+      }
+
+      return NextResponse.json({
+        imagePath,
+        signedUrl: data.signedUrl,
       });
+    }
 
-    if (uploadError) {
-      console.error("EB image upload failed");
-      return NextResponse.json({ error: "Failed to upload image" }, { status: 500 });
+    const imagePath = typeof payload.imagePath === "string" ? payload.imagePath : "";
+    const fileType = typeof payload.fileType === "string" ? payload.fileType : "";
+    const expectedPrefix = `profiles/${profile.id}/`;
+    if (
+      !imagePath.startsWith(expectedPrefix) ||
+      imagePath.includes("..") ||
+      !ALLOWED_IMAGE_TYPES.includes(fileType as AllowedImageType) ||
+      !imagePath.endsWith(`.${EXTENSION_BY_TYPE[fileType as AllowedImageType]}`)
+    ) {
+      return NextResponse.json({ error: "Invalid uploaded image" }, { status: 400 });
+    }
+
+    const storage = supabase.storage.from(BUCKET_NAME);
+    const { data: uploadedImage, error: downloadError } = await storage.download(imagePath);
+    if (downloadError || !uploadedImage) {
+      return NextResponse.json({ error: "Uploaded image was not found" }, { status: 400 });
+    }
+
+    const bytes = new Uint8Array(await uploadedImage.arrayBuffer());
+    if (
+      bytes.length === 0 ||
+      bytes.length > MAX_IMAGE_SIZE ||
+      !hasValidImageSignature(bytes, fileType as AllowedImageType)
+    ) {
+      await storage.remove([imagePath]);
+      return NextResponse.json(
+        { error: "The uploaded file is not a valid image" },
+        { status: 400 },
+      );
     }
 
     try {
@@ -182,14 +212,12 @@ export async function POST(request: NextRequest) {
         data: { imagePath },
       });
     } catch (error) {
-      await supabase.storage.from(BUCKET_NAME).remove([imagePath]);
+      await storage.remove([imagePath]);
       throw error;
     }
 
     if (profile.imagePath && profile.imagePath !== imagePath) {
-      const { error: removeError } = await supabase.storage
-        .from(BUCKET_NAME)
-        .remove([profile.imagePath]);
+      const { error: removeError } = await storage.remove([profile.imagePath]);
       if (removeError) console.error("Previous EB image cleanup failed");
     }
 
@@ -198,6 +226,9 @@ export async function POST(request: NextRequest) {
       imageUrl: `/api/admin/eb-profiles/image?userId=${encodeURIComponent(userId)}&v=${encodeURIComponent(imagePath)}`,
     });
   } catch (error) {
+    if (error instanceof SyntaxError) {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
     console.error(
       "Update EB image failed",
       error instanceof Error ? error.name : "UnknownError",
