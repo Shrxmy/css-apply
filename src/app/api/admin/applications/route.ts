@@ -6,6 +6,9 @@ import { Prisma } from "@prisma/client";
 import { sendEmail, emailTemplates } from "@/lib/email";
 import { committeeRoles } from "@/data/committeeRoles";
 import { ensureCycleMemberId } from "@/lib/member-id";
+import { createLogger } from "@/lib/logger";
+
+const applicationsLogger = createLogger("api/admin/applications");
 
 const normalizeCommitteeId = (value: string) => {
   const normalizedValue = value.toLowerCase().replace(/&/g, "and");
@@ -495,7 +498,7 @@ export async function GET(request: NextRequest) {
       applications: [],
     });
   } catch (error) {
-    console.error("Error fetching applications:", error);
+    applicationsLogger.error("application query failed", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },
@@ -550,9 +553,6 @@ export async function DELETE(_request: NextRequest) {
           where: { id: committeeApp.id },
         });
         cleanedCount++;
-        console.log(
-          `Cleaned up orphaned committee application for student: ${committeeApp.studentNumber}`,
-        );
       }
     }
 
@@ -562,7 +562,7 @@ export async function DELETE(_request: NextRequest) {
       cleanedCount,
     });
   } catch (error) {
-    console.error("Error cleaning up orphaned records:", error);
+    applicationsLogger.error("orphan cleanup failed", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },
@@ -668,11 +668,8 @@ export async function PUT(request: NextRequest) {
               emailTemplate.subject,
               emailTemplate.html,
             );
-            console.log(
-              `Acceptance email sent to ${updatedApplication.user.email} for member application`,
-            );
           } catch (emailError) {
-            console.error("Failed to send acceptance email:", emailError);
+            applicationsLogger.error("acceptance email failed", emailError);
             // Don't fail the request if email fails
           }
         }
@@ -769,9 +766,6 @@ export async function PUT(request: NextRequest) {
               emailTemplate.subject,
               emailTemplate.html,
             );
-            console.log(
-              `Acceptance email sent to ${updatedApplication.user.email} for committee application`,
-            );
           } else if (
             action === "reject" &&
             updatedApplication?.firstOptionCommittee
@@ -784,9 +778,6 @@ export async function PUT(request: NextRequest) {
               updatedApplication.user.email,
               emailTemplate.subject,
               emailTemplate.html,
-            );
-            console.log(
-              `Rejection email sent to ${updatedApplication.user.email} for committee application`,
             );
           } else if (
             action === "redirect" &&
@@ -804,9 +795,6 @@ export async function PUT(request: NextRequest) {
                 updatedApplication.user.email,
                 emailTemplate.subject,
                 emailTemplate.html,
-              );
-              console.log(
-                `Member redirection email sent to ${updatedApplication.user.email} for committee application`,
               );
             } else {
               // Check if redirecting to an EA role
@@ -826,9 +814,6 @@ export async function PUT(request: NextRequest) {
                   emailTemplate.subject,
                   emailTemplate.html,
                 );
-                console.log(
-                  `EA redirection email sent to ${updatedApplication.user.email} for committee application (redirected to ${eaRole.title})`,
-                );
               } else {
                 // Regular committee redirection (to another committee)
                 const emailTemplate = emailTemplates.committeeRedirected(
@@ -843,14 +828,11 @@ export async function PUT(request: NextRequest) {
                   emailTemplate.subject,
                   emailTemplate.html,
                 );
-                console.log(
-                  `Redirect email sent to ${updatedApplication.user.email} for committee application (redirected to ${redirection})`,
-                );
               }
             }
           }
         } catch (emailError) {
-          console.error("Failed to send email:", emailError);
+          applicationsLogger.error("application email failed", emailError);
         }
       }
     } else if (type === "executive-associate") {
@@ -887,12 +869,9 @@ export async function PUT(request: NextRequest) {
                 redirection: currentApplication.redirection,
               },
             });
-            console.log(
-              `Cleaned up committee application record for accepted EA application: ${currentApplication.studentNumber}`,
-            );
           } catch (error) {
-            console.error(
-              "Error cleaning up committee application record:",
+            applicationsLogger.error(
+              "redirected application cleanup failed",
               error,
             );
             // Don't fail the request if cleanup fails
@@ -915,12 +894,9 @@ export async function PUT(request: NextRequest) {
                 redirection: currentApplication.redirection,
               },
             });
-            console.log(
-              `Cleaned up committee application record for rejected EA application: ${currentApplication.studentNumber}`,
-            );
           } catch (error) {
-            console.error(
-              "Error cleaning up committee application record:",
+            applicationsLogger.error(
+              "redirected application cleanup failed",
               error,
             );
             // Don't fail the request if cleanup fails
@@ -986,9 +962,6 @@ export async function PUT(request: NextRequest) {
               emailTemplate.subject,
               emailTemplate.html,
             );
-            console.log(
-              `Acceptance email sent to ${updatedApplication.user.email} for EA application`,
-            );
           } else if (action === "reject" && updatedApplication?.ebRole) {
             const emailTemplate = emailTemplates.executiveAssistantRejected(
               updatedApplication.user.name,
@@ -998,9 +971,6 @@ export async function PUT(request: NextRequest) {
               updatedApplication.user.email,
               emailTemplate.subject,
               emailTemplate.html,
-            );
-            console.log(
-              `Rejection email sent to ${updatedApplication.user.email} for EA application`,
             );
           } else if (
             action === "redirect" &&
@@ -1020,9 +990,6 @@ export async function PUT(request: NextRequest) {
                 emailTemplate.subject,
                 emailTemplate.html,
               );
-              console.log(
-                `Member redirection email sent to ${updatedApplication.user.email} for EA application`,
-              );
             } else if (redirection.startsWith("committee-")) {
               const committeeId = redirection.replace("committee-", "");
               const emailTemplate =
@@ -1037,9 +1004,6 @@ export async function PUT(request: NextRequest) {
                 emailTemplate.subject,
                 emailTemplate.html,
               );
-              console.log(
-                `Committee redirection email sent to ${updatedApplication.user.email} for EA application (redirected to ${committeeId})`,
-              );
             } else {
               // Regular EA to EA redirection
               const emailTemplate = emailTemplates.executiveAssistantRedirected(
@@ -1053,13 +1017,10 @@ export async function PUT(request: NextRequest) {
                 emailTemplate.subject,
                 emailTemplate.html,
               );
-              console.log(
-                `EA redirection email sent to ${updatedApplication.user.email} for EA application (redirected to ${redirection})`,
-              );
             }
           }
         } catch (emailError) {
-          console.error("Failed to send email:", emailError);
+          applicationsLogger.error("application email failed", emailError);
           // Don't fail the request if email fails
         }
       }
@@ -1070,13 +1031,18 @@ export async function PUT(request: NextRequest) {
       );
     }
 
+    applicationsLogger.info("application action completed", {
+      type,
+      action,
+    });
+
     return NextResponse.json({
       success: true,
       application: updatedApplication,
       message: `Application ${action}ed successfully`,
     });
   } catch (error) {
-    console.error("Error updating application:", error);
+    applicationsLogger.error("application action failed", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

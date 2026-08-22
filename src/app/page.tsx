@@ -10,6 +10,10 @@ import { Icon } from "@iconify/react";
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
+import { createLogger } from "@/lib/logger";
+import useSWR from "swr";
+
+const loginLogger = createLogger("login");
 
 function HomeContent() {
   // Auth button state and handler (migrated from old LoginButton)
@@ -27,7 +31,9 @@ function HomeContent() {
       });
 
       if (result?.error) {
-        console.error("Sign-in error:", result.error);
+        loginLogger.warn("provider rejected sign-in", {
+          reason: result.error,
+        });
         // Redirect to error page with error details
         router.push(`/auth/error?error=${encodeURIComponent(result.error)}`);
       } else if (result?.ok) {
@@ -37,7 +43,7 @@ function HomeContent() {
         }, 100);
       }
     } catch (error) {
-      console.error("Sign-in error:", error);
+      loginLogger.error("sign-in request failed", error);
       router.push(`/auth/error?error=Default`);
     } finally {
       setIsLoggingIn(false);
@@ -53,7 +59,9 @@ function HomeContent() {
       });
 
       if (result?.error) {
-        console.error("Sign-in error:", result.error);
+        loginLogger.warn("provider rejected sign-in", {
+          reason: result.error,
+        });
         router.push(`/auth/error?error=${encodeURIComponent(result.error)}`);
       } else if (result?.ok) {
         // Wait a moment for session to be established
@@ -62,7 +70,7 @@ function HomeContent() {
         }, 100);
       }
     } catch (error) {
-      console.error("Sign-in error:", error);
+      loginLogger.error("sign-in request failed", error);
       router.push(`/auth/error?error=Default`);
     } finally {
       setIsLoggingIn(false);
@@ -126,57 +134,19 @@ function HomeContent() {
     },
   ];
 
-  const partnerLogos: Array<{
-    src: string;
-    alt: string;
-    size: string;
-    facebookUrl: string;
-    shape?: string;
-  }> = [
-    {
-      src: "/assets/css-apply-static-images/assets/partners/BiteSlice.webp",
-      alt: "BiteSlice",
-      size: "h-20 w-20",
-      facebookUrl: "https://www.facebook.com/profile.php?id=100064060713967",
-    },
-    {
-      src: "/assets/css-apply-static-images/assets/partners/HomeRoom.webp",
-      alt: "HomeRoom",
-      size: "h-20 w-20",
-      facebookUrl: "https://www.facebook.com/homeroomcoworkingph",
-    },
-    {
-      src: "/assets/css-apply-static-images/assets/partners/MindZone.webp",
-      alt: "MindZone",
-      size: "h-20 w-20",
-      facebookUrl: "https://www.facebook.com/mindzoneespanaph",
-    },
-    {
-      src: "/assets/css-apply-static-images/assets/partners/NomuCafe.webp",
-      alt: "NomuCafe",
-      size: "h-20 w-20",
-      facebookUrl: "https://www.facebook.com/nomuPH",
-    },
-
-    {
-      src: "/assets/css-apply-static-images/assets/partners/TheCatalyst.webp",
-      alt: "TheCatalyst",
-      size: "h-28 w-28",
-      facebookUrl: "https://www.facebook.com/coworking.thecatalyst",
-    },
-    {
-      src: "/assets/css-apply-static-images/assets/partners/Yorokobi.webp",
-      alt: "Yorokobi",
-      size: "h-20 w-20",
-      facebookUrl: "https://www.facebook.com/yorokobimnl",
-    },
-    {
-      src: "/assets/css-apply-static-images/assets/partners/ZeroCafe.webp",
-      alt: "ZeroCafe",
-      size: "h-20 w-20",
-      facebookUrl: "https://www.facebook.com/ZeroCafePH",
-    },
-  ];
+  const { data: exclusivePerksData, isLoading: areExclusivePerksLoading } =
+    useSWR<{
+      items: Array<{
+        id: string;
+        name: string;
+        destinationUrl: string;
+        imageUrl: string;
+        shape: "circle" | "rounded";
+        fit: "cover" | "contain";
+        size: "standard" | "large";
+      }>;
+    }>("/api/exclusive-perks");
+  const partnerLogos = exclusivePerksData?.items ?? [];
 
   const scrollToNextSection = () => {
     const nextSection = document.getElementById("about-css-section");
@@ -558,52 +528,62 @@ function HomeContent() {
         </div>
       </section>
 
-      <section id="perks-section" className="h-60 overflow-hidden">
-        {/* Title */}
-        <div className="flex justify-center">
-          <p className="font-inter font-bold text-lg md:text-2xl xl:text-3xl">
-            🎉Enjoy Exclusive Perks🎉
-          </p>
-        </div>
-
-        {/* Partners container */}
-        <div className="flex justify-center mt-8">
-          <div className="w-[90%] flex justify-center items-center overflow-x-auto gap-4 md:gap-6 lg:gap-8 pb-3">
-            {partnerLogos.map((partner) => (
-              <a
-                key={partner.alt}
-                href={partner.facebookUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`${partner.size} ${
-                  partner.shape || "rounded-full"
-                } shrink-0 overflow-hidden bg-white cursor-pointer transition-all duration-300 ease-in-out hover:scale-110 hover:shadow-lg hover:shadow-blue-500/25 ${
-                  partner.shape === "rounded-lg"
-                    ? "p-2 flex items-center justify-center"
-                    : ""
-                }`}
-              >
-                <Image
-                  src={partner.src}
-                  alt={partner.alt}
-                  width={partner.size.includes("h-28") ? 100 : 80}
-                  height={partner.size.includes("h-28") ? 100 : 80}
-                  className={`w-full h-full transition-transform duration-300 ease-in-out hover:scale-105 ${
-                    partner.alt === "ZeroCafe"
-                      ? "object-contain"
-                      : partner.shape === "rounded-lg"
-                        ? "object-contain"
-                        : "object-cover"
-                  }`}
-                />
-              </a>
-            ))}
+      {(areExclusivePerksLoading || partnerLogos.length > 0) && (
+        <section id="perks-section" className="h-60 overflow-hidden">
+          <div className="flex justify-center">
+            <p className="font-inter text-lg font-bold md:text-2xl xl:text-3xl">
+              🎉Enjoy Exclusive Perks🎉
+            </p>
           </div>
-        </div>
-        <div className="flex justify-center">
-          <p className="font-inter font-semibold text-sm  ">and many more!</p>
-        </div>
-      </section>
+
+          <div className="mt-8 flex justify-center">
+            <div className="flex w-[90%] items-center justify-center gap-4 overflow-x-auto pb-3 md:gap-6 lg:gap-8">
+              {areExclusivePerksLoading
+                ? Array.from({ length: 7 }, (_, index) => (
+                    <div
+                      key={index}
+                      aria-hidden="true"
+                      className="h-20 w-20 shrink-0 animate-pulse rounded-full bg-[#E8F2FF]"
+                    />
+                  ))
+                : partnerLogos.map((partner) => {
+                    const isLarge = partner.size === "large";
+                    const isRounded = partner.shape === "rounded";
+                    return (
+                      <a
+                        key={partner.id}
+                        href={partner.destinationUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={`Visit ${partner.name}`}
+                        className={`${isLarge ? "h-28 w-28" : "h-20 w-20"} ${
+                          isRounded ? "rounded-lg p-2" : "rounded-full"
+                        } flex shrink-0 cursor-pointer items-center justify-center overflow-hidden bg-white transition-all duration-300 ease-in-out hover:scale-110 hover:shadow-lg hover:shadow-blue-500/25`}
+                      >
+                        <Image
+                          src={partner.imageUrl}
+                          alt={`${partner.name} logo`}
+                          width={isLarge ? 112 : 80}
+                          height={isLarge ? 112 : 80}
+                          unoptimized
+                          className={`h-full w-full transition-transform duration-300 ease-in-out hover:scale-105 ${
+                            partner.fit === "contain"
+                              ? "object-contain"
+                              : "object-cover"
+                          }`}
+                        />
+                      </a>
+                    );
+                  })}
+            </div>
+          </div>
+          {!areExclusivePerksLoading && (
+            <div className="flex justify-center">
+              <p className="font-inter text-sm font-semibold">and many more!</p>
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Mobile View */}
       <section id="expect-section" className="lg:hidden overflow-hidden">

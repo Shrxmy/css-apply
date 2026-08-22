@@ -38,19 +38,24 @@ model User {
 }
 
 model MemberApplication {
-  id                 String            @id @default(cuid())
-  studentNumber      String
-  user               User              @relation(fields: [studentNumber], references: [studentNumber], onDelete: Cascade)
-  recruitmentCycleId String?
-  recruitmentCycle   RecruitmentCycle? @relation(fields: [recruitmentCycleId], references: [id], onDelete: SetNull)
-  paymentProof       String
-  hasAccepted        Boolean           @default(false)
-  createdAt          DateTime          @default(now())
-  updatedAt          DateTime          @updatedAt
+  id                     String            @id @default(cuid())
+  studentNumber          String
+  user                   User              @relation(fields: [studentNumber], references: [studentNumber], onDelete: Cascade)
+  recruitmentCycleId     String?
+  recruitmentCycle       RecruitmentCycle? @relation(fields: [recruitmentCycleId], references: [id], onDelete: SetNull)
+  paymentProof           String
+  paymentStatus          String            @default("not_submitted")
+  paymentReviewedAt      DateTime?
+  paymentReviewedBy      String?
+  paymentRejectionReason String?
+  hasAccepted            Boolean           @default(false)
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
 
   @@unique([studentNumber, recruitmentCycleId])
   @@index([hasAccepted])
   @@index([recruitmentCycleId])
+  @@index([recruitmentCycleId, paymentStatus])
 }
 
 model Membership {
@@ -88,6 +93,10 @@ model ExecutiveAssociateApplication {
   secondOptionEb         String
   cv                     String
   paymentProof           String?
+  paymentStatus          String            @default("not_submitted")
+  paymentReviewedAt      DateTime?
+  paymentReviewedBy      String?
+  paymentRejectionReason String?
   supabaseFilePath       String?
   interviewSlotDay       String?
   interviewSlotTimeStart String?
@@ -106,6 +115,7 @@ model ExecutiveAssociateApplication {
   @@index([hasAccepted])
   @@index([hasFinishedInterview])
   @@index([recruitmentCycleId])
+  @@index([recruitmentCycleId, paymentStatus])
   @@map("EAApplication")
 }
 
@@ -120,6 +130,10 @@ model CommitteeApplication {
   portfolioLink          String?
   cv                     String
   paymentProof           String?
+  paymentStatus          String            @default("not_submitted")
+  paymentReviewedAt      DateTime?
+  paymentReviewedBy      String?
+  paymentRejectionReason String?
   supabaseFilePath       String?
   interviewSlotDay       String?
   interviewSlotTimeStart String?
@@ -138,6 +152,7 @@ model CommitteeApplication {
   @@index([hasAccepted])
   @@index([hasFinishedInterview])
   @@index([recruitmentCycleId])
+  @@index([recruitmentCycleId, paymentStatus])
 }
 
 model AvailableEBInterviewTime {

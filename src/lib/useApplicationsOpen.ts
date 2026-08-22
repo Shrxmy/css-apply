@@ -3,7 +3,7 @@ import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { swrFetcher } from "@/lib/swr-fetcher";
 
-interface ActiveRecruitmentCycleResponse {
+interface ApplicationBootstrapResponse {
   activeCycle: {
     applicationStart: string;
     interviewEnd: string;
@@ -22,10 +22,13 @@ const getTodayDateOnlyTimestamp = () => {
 
 export function useApplicationsOpenState(redirectTo?: string) {
   const router = useRouter();
-  const { data, error, isLoading } = useSWR<ActiveRecruitmentCycleResponse>(
-    "/api/recruitment-cycle/active",
-    (url: string) => swrFetcher(url) as Promise<ActiveRecruitmentCycleResponse>,
-    { revalidateOnFocus: false },
+  // Share the same bootstrap request used by useApplicationStatus. This avoids
+  // a second authenticated API call and duplicate active-cycle query whenever
+  // an application page opens.
+  const { data, error, isLoading } = useSWR<ApplicationBootstrapResponse>(
+    "/api/applications/check-existing",
+    (url: string) => swrFetcher(url) as Promise<ApplicationBootstrapResponse>,
+    { revalidateOnFocus: false, dedupingInterval: 10000 },
   );
 
   const activeCycle = data?.activeCycle ?? null;

@@ -10,7 +10,20 @@ import useSWR from "swr";
 import { roles as ebRoles } from "@/data/ebRoles";
 import { committeeRoles } from "@/data/committeeRoles";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import AdminContentLoading from "@/components/AdminContentLoading";
 import FormProcessingOverlay from "@/components/FormProcessingOverlay";
+import MobileSidebar from "@/components/AdminMobileSB";
+import SidebarContent from "@/components/AdminSidebar";
+import {
+  EXCLUSIVE_PERK_IMAGE_TYPES,
+  MAX_EXCLUSIVE_PERK_IMAGE_SIZE,
+} from "@/lib/exclusive-perks";
+import type {
+  ExclusivePerkFit,
+  ExclusivePerkResponseItem,
+  ExclusivePerkShape,
+  ExclusivePerkSize,
+} from "@/lib/exclusive-perks";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -134,15 +147,29 @@ const swrFetcher = (url: string) => fetch(url).then((r) => r.json());
 
 // ─── Components ──────────────────────────────────────────────────────────────
 
-function StatCard({ label, value }: { label: string; value: number }) {
+function StatCard({
+  label,
+  value,
+  isLoading = false,
+}: {
+  label: string;
+  value: number;
+  isLoading?: boolean;
+}) {
   return (
-    <div className="bg-white rounded-lg p-4 border border-[#005FD9]/10">
-      <p className="text-[10px] font-medium text-[#134687]/50 uppercase tracking-widest font-mono">
+    <div className="rounded-lg border border-[#005FD9]/10 bg-white p-4">
+      <p className="text-[10px] font-medium uppercase tracking-widest text-[#134687]/50 font-mono">
         {label}
       </p>
-      <p className="text-2xl font-bold text-[#044FAF] font-mono mt-1">
-        {value}
-      </p>
+      <div className="mt-1 flex h-8 items-center">
+        {isLoading ? (
+          <LoadingSpinner label={`Loading ${label}`} size="sm" />
+        ) : (
+          <p className="text-2xl font-bold text-[#044FAF] font-mono">
+            {value}
+          </p>
+        )}
+      </div>
     </div>
   );
 }
@@ -279,13 +306,56 @@ function UserAvatar({
 
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
-type Tab = "users" | "settings";
+type Tab = "users" | "settings" | "email";
+type SettingsSection = "general" | "executive-board" | "recruitment";
+
+const isTab = (value: string | null): value is Tab =>
+  value === "users" || value === "settings" || value === "email";
+
+const isSettingsSection = (value: string | null): value is SettingsSection =>
+  value === "general" ||
+  value === "executive-board" ||
+  value === "recruitment";
 
 export default function SuperAdminDashboard() {
   const [activeTab, setActiveTab] = useState<Tab>("users");
+  const [settingsSection, setSettingsSection] =
+    useState<SettingsSection>("general");
+  const [isLocationReady, setIsLocationReady] = useState(false);
   const { data: session, status } = useSession();
   const router = useRouter();
-  const sessionImage = (session?.user as { image?: string } | undefined)?.image;
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const savedTab = params.get("tab");
+    const savedSection = params.get("section");
+
+    if (isTab(savedTab)) setActiveTab(savedTab);
+    if (isSettingsSection(savedSection)) setSettingsSection(savedSection);
+    setIsLocationReady(true);
+  }, []);
+
+  const updateManagementLocation = useCallback(
+    (tab: Tab, section: SettingsSection = settingsSection) => {
+      setActiveTab(tab);
+      if (tab === "settings") setSettingsSection(section);
+
+      const url = new URL(window.location.href);
+      url.searchParams.set("tab", tab);
+      if (tab === "settings") url.searchParams.set("section", section);
+      else url.searchParams.delete("section");
+      window.history.replaceState(window.history.state, "", url);
+    },
+    [settingsSection],
+  );
+
+  const updateSettingsSection = useCallback((section: SettingsSection) => {
+    setSettingsSection(section);
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", "settings");
+    url.searchParams.set("section", section);
+    window.history.replaceState(window.history.state, "", url);
+  }, []);
 
   useEffect(() => {
     if (status === "loading") return;
@@ -299,7 +369,7 @@ export default function SuperAdminDashboard() {
     }
   }, [status, session, router]);
 
-  if (status === "loading") {
+  if (status === "loading" || !isLocationReady) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F3F3FD]">
         <LoadingSpinner label="Loading" size="lg" />
@@ -460,50 +530,40 @@ export default function SuperAdminDashboard() {
     return null;
 
   return (
-    <div className="min-h-screen bg-[#F4F7FB]">
-      {/* Header */}
-      <div className="sticky top-0 z-30 bg-white/95 shadow-sm backdrop-blur-sm">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div className="w-fit rounded-xl bg-[#134687] px-5 py-2 text-center text-lg font-medium text-white font-poppins lg:text-2xl">
-              Super Admin
-            </div>
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => router.push("/admin")}
-                className="text-sm text-[#134687] hover:text-[#044FAF] font-medium font-Inter"
-              >
-                &#8592; Admin
-              </button>
-              {sessionImage ? (
-                <Image
-                  src={sessionImage}
-                  alt="Admin profile picture"
-                  width={32}
-                  height={32}
-                  className="h-8 w-8 rounded-full object-cover border border-[#005FD9]/15"
-                />
-              ) : (
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#134687] text-xs font-bold text-white">
-                  {session.user?.name?.[0]?.toUpperCase() || "A"}
-                </div>
-              )}
-            </div>
+    <div className="flex h-dvh overflow-hidden bg-[#F3F3FD] bg-[url('/assets/css-apply-static-images/assets/pictures/background.webp')] bg-cover bg-repeat">
+      <MobileSidebar>
+        <SidebarContent activePage="super-admin" />
+      </MobileSidebar>
+
+      <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-6 [scrollbar-gutter:stable] md:px-8 md:pb-8">
+        <header className="mb-8 mt-28 text-center md:mt-8 md:text-left">
+          <div className="mb-4 w-fit max-w-full rounded-[45px] px-6 py-2 text-center text-lg font-poppins font-medium text-white [background:linear-gradient(90deg,_#2F7EE3_0%,_#0349A2_100%)] lg:py-4 lg:text-4xl">
+            EB Management
           </div>
-          {/* Tabs */}
-          <div className="flex gap-1 mt-4 -mb-px">
+          <p className="mb-4 text-xs font-Inter font-light leading-5 text-black md:mb-6 lg:text-lg">
+            Manage users, Executive Board configuration, recruitment settings,
+            and email templates.
+          </p>
+          <hr className="border-[#005FD9]" />
+        </header>
+
+        <div className="mb-5 rounded-xl border border-[#005FD9]/10 bg-white p-5">
+          <p className="mb-2 text-xs font-medium uppercase tracking-wider text-[#134687]/50 font-mono">
+            Configuration Section
+          </p>
+          <div className="flex flex-wrap gap-2">
             {[
-              { key: "users" as Tab, label: "user_db" },
-              { key: "settings" as Tab, label: "config" },
-              { key: "email" as Tab, label: "email_test" },
+              { key: "users" as Tab, label: "User Database" },
+              { key: "settings" as Tab, label: "Configuration" },
+              { key: "email" as Tab, label: "Email Test" },
             ].map((tab) => (
               <button
                 key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
-                className={`rounded-lg px-4 py-2 text-sm font-mono transition-colors ${
+                onClick={() => updateManagementLocation(tab.key)}
+                className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
                   activeTab === tab.key
-                    ? "bg-[#E8F2FF] text-[#134687]"
-                    : "text-[#134687]/45 hover:bg-[#F4F7FB] hover:text-[#134687]"
+                    ? "bg-[#134687] text-white"
+                    : "border border-[#005FD9]/15 text-[#134687] hover:bg-[#F3F3FD]"
                 }`}
               >
                 {tab.label}
@@ -511,17 +571,20 @@ export default function SuperAdminDashboard() {
             ))}
           </div>
         </div>
-      </div>
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-        {activeTab === "users" ? (
-          <UsersTab />
-        ) : activeTab === "settings" ? (
-          <SettingsTab />
-        ) : (
-          <EmailTestTab />
-        )}
-      </div>
+        <div className="mb-5 rounded-xl border border-[#005FD9]/10 bg-white p-5">
+          {activeTab === "users" ? (
+            <UsersTab />
+          ) : activeTab === "settings" ? (
+            <SettingsTab
+              settingsSection={settingsSection}
+              onSettingsSectionChange={updateSettingsSection}
+            />
+          ) : (
+            <EmailTestTab />
+          )}
+        </div>
+      </main>
     </div>
   );
 }
@@ -746,10 +809,22 @@ function UsersTab() {
     <div className="space-y-5">
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard label="users" value={stats.totalUsers} />
-        <StatCard label="eb" value={stats.totalEbMembers} />
-        <StatCard label="admins" value={stats.totalAdmins} />
-        <StatCard label="applicants" value={stats.totalApplicants} />
+        <StatCard label="users" value={stats.totalUsers} isLoading={loading} />
+        <StatCard
+          label="eb"
+          value={stats.totalEbMembers}
+          isLoading={loading}
+        />
+        <StatCard
+          label="admins"
+          value={stats.totalAdmins}
+          isLoading={loading}
+        />
+        <StatCard
+          label="applicants"
+          value={stats.totalApplicants}
+          isLoading={loading}
+        />
       </div>
 
       {/* Pending changes */}
@@ -1221,11 +1296,15 @@ function UsersTab() {
 
 // ─── Settings Tab ────────────────────────────────────────────────────────────
 
-type SettingsSection = "general" | "executive-board" | "recruitment";
+interface SettingsTabProps {
+  settingsSection: SettingsSection;
+  onSettingsSectionChange: (section: SettingsSection) => void;
+}
 
-function SettingsTab() {
-  const [settingsSection, setSettingsSection] =
-    useState<SettingsSection>("general");
+function SettingsTab({
+  settingsSection,
+  onSettingsSectionChange,
+}: SettingsTabProps) {
   const {
     data: cycleData,
     isLoading,
@@ -1268,14 +1347,55 @@ function SettingsTab() {
   const [selectedEbPictures, setSelectedEbPictures] = useState<
     Record<string, { file: File; previewUrl: string }>
   >({});
-  const [savingEbPictureRole, setSavingEbPictureRole] = useState<string | null>(
-    null,
+  const [savingEbPictureRoles, setSavingEbPictureRoles] = useState<Set<string>>(
+    () => new Set(),
+  );
+
+  const setEbPictureRoleSaving = useCallback(
+    (roleId: string, isSaving: boolean) => {
+      setSavingEbPictureRoles((current) => {
+        const next = new Set(current);
+        if (isSaving) next.add(roleId);
+        else next.delete(roleId);
+        return next;
+      });
+    },
+    [],
   );
   const [selectedPaymentQr, setSelectedPaymentQr] = useState<File | null>(null);
   const [savingPaymentQr, setSavingPaymentQr] = useState(false);
   const [selectedReceiptTemplate, setSelectedReceiptTemplate] =
     useState<File | null>(null);
   const [savingReceiptTemplate, setSavingReceiptTemplate] = useState(false);
+  const {
+    data: exclusivePerksData,
+    isLoading: areExclusivePerksLoading,
+    mutate: mutateExclusivePerks,
+  } = useSWR<{ items: ExclusivePerkResponseItem[] }>(
+    "/api/admin/exclusive-perks",
+    swrFetcher,
+    { revalidateOnFocus: false },
+  );
+  const [exclusivePerkForm, setExclusivePerkForm] = useState<{
+    name: string;
+    destinationUrl: string;
+    shape: ExclusivePerkShape;
+    fit: ExclusivePerkFit;
+    size: ExclusivePerkSize;
+  }>({
+    name: "",
+    destinationUrl: "",
+    shape: "rounded",
+    fit: "contain",
+    size: "standard",
+  });
+  const [selectedExclusivePerkImage, setSelectedExclusivePerkImage] =
+    useState<File | null>(null);
+  const [savingExclusivePerk, setSavingExclusivePerk] = useState(false);
+  const [deletingExclusivePerks, setDeletingExclusivePerks] = useState<
+    Set<string>
+  >(() => new Set());
+  const exclusivePerkFileInputRef = useRef<HTMLInputElement>(null);
   const [communityForm, setCommunityForm] = useState({
     enabled: true,
     url: "",
@@ -1313,6 +1433,145 @@ function SettingsTab() {
   const availability =
     availabilityData?.availability ??
     Object.fromEntries(ebRoles.map((role) => [role.id, true]));
+
+  const handleExclusivePerkImageSelect = (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0] ?? null;
+    if (!file) {
+      setSelectedExclusivePerkImage(null);
+      return;
+    }
+    if (!EXCLUSIVE_PERK_IMAGE_TYPES.some((type) => type === file.type)) {
+      toast.error("Select a JPEG, PNG, or WebP image");
+      event.target.value = "";
+      return;
+    }
+    if (file.size > MAX_EXCLUSIVE_PERK_IMAGE_SIZE) {
+      toast.error("Image must be 10MB or smaller");
+      event.target.value = "";
+      return;
+    }
+    setSelectedExclusivePerkImage(file);
+  };
+
+  const handleExclusivePerkUpload = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!selectedExclusivePerkImage) {
+      toast.error("Select a partner image");
+      return;
+    }
+
+    setSavingExclusivePerk(true);
+    try {
+      const prepareResponse = await fetch("/api/admin/exclusive-perks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "prepare",
+          fileType: selectedExclusivePerkImage.type,
+          fileSize: selectedExclusivePerkImage.size,
+        }),
+      });
+      const preparation = await readApiResponse(prepareResponse);
+      if (!prepareResponse.ok) {
+        throw new Error(
+          apiError(preparation, "Failed to prepare partner image upload"),
+        );
+      }
+
+      const imagePath =
+        typeof preparation.imagePath === "string" ? preparation.imagePath : "";
+      const signedUrl =
+        typeof preparation.signedUrl === "string" ? preparation.signedUrl : "";
+      if (!imagePath || !signedUrl) {
+        throw new Error("The upload service returned incomplete credentials");
+      }
+
+      const uploadBody = new FormData();
+      uploadBody.append("cacheControl", "3600");
+      uploadBody.append("", selectedExclusivePerkImage);
+      const uploadResponse = await fetch(signedUrl, {
+        method: "PUT",
+        headers: { "x-upsert": "false" },
+        body: uploadBody,
+      });
+      if (!uploadResponse.ok) {
+        throw new Error("Failed to transfer the partner image to storage");
+      }
+
+      const completeResponse = await fetch("/api/admin/exclusive-perks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "complete",
+          imagePath,
+          fileType: selectedExclusivePerkImage.type,
+          ...exclusivePerkForm,
+        }),
+      });
+      const result = await readApiResponse(completeResponse);
+      if (!completeResponse.ok) {
+        throw new Error(apiError(result, "Failed to save exclusive perk"));
+      }
+
+      setExclusivePerkForm({
+        name: "",
+        destinationUrl: "",
+        shape: "rounded",
+        fit: "contain",
+        size: "standard",
+      });
+      setSelectedExclusivePerkImage(null);
+      if (exclusivePerkFileInputRef.current) {
+        exclusivePerkFileInputRef.current.value = "";
+      }
+      await mutateExclusivePerks();
+      toast.success("Exclusive perk added to the homepage");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to add exclusive perk",
+      );
+    } finally {
+      setSavingExclusivePerk(false);
+    }
+  };
+
+  const handleExclusivePerkDelete = async (item: ExclusivePerkResponseItem) => {
+    setDeletingExclusivePerks((current) => new Set(current).add(item.id));
+    try {
+      const response = await fetch("/api/admin/exclusive-perks", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: item.id }),
+      });
+      const result = await readApiResponse(response);
+      if (!response.ok) {
+        throw new Error(apiError(result, "Failed to remove exclusive perk"));
+      }
+      await mutateExclusivePerks(
+        (current) =>
+          current
+            ? { items: current.items.filter((perk) => perk.id !== item.id) }
+            : current,
+        false,
+      );
+      void mutateExclusivePerks().catch(() => undefined);
+      toast.success(`${item.name} removed from the homepage`);
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to remove exclusive perk",
+      );
+    } finally {
+      setDeletingExclusivePerks((current) => {
+        const next = new Set(current);
+        next.delete(item.id);
+        return next;
+      });
+    }
+  };
 
   const handleReceiptTemplateUpload = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1446,7 +1705,7 @@ function SettingsTab() {
     const selection = selectedEbPictures[profile.roleId];
     if (!selection) return;
 
-    setSavingEbPictureRole(profile.roleId);
+    setEbPictureRoleSaving(profile.roleId, true);
     try {
       const prepareResponse = await fetch("/api/admin/eb-profiles/image", {
         method: "POST",
@@ -1496,25 +1755,59 @@ function SettingsTab() {
         throw new Error(apiError(result, "Failed to save EB picture"));
       }
 
-      URL.revokeObjectURL(selection.previewUrl);
+      const confirmedImageUrl =
+        typeof result.imageUrl === "string" ? result.imageUrl : null;
+      const localPreviewUrl = selection.previewUrl;
       setSelectedEbPictures((current) => {
         const next = { ...current };
         delete next[profile.roleId];
         return next;
       });
-      await mutateEbPictures();
+      await mutateEbPictures(
+        (current) =>
+          current
+            ? {
+                ...current,
+                profiles: current.profiles.map((item) =>
+                  item.userId === profile.userId
+                    ? { ...item, imageUrl: localPreviewUrl }
+                    : item,
+                ),
+              }
+            : current,
+        false,
+      );
+      void mutateEbPictures()
+        .catch(async () => {
+          if (!confirmedImageUrl) return;
+          await mutateEbPictures(
+            (current) =>
+              current
+                ? {
+                    ...current,
+                    profiles: current.profiles.map((item) =>
+                      item.userId === profile.userId
+                        ? { ...item, imageUrl: confirmedImageUrl }
+                        : item,
+                    ),
+                  }
+                : current,
+            false,
+          );
+        })
+        .finally(() => URL.revokeObjectURL(localPreviewUrl));
       toast.success(`${profile.position} picture updated`);
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to upload EB picture",
       );
     } finally {
-      setSavingEbPictureRole(null);
+      setEbPictureRoleSaving(profile.roleId, false);
     }
   };
 
   const handleEbPictureRemove = async (profile: ActiveEbPictureProfile) => {
-    setSavingEbPictureRole(profile.roleId);
+    setEbPictureRoleSaving(profile.roleId, true);
     try {
       const response = await fetch("/api/admin/eb-profiles/image", {
         method: "DELETE",
@@ -1526,14 +1819,28 @@ function SettingsTab() {
         throw new Error(apiError(result, "Failed to remove EB picture"));
       }
 
-      await mutateEbPictures();
+      await mutateEbPictures(
+        (current) =>
+          current
+            ? {
+                ...current,
+                profiles: current.profiles.map((item) =>
+                  item.userId === profile.userId
+                    ? { ...item, imageUrl: null }
+                    : item,
+                ),
+              }
+            : current,
+        false,
+      );
+      void mutateEbPictures().catch(() => undefined);
       toast.success(`${profile.position} picture removed`);
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to remove EB picture",
       );
     } finally {
-      setSavingEbPictureRole(null);
+      setEbPictureRoleSaving(profile.roleId, false);
     }
   };
 
@@ -1630,8 +1937,8 @@ function SettingsTab() {
 
   if (isLoading)
     return (
-      <div className="flex justify-center py-12">
-        <LoadingSpinner label="Loading settings" />
+      <div className="flex min-h-[calc(100dvh-320px)] items-center justify-center rounded-2xl bg-white">
+        <AdminContentLoading description="Loading configuration data..." />
       </div>
     );
 
@@ -1660,7 +1967,7 @@ function SettingsTab() {
     <div className="space-y-5">
       <nav
         aria-label="Configuration sections"
-        className="sticky top-[132px] z-20 rounded-2xl bg-white/95 p-2 shadow-sm backdrop-blur-md"
+        className="rounded-2xl border border-[#005FD9]/10 bg-white p-2 shadow-sm"
       >
         <div className="flex gap-1 overflow-x-auto">
           {settingsSections.map((section) => {
@@ -1669,7 +1976,7 @@ function SettingsTab() {
               <button
                 key={section.key}
                 type="button"
-                onClick={() => setSettingsSection(section.key)}
+                onClick={() => onSettingsSectionChange(section.key)}
                 aria-current={active ? "page" : undefined}
                 className={`min-w-[150px] flex-1 rounded-xl px-4 py-3 text-left transition-colors ${
                   active
@@ -1689,6 +1996,7 @@ function SettingsTab() {
         </div>
       </nav>
 
+      <div>
       {settingsSection === "general" && (
         <div className="space-y-5">
       <div className="rounded-2xl bg-white/90 p-5 shadow-sm sm:p-6">
@@ -1851,10 +2159,239 @@ function SettingsTab() {
           </button>
         </form>
       </div>
+
+      <div
+        className="relative rounded-2xl bg-white/90 p-5 shadow-sm sm:p-6"
+        aria-busy={savingExclusivePerk}
+      >
+        <FormProcessingOverlay
+          active={savingExclusivePerk}
+          label="Adding homepage perk"
+        />
+        <fieldset
+          disabled={savingExclusivePerk}
+          className={`transition ${
+            savingExclusivePerk
+              ? "pointer-events-none opacity-45 grayscale"
+              : ""
+          }`}
+        >
+          <h2 className="mb-1 text-sm font-bold text-[#134687] font-poppins">
+            exclusive perks partners
+          </h2>
+          <p className="mb-5 text-xs text-[#134687]/40 font-mono">
+            manage the partner logos and destination links shown on the homepage
+          </p>
+
+          {areExclusivePerksLoading ? (
+            <div className="flex justify-center py-8">
+              <LoadingSpinner label="Loading exclusive perks" size="md" />
+            </div>
+          ) : exclusivePerksData?.items.length ? (
+            <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {exclusivePerksData.items.map((item) => {
+                const isDeleting = deletingExclusivePerks.has(item.id);
+                return (
+                  <div
+                    key={item.id}
+                    className="relative flex min-w-0 items-center gap-3 rounded-xl border border-[#005FD9]/10 bg-[#F7F9FC] p-3"
+                    aria-busy={isDeleting}
+                  >
+                    <FormProcessingOverlay
+                      active={isDeleting}
+                      label="Removing perk"
+                    />
+                    <div
+                      className={`relative h-16 w-16 shrink-0 overflow-hidden bg-white ${
+                        item.shape === "circle" ? "rounded-full" : "rounded-lg"
+                      }`}
+                    >
+                      <Image
+                        src={item.imageUrl}
+                        alt={`${item.name} logo`}
+                        fill
+                        unoptimized
+                        sizes="64px"
+                        className={
+                          item.fit === "contain" ? "object-contain" : "object-cover"
+                        }
+                      />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs font-semibold text-[#134687] font-poppins">
+                        {item.name}
+                      </p>
+                      <a
+                        href={item.destinationUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-0.5 block truncate text-[10px] text-[#044FAF] hover:underline font-mono"
+                      >
+                        {item.destinationUrl}
+                      </a>
+                      <div className="mt-2 flex items-center gap-2">
+                        {item.isLegacy && (
+                          <span className="rounded bg-[#E8F2FF] px-1.5 py-0.5 text-[9px] font-semibold text-[#134687]">
+                            current default
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          disabled={isDeleting}
+                          onClick={() => handleExclusivePerkDelete(item)}
+                          className="text-[10px] font-medium text-red-600 hover:text-red-700 disabled:opacity-40"
+                        >
+                          remove
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="mb-6 rounded-xl bg-[#F7F9FC] p-4 text-xs text-[#134687]/50">
+              No exclusive perks are currently shown on the homepage.
+            </p>
+          )}
+
+          <form
+            onSubmit={handleExclusivePerkUpload}
+            className="space-y-4 border-t border-[#005FD9]/10 pt-5"
+          >
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-[#134687]/60 font-mono">
+                  Partner Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  maxLength={80}
+                  value={exclusivePerkForm.name}
+                  onChange={(event) =>
+                    setExclusivePerkForm((current) => ({
+                      ...current,
+                      name: event.target.value,
+                    }))
+                  }
+                  className="w-full rounded-xl border-0 bg-[#F7F9FC] px-3 py-2 text-sm ring-1 ring-inset ring-[#DCE4EE] outline-none focus:ring-2 focus:ring-[#044FAF]/25"
+                  placeholder="Partner or establishment name"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-[#134687]/60 font-mono">
+                  Destination Link *
+                </label>
+                <input
+                  type="url"
+                  required
+                  value={exclusivePerkForm.destinationUrl}
+                  onChange={(event) =>
+                    setExclusivePerkForm((current) => ({
+                      ...current,
+                      destinationUrl: event.target.value,
+                    }))
+                  }
+                  className="w-full rounded-xl border-0 bg-[#F7F9FC] px-3 py-2 text-sm ring-1 ring-inset ring-[#DCE4EE] outline-none focus:ring-2 focus:ring-[#044FAF]/25"
+                  placeholder="https://facebook.com/partner"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-[#134687]/60 font-mono">
+                  Logo Shape
+                </label>
+                <select
+                  value={exclusivePerkForm.shape}
+                  onChange={(event) =>
+                    setExclusivePerkForm((current) => ({
+                      ...current,
+                      shape: event.target.value as ExclusivePerkShape,
+                    }))
+                  }
+                  className="w-full rounded-xl border border-[#DCE4EE] bg-[#F7F9FC] px-3 py-2 text-sm text-[#134687]"
+                >
+                  <option value="rounded">Rounded square</option>
+                  <option value="circle">Circle</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-[#134687]/60 font-mono">
+                  Image Fit
+                </label>
+                <select
+                  value={exclusivePerkForm.fit}
+                  onChange={(event) =>
+                    setExclusivePerkForm((current) => ({
+                      ...current,
+                      fit: event.target.value as ExclusivePerkFit,
+                    }))
+                  }
+                  className="w-full rounded-xl border border-[#DCE4EE] bg-[#F7F9FC] px-3 py-2 text-sm text-[#134687]"
+                >
+                  <option value="contain">Show entire logo</option>
+                  <option value="cover">Fill the frame</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-[#134687]/60 font-mono">
+                  Display Size
+                </label>
+                <select
+                  value={exclusivePerkForm.size}
+                  onChange={(event) =>
+                    setExclusivePerkForm((current) => ({
+                      ...current,
+                      size: event.target.value as ExclusivePerkSize,
+                    }))
+                  }
+                  className="w-full rounded-xl border border-[#DCE4EE] bg-[#F7F9FC] px-3 py-2 text-sm text-[#134687]"
+                >
+                  <option value="standard">Standard</option>
+                  <option value="large">Featured</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-[#134687]/60 font-mono">
+                Partner Image *
+              </label>
+              <input
+                ref={exclusivePerkFileInputRef}
+                type="file"
+                required
+                accept="image/jpeg,image/png,image/webp"
+                onChange={handleExclusivePerkImageSelect}
+                className="block w-full text-sm text-[#134687] file:mr-4 file:rounded-lg file:border-0 file:bg-[#E8F2FF] file:px-4 file:py-2 file:text-sm file:font-medium file:text-[#134687] hover:file:bg-[#DCECFF]"
+              />
+              <p className="mt-1 text-[10px] text-[#134687]/45 font-mono">
+                JPEG, PNG, or WebP · maximum 10MB
+              </p>
+            </div>
+
+            <button
+              type="submit"
+              disabled={savingExclusivePerk || !selectedExclusivePerkImage}
+              className="rounded-lg bg-[#134687] px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-[#0F376B] disabled:opacity-40 font-poppins"
+            >
+              {savingExclusivePerk ? "adding partner..." : "add homepage perk"}
+            </button>
+          </form>
+        </fieldset>
+      </div>
         </div>
       )}
 
-      {settingsSection === "executive-board" && (
+      {settingsSection === "executive-board" &&
+        (isEbPicturesLoading || isAvailabilityLoading ? (
+          <div className="flex min-h-[calc(100dvh-380px)] items-center justify-center rounded-2xl bg-white">
+            <AdminContentLoading description="Loading Executive Board configuration..." />
+          </div>
+        ) : (
         <div className="space-y-5">
       <div className="rounded-2xl bg-white/90 p-5 shadow-sm sm:p-6">
         <h2 className="mb-1 text-sm font-bold text-[#134687] font-poppins">
@@ -1885,7 +2422,7 @@ function SettingsTab() {
               );
               const selection = selectedEbPictures[role.id];
               const previewUrl = selection?.previewUrl || profile?.imageUrl;
-              const isSavingPicture = savingEbPictureRole === role.id;
+              const isSavingPicture = savingEbPictureRoles.has(role.id);
 
               return (
                 <div
@@ -2051,7 +2588,7 @@ function SettingsTab() {
         )}
       </div>
         </div>
-      )}
+      ))}
 
       {settingsSection === "recruitment" && (
         <div className="space-y-5">
@@ -2233,6 +2770,7 @@ function SettingsTab() {
       </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

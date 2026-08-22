@@ -131,21 +131,15 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const activeCycle = await prisma.recruitmentCycle.findFirst({
-      where: { isActive: true },
-      orderBy: { createdAt: "desc" },
-      select: { id: true },
-    });
-
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
       include: {
         memberApplications: {
-          where: { recruitmentCycleId: activeCycle?.id ?? "__no_active_cycle__" },
+          where: { recruitmentCycle: { isActive: true } },
           take: 1,
         },
         memberships: {
-          where: { recruitmentCycleId: activeCycle?.id ?? "__no_active_cycle__" },
+          where: { recruitmentCycle: { isActive: true } },
           select: { memberId: true },
           take: 1,
         },
@@ -168,7 +162,10 @@ export async function GET() {
         sex: user.sex,
         dateOfBirth: user.dateOfBirth,
         isOldCssMember: user.isOldCssMember,
-        memberships: user.memberships,
+        memberships:
+          user.memberApplications[0]?.paymentStatus === "approved"
+            ? user.memberships
+            : [],
       },
     });
   } catch (error) {

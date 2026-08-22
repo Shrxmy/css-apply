@@ -22,38 +22,71 @@ export async function GET() {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const activeCycle = await prisma.recruitmentCycle.findFirst({
-      where: { isActive: true },
-      select: { id: true, schoolYear: true },
-    });
+    const [activeCycle, profiles] = await Promise.all([
+      prisma.recruitmentCycle.findFirst({
+        where: { isActive: true },
+        select: { id: true, schoolYear: true },
+      }),
+      prisma.eBProfile.findMany({
+        where: {
+          isActive: true,
+          recruitmentCycle: { isActive: true },
+        },
+        select: {
+          userId: true,
+          position: true,
+          imagePath: true,
+          user: { select: { name: true } },
+        },
+        orderBy: { position: "asc" },
+      }),
+    ]);
 
     if (!activeCycle) {
       return NextResponse.json({ profiles: [], activeCycle: null });
     }
 
-    const profiles = await prisma.eBProfile.findMany({
-      where: { recruitmentCycleId: activeCycle.id, isActive: true },
-      select: {
-        userId: true,
-        position: true,
-        imagePath: true,
-        user: { select: { name: true } },
-      },
-      orderBy: { position: "asc" },
-    });
+    const imagePaths = profiles.flatMap((profile) =>
+      profile.imagePath ? [profile.imagePath] : [],
+    );
+    const signedImageUrls = new Map<string, string>();
 
-    return NextResponse.json({
-      profiles: profiles.map((profile) => ({
-        userId: profile.userId,
-        position: profile.position,
-        roleId: getRoleId(profile.position),
-        userName: profile.user.name,
-        imageUrl: profile.imagePath
-          ? `/api/admin/eb-profiles/image?userId=${encodeURIComponent(profile.userId)}&v=${encodeURIComponent(profile.imagePath)}`
-          : null,
-      })),
-      activeCycle,
-    });
+    if (imagePaths.length > 0) {
+      const { data: signedImages, error } = await supabase.storage
+        .from(EB_IMAGE_BUCKET)
+        .createSignedUrls(imagePaths, 15 * 60);
+
+      if (error) {
+        console.error("EB image URL preparation failed");
+      } else {
+        for (const image of signedImages) {
+          if (image.path && image.signedUrl) {
+            signedImageUrls.set(image.path, image.signedUrl);
+          }
+        }
+      }
+    }
+
+    return NextResponse.json(
+      {
+        profiles: profiles.map((profile) => ({
+          userId: profile.userId,
+          position: profile.position,
+          roleId: getRoleId(profile.position),
+          userName: profile.user.name,
+          imageUrl: profile.imagePath
+            ? signedImageUrls.get(profile.imagePath) ??
+              `/api/admin/eb-profiles/image?userId=${encodeURIComponent(profile.userId)}&v=${encodeURIComponent(profile.imagePath)}`
+            : null,
+        })),
+        activeCycle,
+      },
+      {
+        headers: {
+          "Cache-Control": "private, no-store",
+        },
+      },
+    );
   } catch (error) {
     console.error(
       "Get active EB profiles failed",

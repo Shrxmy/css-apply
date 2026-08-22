@@ -5,6 +5,12 @@ const nextConfig: NextConfig = {
   // Running `next build` must not invalidate an active `next dev` server.
   distDir: process.env.NODE_ENV === "development" ? ".next-dev" : ".next",
   poweredByHeader: false,
+  // Keep recently visited routes compiled during local development so moving
+  // between admin/application pages does not repeatedly trigger cold rebuilds.
+  onDemandEntries: {
+    maxInactiveAge: 25 * 60 * 1000,
+    pagesBufferLength: 12,
+  },
   experimental: {
     serverActions: {
       bodySizeLimit: "10mb",

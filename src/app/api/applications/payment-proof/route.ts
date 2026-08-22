@@ -2,13 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { sendEmail, emailTemplates } from "@/lib/email";
-import { ensureCycleMemberId } from "@/lib/member-id";
 import { paymentProofSchema } from "@/lib/schemas";
 import {
   getActiveCycle,
   getApplicationRuleResponse,
   isGoogleDriveUrl,
+  lockApplicantCycle,
 } from "@/lib/application-rules";
 
 export async function POST(request: NextRequest) {
@@ -28,20 +27,25 @@ export async function POST(request: NextRequest) {
 
     const cycle = await getActiveCycle();
     const proof = parsed.data.paymentProof.trim();
-    const result = await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx) => {
+      await lockApplicantCycle(tx, session.user.email!, cycle.id);
+
       const user = await tx.user.findUnique({
         where: { email: session.user.email! },
         include: {
           memberApplications: {
             where: { recruitmentCycleId: cycle.id, hasAccepted: true },
+            select: { id: true, paymentStatus: true },
             take: 2,
           },
           committeeApplications: {
             where: { recruitmentCycleId: cycle.id, hasAccepted: true },
+            select: { id: true, paymentStatus: true },
             take: 2,
           },
           executiveAssociateApplications: {
             where: { recruitmentCycleId: cycle.id, hasAccepted: true },
+            select: { id: true, paymentStatus: true },
             take: 2,
           },
         },
@@ -51,14 +55,17 @@ export async function POST(request: NextRequest) {
       const acceptedApplications = [
         ...user.memberApplications.map((application) => ({
           id: application.id,
+          paymentStatus: application.paymentStatus,
           type: "member" as const,
         })),
         ...user.committeeApplications.map((application) => ({
           id: application.id,
+          paymentStatus: application.paymentStatus,
           type: "committee" as const,
         })),
         ...user.executiveAssociateApplications.map((application) => ({
           id: application.id,
+          paymentStatus: application.paymentStatus,
           type: "executive-associate" as const,
         })),
       ];
@@ -71,44 +78,43 @@ export async function POST(request: NextRequest) {
       }
 
       const application = acceptedApplications[0];
+      if (application.paymentStatus === "pending") {
+        throw new Error("RECEIPT_ALREADY_PENDING");
+      }
+      if (application.paymentStatus === "approved") {
+        throw new Error("RECEIPT_ALREADY_APPROVED");
+      }
+
+      const reviewData = {
+        paymentProof: proof,
+        paymentStatus: "pending",
+        paymentReviewedAt: null,
+        paymentReviewedBy: null,
+        paymentRejectionReason: null,
+      };
       if (application.type === "member") {
         await tx.memberApplication.update({
           where: { id: application.id },
-          data: { paymentProof: proof },
+          data: reviewData,
         });
       } else if (application.type === "committee") {
         await tx.committeeApplication.update({
           where: { id: application.id },
-          data: { paymentProof: proof },
+          data: reviewData,
         });
       } else {
         await tx.executiveAssociateApplication.update({
           where: { id: application.id },
-          data: { paymentProof: proof },
+          data: reviewData,
         });
       }
-
-      const memberId = await ensureCycleMemberId(tx, user.id, cycle.id);
-      return { memberId, user };
     });
-
-    try {
-      const template = emailTemplates.memberIdReleased(
-        result.user.name || "Valued Member",
-        result.memberId,
-      );
-      await sendEmail(result.user.email, template.subject, template.html);
-    } catch (emailError) {
-      console.error(
-        "Member ID email failed",
-        emailError instanceof Error ? emailError.name : "UnknownError",
-      );
-    }
 
     return NextResponse.json({
       success: true,
       paymentProof: proof,
-      memberId: result.memberId,
+      paymentStatus: "pending",
+      message: "Acknowledgement receipt submitted for Executive Board review",
     });
   } catch (error) {
     if (error instanceof SyntaxError) {
@@ -128,6 +134,14 @@ export async function POST(request: NextRequest) {
       },
       MULTIPLE_ACCEPTED_APPLICATIONS: {
         error: "Multiple accepted applications require administrator review",
+        status: 409,
+      },
+      RECEIPT_ALREADY_PENDING: {
+        error: "Your acknowledgement receipt is already awaiting Executive Board review",
+        status: 409,
+      },
+      RECEIPT_ALREADY_APPROVED: {
+        error: "Your acknowledgement receipt has already been approved",
         status: 409,
       },
     };

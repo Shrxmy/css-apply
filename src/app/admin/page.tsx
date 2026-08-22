@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import MobileSidebar from "@/components/AdminMobileSB";
 import SidebarContent from "@/components/AdminSidebar";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import AdminContentLoading from "@/components/AdminContentLoading";
 import useSWR from "swr";
 
 // import {
@@ -565,14 +566,13 @@ const Schedule = () => {
 
           {/* INNER SHAPE */}
           <div
-            className="bg-[#F3F3FD] border border-[#005FD9]/10 rounded-lg p-4 md:p-8"
+            className={`bg-[#F3F3FD] border border-[#005FD9]/10 rounded-lg p-4 md:p-8 ${
+              isSlotsLoading ? "flex items-center justify-center" : ""
+            }`}
             style={{ minHeight: "calc(100vh - 400px)" }}
           >
             {isSlotsLoading ? (
-              <div className="flex flex-col items-center justify-center gap-4 h-full px-2 text-sm text-[#134687]">
-                <LoadingSpinner label="Loading schedule data" size="lg" />
-                <p>Loading schedule data...</p>
-              </div>
+              <AdminContentLoading description="Loading schedule data..." />
             ) : !shouldShowCalendar ? (
               <div className="flex flex-col items-center justify-center h-full px-2">
                 {/* big calendar icon */}

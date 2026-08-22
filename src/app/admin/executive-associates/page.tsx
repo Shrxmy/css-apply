@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import MobileSidebar from "@/components/AdminMobileSB";
 import SidebarContent from "@/components/AdminSidebar";
+import AdminContentLoading from "@/components/AdminContentLoading";
+import AdminEmptyState from "@/components/AdminEmptyState";
 import { committeeRolesSubmitted } from "@/data/committeeRoles";
 import { roles } from "@/data/ebRoles";
 import { toast } from "sonner";
@@ -215,10 +217,7 @@ const EAs = () => {
   if (status === "loading") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F3F3FD] bg-[url('/assets/css-apply-static-images/assets/pictures/background.webp')] bg-cover bg-repeat">
-        <div className="flex flex-col items-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#044FAF]"></div>
-          <p className="mt-4 text-[#134687]">Loading session...</p>
-        </div>
+        <AdminContentLoading description="Loading admin session..." />
       </div>
     );
   }
@@ -232,7 +231,7 @@ const EAs = () => {
       <div className="flex-1 p-6 md:p-8 pt-16 md:pt-12 overflow-y-auto h-screen">
         {/* Header */}
         <div className="mb-8 mt-12 md:mt-8 text-center md:text-left">
-          <div className="rounded-[45px] text-white text-lg lg:text-4xl font-poppins font-medium px-6 py-2 lg:py-4 text-center [background:linear-gradient(90deg,#2F7EE3_0%,#0349A2_100%)] w-fit mb-4">
+          <div className="mb-4 w-fit max-w-full rounded-[45px] px-6 py-2 text-center text-lg font-poppins font-medium text-white [background:linear-gradient(90deg,_#2F7EE3_0%,_#0349A2_100%)] lg:py-4 lg:text-4xl">
             Executive Associates
           </div>
           <p className="text-black text-xs lg:text-lg font-Inter font-light leading-5 mb-4 md:mb-6">
@@ -244,7 +243,7 @@ const EAs = () => {
 
         {/* Filters */}
         <div className="bg-white rounded-xl border border-[#005FD9]/10 p-5 mb-5">
-          <div className="flex flex-wrap gap-4 items-center justify-between">
+          <div className="flex flex-col items-stretch gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <label className="block text-xs font-medium text-[#134687]/50 uppercase tracking-wider font-mono mb-1">
                 Status
@@ -262,7 +261,7 @@ const EAs = () => {
                       | "no-schedule",
                   )
                 }
-                className="px-3 py-2 border border-[#005FD9]/15 rounded-lg text-sm text-[#134687] focus:outline-none focus:ring-2 focus:ring-[#044FAF]/20"
+                className="w-full rounded-lg border border-[#005FD9]/15 px-3 py-2 text-sm text-[#134687] focus:outline-none focus:ring-2 focus:ring-[#044FAF]/20 sm:w-auto"
               >
                 <option value="all">All Applications</option>
                 <option value="accepted">Accepted</option>
@@ -274,7 +273,7 @@ const EAs = () => {
             </div>
             <button
               onClick={handleCSVExport}
-              className="px-4 py-2 text-sm text-[#134687] border border-[#005FD9]/15 rounded-lg hover:bg-[#F3F3FD] transition-colors font-medium"
+              className="w-full rounded-lg border border-[#005FD9]/15 px-4 py-2 text-sm font-medium text-[#134687] transition-colors hover:bg-[#F3F3FD] sm:w-auto"
             >
               Export CSV
             </button>
@@ -282,20 +281,18 @@ const EAs = () => {
         </div>
 
         {/* EAs List */}
-        <div className="bg-white rounded-xl border border-[#005FD9]/10 p-5 mb-5 min-h-[calc(100vh-180px)] md:min-h-[calc(100vh-280px)]">
+        <div
+          className={`mb-5 min-h-[280px] rounded-xl border border-[#005FD9]/10 bg-white p-5 md:min-h-[max(280px,calc(100dvh-400px))] ${
+            loading ? "flex items-center justify-center" : ""
+          }`}
+        >
           {loading ? (
-            <div className="flex flex-col items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#044FAF]"></div>
-              <p className="mt-3 text-sm text-[#134687]/60">
-                Loading applications...
-              </p>
-            </div>
+            <AdminContentLoading description="Loading executive associate data..." />
           ) : eas.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-[#134687]/40 text-sm">
-                No executive associate applications found
-              </p>
-            </div>
+            <AdminEmptyState
+              title="No executive associate applications found"
+              description="There are no Executive Associate records matching the selected status yet."
+            />
           ) : (
             <div className="space-y-3">
               {eas.map((ea) => {
@@ -306,7 +303,7 @@ const EAs = () => {
                     key={ea.id}
                     className="border border-[#005FD9]/10 rounded-lg p-4 hover:bg-[#F3F3FD]/50 transition-colors"
                   >
-                    <div className="flex justify-between items-start">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <h3 className="text-sm font-semibold text-[#134687] truncate">
@@ -314,7 +311,7 @@ const EAs = () => {
                           </h3>
                           {getStatusBadge(ea)}
                         </div>
-                        <div className="text-xs text-[#134687]/60 font-mono space-y-0.5">
+                        <div className="space-y-0.5 break-words text-xs text-[#134687]/60 font-mono">
                           <div>
                             {ea.studentNumber} &middot; {ea.user.section}{" "}
                             &middot; {ea.user.email}
@@ -337,7 +334,7 @@ const EAs = () => {
                           </div>
                         </div>
                       </div>
-                      <div className="flex flex-col gap-2 ml-3 shrink-0 items-end">
+                      <div className="flex w-full flex-col items-start gap-2 sm:ml-3 sm:w-auto sm:shrink-0 sm:items-end">
                         {ea.cvDownloadUrl && (
                           <button
                             onClick={() => handleDownloadCV(ea)}
@@ -358,7 +355,7 @@ const EAs = () => {
                         )}
 
                         {ea.status === "evaluating" && !ea.hasAccepted && !ea.redirection && (
-                          <div className="flex gap-1">
+                          <div className="flex flex-wrap gap-1">
                             <button
                               onClick={() => handleEAAction(ea.id, "accept")}
                               disabled={processingId === ea.id}
@@ -396,7 +393,7 @@ const EAs = () => {
 
         {/* Pagination */}
         {eas.length > 0 && pagination.totalPages > 1 && (
-          <div className="bg-white rounded-xl border border-[#005FD9]/10 p-4 flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#005FD9]/10 bg-white p-4">
             <div className="text-xs text-[#134687]/40 font-mono">
               {(pagination.currentPage - 1) * pagination.limit + 1}&ndash;
               {Math.min(
@@ -405,7 +402,7 @@ const EAs = () => {
               )}{" "}
               / {pagination.totalCount}
             </div>
-            <div className="flex gap-1">
+            <div className="flex flex-wrap gap-1">
               <button
                 onClick={() => handlePageChange(currentPage - 1)}
                 disabled={!pagination.hasPreviousPage}

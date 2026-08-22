@@ -7,52 +7,54 @@ interface LoadingScreenProps {
   message?: string;
 }
 
+const COMMITTEE_IMAGES = [
+  "/assets/css-apply-static-images/assets/committee_test/CSAR_ACADEMICS.webp",
+  "/assets/css-apply-static-images/assets/committee_test/CSAR_COMMDEV.webp",
+  "/assets/css-apply-static-images/assets/committee_test/CSAR_CREATIVES.webp",
+  "/assets/css-apply-static-images/assets/committee_test/CSAR_DOCU.webp",
+  "/assets/css-apply-static-images/assets/committee_test/CSAR_EXTERNALS.webp",
+  "/assets/css-apply-static-images/assets/committee_test/CSAR_FINANCE.webp",
+  "/assets/css-apply-static-images/assets/committee_test/CSAR_LOGISTICS.webp",
+  "/assets/css-apply-static-images/assets/committee_test/CSAR_PUBLICITY.webp",
+  "/assets/css-apply-static-images/assets/committee_test/CSAR_SPOTA.webp",
+  "/assets/css-apply-static-images/assets/committee_test/CSAR_TECHDEV.webp",
+] as const;
+
 export default function LoadingScreen({
-  message = "Compiling your journey...",
+  message = "Loading your journey...",
 }: LoadingScreenProps) {
-  const [progress, setProgress] = useState(0);
+  const [progress, setProgress] = useState(18);
   const [showText, setShowText] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
-  const committeeImages = [
-    "/assets/css-apply-static-images/assets/committee_test/CSAR_ACADEMICS.webp",
-    "/assets/css-apply-static-images/assets/committee_test/CSAR_COMMDEV.webp",
-    "/assets/css-apply-static-images/assets/committee_test/CSAR_CREATIVES.webp",
-    "/assets/css-apply-static-images/assets/committee_test/CSAR_DOCU.webp",
-    "/assets/css-apply-static-images/assets/committee_test/CSAR_EXTERNALS.webp",
-    "/assets/css-apply-static-images/assets/committee_test/CSAR_FINANCE.webp",
-    "/assets/css-apply-static-images/assets/committee_test/CSAR_LOGISTICS.webp",
-    "/assets/css-apply-static-images/assets/committee_test/CSAR_PUBLICITY.webp",
-    "/assets/css-apply-static-images/assets/committee_test/CSAR_SPOTA.webp",
-    "/assets/css-apply-static-images/assets/committee_test/CSAR_TECHDEV.webp",
-  ];
-
   useEffect(() => {
+    // Move quickly at first, then settle below 100 while real work finishes.
+    // The component unmounts immediately when the page is ready—there is no
+    // artificial minimum loading duration.
     const interval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          return 100;
-        }
-        return prev + 10;
+      setProgress((previous) => {
+        if (previous >= 97) return previous;
+        const increment =
+          previous < 65 ? 14 : previous < 85 ? 6 : previous < 93 ? 2 : 1;
+        return Math.min(97, previous + increment);
       });
-    }, 200);
+    }, 90);
 
     const textTimer = setTimeout(() => {
       setShowText(true);
-    }, 500);
+    }, 120);
 
     // Cycle through committee images
     const imageInterval = setInterval(() => {
-      setCurrentImageIndex((prev) => (prev + 1) % committeeImages.length);
-    }, 800);
+      setCurrentImageIndex((prev) => (prev + 1) % COMMITTEE_IMAGES.length);
+    }, 700);
 
     return () => {
       clearInterval(interval);
       clearTimeout(textTimer);
       clearInterval(imageInterval);
     };
-  }, [committeeImages.length]);
+  }, []);
 
   return (
     <>
@@ -78,10 +80,12 @@ export default function LoadingScreen({
           <div className="relative w-37.5 h-37.5 flex items-center justify-center group">
             <Image
               key={currentImageIndex}
-              src={committeeImages[currentImageIndex]}
+              src={COMMITTEE_IMAGES[currentImageIndex]}
               alt={`Committee ${currentImageIndex + 1}`}
               width={150}
               height={150}
+              priority={currentImageIndex === 0}
+              unoptimized
               className="transform transition-all duration-500 ease-in-out hover:scale-110 drop-shadow-lg group-hover:drop-shadow-xl"
               style={{
                 animation: "popOut 0.6s ease-in-out",
@@ -104,7 +108,7 @@ export default function LoadingScreen({
           </div>
           <div className="bg-white/20 backdrop-blur-sm rounded-full h-4 border border-white/30 shadow-inner">
             <div
-              className="bg-[#134687]  h-4 rounded-full transition-all duration-500 ease-out shadow-lg relative overflow-hidden"
+              className="relative h-4 overflow-hidden rounded-full bg-[#134687] shadow-lg transition-all duration-200 ease-out"
               style={{ width: `${progress}%` }}
             >
               {/* Shimmer effect */}
@@ -123,7 +127,7 @@ export default function LoadingScreen({
             {message}
           </p>
           <p className="text-[#134687]/80 text-sm drop-shadow-md">
-            Initializing CSSApply system
+            Preparing your page
           </p>
         </div>
 

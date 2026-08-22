@@ -43,7 +43,7 @@ export default function ApplicationGuard({
     data: appStatus,
     isLoading,
     error,
-  } = useApplicationStatus(status === "authenticated");
+  } = useApplicationStatus(status !== "unauthenticated");
 
   // Schedule and success pages are reached right after submission.
   // SWR may still hold stale "no application" data — skip the application check.

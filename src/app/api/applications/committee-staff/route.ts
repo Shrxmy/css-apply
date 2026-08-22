@@ -173,22 +173,15 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const activeCycle = await prisma.recruitmentCycle.findFirst({
-      where: { isActive: true },
-      orderBy: { createdAt: "desc" },
-      select: { id: true },
-    });
-    const activeCycleId = activeCycle?.id ?? "__no_active_cycle__";
-
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
       include: {
         committeeApplications: {
-          where: { recruitmentCycleId: activeCycleId },
+          where: { recruitmentCycle: { isActive: true } },
           take: 1,
         },
         memberships: {
-          where: { recruitmentCycleId: activeCycleId },
+          where: { recruitmentCycle: { isActive: true } },
           select: { memberId: true },
           take: 1,
         },
@@ -200,12 +193,12 @@ export async function GET() {
 
     const application = user.committeeApplications[0] ?? null;
     let meetingLink: string | null = null;
-    if (application?.interviewBy && activeCycle) {
+    if (application?.interviewBy) {
       meetingLink =
         (
           await prisma.eBProfile.findFirst({
             where: {
-              recruitmentCycleId: activeCycle.id,
+              recruitmentCycle: { isActive: true },
               isActive: true,
               position: {
                 equals: getPositionTitle(application.interviewBy),
@@ -229,7 +222,8 @@ export async function GET() {
         sex: user.sex,
         dateOfBirth: user.dateOfBirth,
         isOldCssMember: user.isOldCssMember,
-        memberships: user.memberships,
+        memberships:
+          application?.paymentStatus === "approved" ? user.memberships : [],
       },
       meetingLink,
     });

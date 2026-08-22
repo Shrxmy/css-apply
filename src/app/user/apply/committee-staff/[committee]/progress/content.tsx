@@ -8,6 +8,7 @@ import LoadingSpinner from "@/components/LoadingSpinner";
 import LoadingScreen from "@/components/LoadingScreen";
 import FormProcessingOverlay from "@/components/FormProcessingOverlay";
 import Footer from "@/components/Footer";
+import NoApplicationFound from "@/components/NoApplicationFound";
 import { committeeRolesSubmitted } from "@/data/committeeRoles";
 import { roles } from "@/data/ebRoles";
 import { useSession } from "next-auth/react";
@@ -44,6 +45,8 @@ export default function CommitteeProgressPageContent() {
       createdAt: string;
       updatedAt: string;
       paymentProof?: string;
+      paymentStatus?: "not_submitted" | "pending" | "approved" | "rejected";
+      paymentRejectionReason?: string;
     };
     user: {
       id: string;
@@ -66,6 +69,11 @@ export default function CommitteeProgressPageContent() {
   const [submittingPaymentProof, setSubmittingPaymentProof] = useState(false);
   const [paymentProofError, setPaymentProofError] = useState("");
   const hasPaymentProof = !!applicationData?.application?.paymentProof;
+  const paymentStatus =
+    applicationData?.application?.paymentStatus ?? "not_submitted";
+  const isPaymentApproved = paymentStatus === "approved";
+  const canSubmitPaymentProof =
+    paymentStatus === "not_submitted" || paymentStatus === "rejected";
 
   const handlePaymentProofSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,10 +97,8 @@ export default function CommitteeProgressPageContent() {
               application: {
                 ...current.application,
                 paymentProof: data.paymentProof,
-              },
-              user: {
-                ...current.user,
-                memberships: [{ memberId: data.memberId }],
+                paymentStatus: "pending",
+                paymentRejectionReason: undefined,
               },
             }
           : current,
@@ -329,26 +335,11 @@ export default function CommitteeProgressPageContent() {
 
   if (!applicationData || !applicationData.hasApplication) {
     return (
-      <div className="min-h-screen bg-[rgb(243,243,253)] flex flex-col">
-        <Header />
-        <div className="grow flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full text-center">
-            <h1 className="text-2xl font-bold text-gray-800 mb-4">
-              No Application Found
-            </h1>
-            <p className="text-gray-600 mb-6">
-              You don&apos;t have an active committee application.
-            </p>
-            <button
-              onClick={() => router.push("/user/apply/committee-staff")}
-              className="bg-[#134687] hover:bg-[#0d3569] text-white font-medium py-2 px-4 rounded-lg transition-colors"
-            >
-              Apply Now
-            </button>
-          </div>
-        </div>
-        <Footer />
-      </div>
+      <NoApplicationFound
+        applicationName="Committee Staff"
+        description="We couldn’t find an active Committee Staff application for the current recruitment cycle. You can choose a committee and begin a new application."
+        applyHref="/user/apply/committee-staff"
+      />
     );
   }
 
@@ -363,7 +354,16 @@ export default function CommitteeProgressPageContent() {
     application.status === "redirected" && !!application.redirection;
   const memberIdDisplay =
     applicationData.user.memberships?.[0]?.memberId ??
-    applicationData.user.id.slice(-7).toUpperCase();
+    "Approved — refresh to view";
+  const memberIdStatus = !application.hasAccepted
+    ? "Pending"
+    : isPaymentApproved
+      ? memberIdDisplay
+      : paymentStatus === "pending"
+        ? "Awaiting Executive Board approval"
+        : paymentStatus === "rejected"
+          ? "Receipt needs resubmission"
+          : "Submit acknowledgement receipt first";
   const hideMeetingAccess =
     application.status === "evaluating" ||
     application.status === "failed" ||
@@ -533,13 +533,9 @@ export default function CommitteeProgressPageContent() {
                       Member ID:
                     </span>
                     <span
-                      className={`text-sm sm:text-base ${application.hasAccepted ? "text-green-600 font-semibold" : "text-gray-500"}`}
+                      className={`text-sm sm:text-base ${isPaymentApproved ? "text-green-600 font-semibold" : "text-gray-500"}`}
                     >
-                      {application.hasAccepted && hasPaymentProof
-                        ? memberIdDisplay
-                        : application.hasAccepted
-                          ? "Submit payment proof first"
-                          : "Pending"}
+                      {memberIdStatus}
                     </span>
                   </div>
 
@@ -596,9 +592,7 @@ export default function CommitteeProgressPageContent() {
                     <div className="text-gray-600">
                       <p>
                         <strong>Member ID:</strong>{" "}
-                        {hasPaymentProof
-                          ? memberIdDisplay
-                          : "Submit payment proof first"}
+                        {memberIdStatus}
                       </p>
                       {application.redirection ? (
                         <p>
@@ -732,7 +726,7 @@ export default function CommitteeProgressPageContent() {
                       </a>
                     </div>
                   )}
-                  {!hasPaymentProof ? (
+                  {canSubmitPaymentProof ? (
                     <form
                       onSubmit={handlePaymentProofSubmit}
                       aria-busy={submittingPaymentProof}
@@ -740,7 +734,7 @@ export default function CommitteeProgressPageContent() {
                     >
                       <FormProcessingOverlay
                         active={submittingPaymentProof}
-                        label="Submitting payment proof..."
+                        label="Submitting acknowledgement receipt..."
                       />
                       <fieldset
                         disabled={submittingPaymentProof}
@@ -766,24 +760,33 @@ export default function CommitteeProgressPageContent() {
                       >
                         {submittingPaymentProof ? (
                           <span className="inline-flex items-center justify-center gap-2">
-                            <LoadingSpinner label="Submitting payment proof" size="sm" className="border-white border-t-transparent" />
+                            <LoadingSpinner label="Submitting acknowledgement receipt" size="sm" className="border-white border-t-transparent" />
                             Submitting...
                           </span>
                         ) : (
-                          "Submit Payment Proof"
+                          "Submit Acknowledgement Receipt"
                         )}
                       </button>
                       </fieldset>
                     </form>
+                  ) : paymentStatus === "pending" ? (
+                    <p className="rounded-lg bg-amber-50 p-3 text-center text-sm font-semibold text-amber-800 mb-4 sm:mb-6">
+                      Your acknowledgement receipt is awaiting Executive Board review.
+                    </p>
                   ) : (
-                    <p className="text-green-700 text-center text-sm font-semibold mb-4 sm:mb-6">
-                      Payment proof submitted. Your Member ID is now available
-                      above.
+                    <p className="rounded-lg bg-green-50 p-3 text-center text-sm font-semibold text-green-700 mb-4 sm:mb-6">
+                      Your acknowledgement receipt was approved. Your Member ID
+                      is available above.
+                    </p>
+                  )}
+                  {paymentStatus === "rejected" && (
+                    <p className="mb-4 rounded-lg bg-red-50 p-3 text-center text-sm text-red-700">
+                      Receipt rejected: {application.paymentRejectionReason || "Please submit a valid acknowledgement receipt."}
                     </p>
                   )}
                   <p className="text-[#134687]/80 text-center text-xs sm:text-sm mt-2">
-                    Your Member ID will be shown after submitting your
-                    acknowledgement receipt link.
+                    Your Member ID will be shown only after an authorized Executive
+                    Board reviewer approves your acknowledgement receipt.
                   </p>
                 </div>
 

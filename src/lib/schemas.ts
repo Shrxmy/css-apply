@@ -96,6 +96,22 @@ export const paymentProofSchema = z.object({
 });
 
 // Admin actions
+export const paymentReviewActionSchema = z
+  .object({
+    applicationId: z.string().min(1, "Application ID is required"),
+    applicationType: z.enum(["member", "committee", "executive-associate"]),
+    action: z.enum(["approve", "reject"]),
+    rejectionReason: z.string().trim().max(500).optional(),
+  })
+  .refine(
+    ({ action, rejectionReason }) =>
+      action !== "reject" || Boolean(rejectionReason?.trim()),
+    {
+      path: ["rejectionReason"],
+      message: "A rejection reason is required",
+    },
+  );
+
 export const applicationActionSchema = z.object({
   applicationId: z.string().min(1),
   type: z.enum(["member", "committee", "executive-associate"]),

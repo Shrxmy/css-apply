@@ -4,11 +4,16 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSession } from "next-auth/react";
 import MobileSidebar from "@/components/AdminMobileSB";
 import SidebarContent from "@/components/AdminSidebar";
+import AdminContentLoading from "@/components/AdminContentLoading";
+import AdminEmptyState from "@/components/AdminEmptyState";
 import { committeeRolesSubmitted } from "@/data/committeeRoles";
 import { roles } from "@/data/ebRoles";
 
 import { LucideChevronDown, LucideChevronUp } from "lucide-react";
 import { toast } from "sonner";
+import { createLogger } from "@/lib/logger";
+
+const adminApplicationsLogger = createLogger("admin/applications");
 
 // Helper function to get committee full name
 const getCommitteeFullName = (committeeId: string): string => {
@@ -180,7 +185,6 @@ const Applications = () => {
   // Clear EB data cache
   const clearEBCache = useCallback((id: string) => {
     ebDataCache.delete(id);
-    console.log(`Cleared EB cache for user ${id}`);
   }, []);
 
   // Memoized EB data fetching with caching
@@ -207,12 +211,9 @@ const Applications = () => {
       // Cache the result
       ebDataCache.set(id, { ...ebProfile, timestamp: Date.now() });
       setEbData(ebProfile);
-      console.log(
-        `Fetched fresh EB data for user ${id}: position=${ebProfile?.position}`,
-      );
       return ebProfile;
     } catch (error) {
-      console.error("Error fetching EB data:", error);
+      adminApplicationsLogger.error("EB profile request failed", error);
       setLoading(false);
       return null;
     }
@@ -235,7 +236,7 @@ const Applications = () => {
         setApplications(data.applications);
       }
     } catch (error) {
-      console.error("Error fetching applications:", error);
+      adminApplicationsLogger.error("application list request failed", error);
     } finally {
       setLoading(false);
     }
@@ -258,10 +259,9 @@ const Applications = () => {
         if (response.ok) {
           const data = await response.json();
           setSearchResults(data.applications);
-          console.log("Search results:", data.applications);
         }
       } catch (error) {
-        console.error("Error searching applications:", error);
+        adminApplicationsLogger.error("application search failed", error);
       } finally {
         setIsSearching(false);
       }
@@ -460,7 +460,7 @@ const Applications = () => {
       link.click();
       document.body.removeChild(link);
     } catch (error) {
-      console.error("Error downloading CV:", error);
+      adminApplicationsLogger.error("CV download failed", error);
       toast.error("Error downloading CV");
     }
   };
@@ -478,7 +478,7 @@ const Applications = () => {
       link.click();
       document.body.removeChild(link);
     } catch (error) {
-      console.error("Error downloading Portfolio:", error);
+      adminApplicationsLogger.error("portfolio download failed", error);
       toast.error("Error downloading Portfolio");
     }
   };
@@ -491,24 +491,48 @@ const Applications = () => {
     if (totalPages <= 1) return null;
 
     return (
-      <div className="flex items-center justify-end gap-2 mt-3">
-        <button
-          onClick={() => onPageChange(page - 1)}
-          disabled={page <= 1}
-          className="px-2.5 py-1 text-xs text-[#134687]/80 border border-[#005FD9]/15 rounded hover:bg-[#F3F3FD] disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          Previous
-        </button>
-        <span className="text-xs text-[#134687]/60 font-mono">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#005FD9]/10 bg-white p-3">
+        <span className="text-xs text-[#134687]/40 font-mono">
           Page {page} of {totalPages}
         </span>
-        <button
-          onClick={() => onPageChange(page + 1)}
-          disabled={page >= totalPages}
-          className="px-2.5 py-1 text-xs text-[#134687]/80 border border-[#005FD9]/15 rounded hover:bg-[#F3F3FD] disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          Next
-        </button>
+        <div className="flex flex-wrap gap-1">
+          <button
+            onClick={() => onPageChange(page - 1)}
+            disabled={page <= 1}
+            className="rounded border border-[#005FD9]/15 px-2.5 py-1 text-xs text-[#134687] font-mono hover:bg-[#F3F3FD] disabled:cursor-not-allowed disabled:opacity-30"
+          >
+            prev
+          </button>
+          {Array.from({ length: Math.min(5, totalPages) }, (_, index) => {
+            let pageNumber;
+            if (totalPages <= 5) pageNumber = index + 1;
+            else if (page <= 3) pageNumber = index + 1;
+            else if (page >= totalPages - 2)
+              pageNumber = totalPages - 4 + index;
+            else pageNumber = page - 2 + index;
+
+            return (
+              <button
+                key={pageNumber}
+                onClick={() => onPageChange(pageNumber)}
+                className={`rounded px-2.5 py-1 text-xs font-mono ${
+                  page === pageNumber
+                    ? "bg-[#044FAF] text-white"
+                    : "border border-[#005FD9]/15 text-[#134687] hover:bg-[#F3F3FD]"
+                }`}
+              >
+                {pageNumber}
+              </button>
+            );
+          })}
+          <button
+            onClick={() => onPageChange(page + 1)}
+            disabled={page >= totalPages}
+            className="rounded border border-[#005FD9]/15 px-2.5 py-1 text-xs text-[#134687] font-mono hover:bg-[#F3F3FD] disabled:cursor-not-allowed disabled:opacity-30"
+          >
+            next
+          </button>
+        </div>
       </div>
     );
   };
@@ -583,10 +607,7 @@ const Applications = () => {
   if (status === "loading") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F3F3FD] bg-[url('/assets/css-apply-static-images/assets/pictures/background.webp')] bg-cover bg-repeat">
-        <div className="flex flex-col items-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#044FAF]"></div>
-          <p className="mt-4 text-[#134687]">Loading session...</p>
-        </div>
+        <AdminContentLoading description="Loading admin session..." />
       </div>
     );
   }
@@ -602,49 +623,12 @@ const Applications = () => {
       <div className="flex-1 p-6 md:p-8 pt-16 md:pt-12 overflow-y-auto h-screen">
         {/* PAGE HEADER */}
         <div className="mb-8 mt-12 md:mt-8 text-center md:text-left">
-          <div className="flex justify-between items-center mb-4">
-            <div className="rounded-[45px] text-white text-lg lg:text-4xl font-poppins font-medium px-6 py-2 lg:py-4 text-center [background:linear-gradient(90deg,#2F7EE3_0%,#0349A2_100%)] w-fit">
+          <div className="mb-4">
+            <div className="w-fit max-w-full rounded-[45px] px-6 py-2 text-center text-lg font-poppins font-medium text-white [background:linear-gradient(90deg,_#2F7EE3_0%,_#0349A2_100%)] lg:py-4 lg:text-4xl">
               All Applications
             </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  if (session?.user?.id) {
-                    clearEBCache(session.user.id);
-                    getEBData(session.user.id, true).then((freshEbData) => {
-                      if (freshEbData?.position) {
-                        fetchApplications(freshEbData.position);
-                      } else {
-                        setLoading(false);
-                      }
-                    });
-                  }
-                }}
-                className="px-4 py-2 text-sm text-[#134687] border border-[#005FD9]/15 rounded-lg hover:bg-[#F3F3FD] transition-colors"
-              >
-                Refresh
-              </button>
-              <button
-                onClick={() => {
-                  if (session?.user?.id) {
-                    clearEBCache(session.user.id);
-                    getEBData(session.user.id, true).then((freshEbData) => {
-                      if (freshEbData?.position) {
-                        fetchApplications(freshEbData.position);
-                      } else {
-                        setLoading(false);
-                      }
-                    });
-                  }
-                }}
-                className="px-4 py-2 text-sm text-[#134687]/50 border border-[#005FD9]/10 rounded-lg hover:bg-[#F3F3FD] transition-colors"
-                title="Force refresh your position data"
-              >
-                Refresh Position
-              </button>
-            </div>
           </div>
-          <p className="text-black text-xs lg:text-lg font-Inter font-light leading-5 mb-2">
+          <p className="mb-2 text-xs font-Inter font-light leading-5 text-black lg:text-lg">
             Review and manage all applications from students for CSSApply
           </p>
           {loading || !ebData ? (
@@ -658,10 +642,20 @@ const Applications = () => {
             </p>
           ) : null}
 
-          {/* SEARCH BAR */}
-          <div className="mb-6">
-            <div className="relative max-w-md">
+          <hr className="border-[#005FD9]" />
+        </div>
+
+        {/* Search and refresh tools */}
+        <div className="mb-5 rounded-xl border border-[#005FD9]/10 bg-white p-5">
+          <label
+            htmlFor="application-search"
+            className="mb-1 block text-xs font-medium uppercase tracking-wider text-[#134687]/50 font-mono"
+          >
+            Search Applications
+          </label>
+          <div className="relative max-w-md">
               <input
+                id="application-search"
                 type="text"
                 placeholder="Search by name, student number, or email..."
                 value={searchQuery}
@@ -685,21 +679,59 @@ const Applications = () => {
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#044FAF]"></div>
                 </div>
               )}
-            </div>
-            {searchQuery.trim() && (
-              <p className="text-sm text-gray-600 mt-2">
-                {isSearching
-                  ? "Searching..."
-                  : `Found ${applicationCounts.total} result(s) for "${searchQuery}"`}
-              </p>
-            )}
           </div>
-
-          <hr className="border-[#005FD9]" />
+          {searchQuery.trim() && (
+            <p className="mt-2 text-sm text-[#134687]/60">
+              {isSearching
+                ? "Searching..."
+                : `Found ${applicationCounts.total} result(s) for "${searchQuery}"`}
+            </p>
+          )}
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+            <button
+              onClick={() => {
+                if (session?.user?.id) {
+                  clearEBCache(session.user.id);
+                  getEBData(session.user.id, true).then((freshEbData) => {
+                    if (freshEbData?.position) {
+                      fetchApplications(freshEbData.position);
+                    } else {
+                      setLoading(false);
+                    }
+                  });
+                }
+              }}
+              className="w-full rounded-lg border border-[#005FD9]/15 px-4 py-2 text-sm font-medium text-[#134687] transition-colors hover:bg-[#F3F3FD] sm:w-auto"
+            >
+              Refresh
+            </button>
+            <button
+              onClick={() => {
+                if (session?.user?.id) {
+                  clearEBCache(session.user.id);
+                  getEBData(session.user.id, true).then((freshEbData) => {
+                    if (freshEbData?.position) {
+                      fetchApplications(freshEbData.position);
+                    } else {
+                      setLoading(false);
+                    }
+                  });
+                }
+              }}
+              className="w-full rounded-lg border border-[#005FD9]/10 px-4 py-2 text-sm font-medium text-[#134687]/60 transition-colors hover:bg-[#F3F3FD] sm:w-auto"
+              title="Force refresh your position data"
+            >
+              Refresh Position
+            </button>
+          </div>
         </div>
 
         {/* APPLICATIONS LIST */}
-        <div className="bg-white rounded-xl border border-[#005FD9]/10 p-5 mb-5 min-h-[calc(100vh-180px)] md:min-h-[calc(100vh-280px)]">
+        <div
+          className={`mb-5 min-h-[280px] rounded-xl border border-[#005FD9]/10 bg-white p-5 md:min-h-[max(280px,calc(100dvh-400px))] ${
+            loading ? "flex items-center justify-center" : ""
+          }`}
+        >
           {(() => {
             const hasApplications =
               currentApplications.committee.length > 0 ||
@@ -708,24 +740,24 @@ const Applications = () => {
 
             if (loading) {
               return (
-                <div className="flex flex-col items-center justify-center py-12">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#044FAF]"></div>
-                  <p className="mt-3 text-sm text-[#134687]/60">
-                    Loading applications...
-                  </p>
-                </div>
+                <AdminContentLoading description="Loading application data..." />
               );
             }
 
             if (!hasApplications) {
               return (
-                <div className="text-center py-12">
-                  <p className="text-[#134687]/40 text-sm">
-                    {searchQuery.trim()
-                      ? `No applications found for "${searchQuery}"`
-                      : "No applications found"}
-                  </p>
-                </div>
+                <AdminEmptyState
+                  title={
+                    searchQuery.trim()
+                      ? `No applications found for “${searchQuery}”`
+                      : "No applications found"
+                  }
+                  description={
+                    searchQuery.trim()
+                      ? "Try another name, student number, or email."
+                      : "Applications will appear here once students submit them."
+                  }
+                />
               );
             }
 
@@ -1030,8 +1062,8 @@ const Applications = () => {
                                       toast.info("Meeting link not available");
                                     }
                                   } catch (error) {
-                                    console.error(
-                                      "Error fetching meeting link:",
+                                    adminApplicationsLogger.error(
+                                      "meeting link request failed",
                                       error,
                                     );
                                     toast.error("Failed to get meeting link");
@@ -1299,8 +1331,8 @@ const Applications = () => {
                                       toast.info("Meeting link not available");
                                     }
                                   } catch (error) {
-                                    console.error(
-                                      "Error fetching meeting link:",
+                                    adminApplicationsLogger.error(
+                                      "meeting link request failed",
                                       error,
                                     );
                                     toast.error("Failed to get meeting link");

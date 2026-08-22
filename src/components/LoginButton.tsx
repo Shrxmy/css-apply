@@ -3,6 +3,9 @@
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { createLogger } from "@/lib/logger";
+
+const loginLogger = createLogger("login");
 
 interface EnterButtonProps {
   isVisible: boolean;
@@ -24,7 +27,7 @@ export default function EnterButton({ isVisible }: EnterButtonProps) {
         redirect: true,
       });
     } catch (error) {
-      console.error("Sign-in error:", error);
+      loginLogger.error("sign-in request failed", error);
       setIsLoggingIn(false);
     }
   };

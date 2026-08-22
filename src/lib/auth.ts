@@ -1,6 +1,10 @@
 import { type NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import { prisma } from "@/lib/prisma";
+import { createLogger } from "@/lib/logger";
+
+const authLogger = createLogger("auth");
+const AUTH_TOKEN_VERSION = 2;
 
 const ALLOWED_SIGNIN_EMAIL_DOMAIN =
   process.env.ALLOWED_SIGNIN_EMAIL_DOMAIN?.trim().toLowerCase() || "ust.edu.ph";
@@ -67,8 +71,8 @@ export const authOptions: NextAuthOptions = {
     async signIn({ user }) {
       try {
         if (!isAllowedSignInEmail(user.email)) {
-          console.warn("Rejected sign-in for disallowed email domain", {
-            email: user.email,
+          authLogger.warn("sign-in blocked", {
+            reason: "email domain is not allowed",
           });
           return false;
         }
@@ -100,184 +104,108 @@ export const authOptions: NextAuthOptions = {
 
         return true;
       } catch (error) {
-        console.error("SignIn error:", error);
+        authLogger.error("sign-in callback failed", error);
         return false;
       }
     },
 
-    async jwt({ token, user }) {
-      if (user) {
-        token.role = "user";
-      }
+    async jwt({ token, user, trigger }) {
+      const appToken = token as typeof token & {
+        authVersion?: number;
+        role?: string;
+        dbId?: string;
+        studentNumber?: string | null;
+        section?: string | null;
+        hasCompletedProfile?: boolean;
+        ebProfile?: {
+          position: string;
+          committees: string[];
+          isActive: boolean;
+        } | null;
+      };
 
-      const email =
-        typeof token?.email === "string" && token.email.length > 0
-          ? token.email
-          : null;
+      // Stable account data is stored in the signed JWT. Re-query only during
+      // sign-in, when an older token lacks database identity, or after an
+      // explicit session update. This avoids a database round-trip before
+      // every authenticated API request.
+      if (
+        user ||
+        !appToken.dbId ||
+        appToken.authVersion !== AUTH_TOKEN_VERSION ||
+        trigger === "update"
+      ) {
+        const email =
+          typeof token.email === "string" && token.email.length > 0
+            ? token.email
+            : user?.email;
 
-      if (email) {
-        try {
-          const dbUser = await prisma.user.findUnique({
-            where: { email },
-            select: {
-              id: true,
-              role: true,
-              name: true,
-            },
-          });
+        if (email) {
+          try {
+            const dbUser = await prisma.user.findUnique({
+              where: { email },
+              select: {
+                id: true,
+                role: true,
+                name: true,
+                studentNumber: true,
+                section: true,
+                ebProfile: {
+                  select: {
+                    position: true,
+                    committees: true,
+                    isActive: true,
+                  },
+                },
+              },
+            });
 
-          if (dbUser) {
-            token.role = dbUser.role;
-            token.dbId = dbUser.id;
-            token.name = dbUser.name;
+            if (dbUser) {
+              appToken.authVersion = AUTH_TOKEN_VERSION;
+              appToken.role = dbUser.role;
+              appToken.dbId = dbUser.id;
+              appToken.name = dbUser.name;
+              appToken.studentNumber = dbUser.studentNumber;
+              appToken.section = dbUser.section;
+              appToken.hasCompletedProfile = Boolean(
+                dbUser.studentNumber && dbUser.section,
+              );
+              appToken.ebProfile = dbUser.ebProfile;
+            }
+          } catch (error) {
+            authLogger.error("session token lookup failed", error);
           }
-        } catch (error) {
-          console.error("JWT callback database error:", error);
         }
       }
 
-      return token;
+      return appToken;
     },
 
     async session({ session, token }) {
-      try {
-        if (!session?.user || !token) {
-          return session;
-        }
+      if (!session?.user || !token) return session;
 
-        (session.user as UserSession).role = token.role as string;
-        (session.user as UserSession).dbId = token.dbId as string;
+      const appToken = token as typeof token & {
+        role?: string;
+        dbId?: string;
+        studentNumber?: string | null;
+        section?: string | null;
+        hasCompletedProfile?: boolean;
+        ebProfile?: {
+          position: string;
+          committees: string[];
+          isActive: boolean;
+        } | null;
+      };
+      const sessionUser = session.user as UserSession;
 
-        const email =
-          typeof session.user.email === "string" && session.user.email.length > 0
-            ? session.user.email
-            : null;
+      sessionUser.id = appToken.dbId;
+      sessionUser.dbId = appToken.dbId;
+      sessionUser.role = appToken.role ?? "user";
+      sessionUser.studentNumber = appToken.studentNumber;
+      sessionUser.section = appToken.section;
+      sessionUser.hasCompletedProfile = appToken.hasCompletedProfile ?? false;
+      sessionUser.ebProfile = appToken.ebProfile ?? null;
 
-        if (!email) {
-          return session;
-        }
-
-        const activeCycle = await prisma.recruitmentCycle.findFirst({
-          where: { isActive: true },
-          orderBy: { createdAt: "desc" },
-          select: { id: true },
-        });
-        const activeCycleId = activeCycle?.id ?? "__no_active_cycle__";
-
-        const dbUser = await prisma.user.findUnique({
-          where: { email },
-          select: {
-            id: true,
-            studentNumber: true,
-            section: true,
-            name: true,
-            role: true,
-            createdAt: true,
-            updatedAt: true,
-            memberApplications: {
-              where: { recruitmentCycleId: activeCycleId },
-              take: 1,
-              select: {
-                id: true,
-                hasAccepted: true,
-                paymentProof: true,
-                createdAt: true,
-              },
-            },
-            executiveAssociateApplications: {
-              where: { recruitmentCycleId: activeCycleId },
-              take: 1,
-              select: {
-                id: true,
-                hasAccepted: true,
-                status: true,
-                firstOptionEb: true,
-              },
-            },
-            committeeApplications: {
-              where: { recruitmentCycleId: activeCycleId },
-              take: 1,
-              select: {
-                id: true,
-                hasAccepted: true,
-                status: true,
-                firstOptionCommittee: true,
-              },
-            },
-            ebProfile: {
-              select: {
-                position: true,
-                committees: true,
-                isActive: true,
-              },
-            },
-          },
-        });
-
-        if (!dbUser) {
-          return session;
-        }
-
-        // Add database user details to session
-        (session.user as UserSession).dbId = dbUser.id;
-        (session.user as UserSession).studentNumber = dbUser.studentNumber;
-        (session.user as UserSession).section = dbUser.section;
-        (session.user as UserSession).name = dbUser.name;
-        (session.user as UserSession).role = dbUser.role;
-        (session.user as UserSession).createdAt = dbUser.createdAt;
-        (session.user as UserSession).updatedAt = dbUser.updatedAt;
-        (session.user as UserSession).ebProfile = dbUser.ebProfile;
-
-        // Add application status information
-        (session.user as UserSession).hasMemberApplication =
-          !!dbUser.memberApplications?.[0];
-        (session.user as UserSession).hasExecutiveAssociateApplication = !!dbUser.executiveAssociateApplications?.[0];
-        (session.user as UserSession).hasCommitteeApplication =
-          !!dbUser.committeeApplications?.[0];
-
-        // Add redirect information for faster navigation
-        (session.user as UserSession).ebRole = dbUser.executiveAssociateApplications?.[0]?.firstOptionEb;
-        (session.user as UserSession).committeeId =
-          dbUser.committeeApplications?.[0]?.firstOptionCommittee;
-
-        // Check if user has completed their profile
-        (session.user as UserSession).hasCompletedProfile =
-          !!dbUser.studentNumber && !!dbUser.section;
-
-        // Check application status for routing
-        (session.user as UserSession).applicationStatus = {
-          member: dbUser.memberApplications?.[0]
-            ? {
-                hasApplication: true,
-                hasPayment: !!dbUser.memberApplications?.[0].paymentProof,
-                isAccepted: dbUser.memberApplications?.[0].hasAccepted,
-                appliedAt: dbUser.memberApplications?.[0].createdAt,
-              }
-            : { hasApplication: false },
-
-          ea: dbUser.executiveAssociateApplications?.[0]
-            ? {
-                hasApplication: true,
-                status: dbUser.executiveAssociateApplications?.[0].status ?? undefined,
-                isAccepted: dbUser.executiveAssociateApplications?.[0].hasAccepted,
-              }
-            : { hasApplication: false },
-
-          committee: dbUser.committeeApplications?.[0]
-            ? {
-                hasApplication: true,
-                status: dbUser.committeeApplications?.[0].status ?? undefined,
-                isAccepted: dbUser.committeeApplications?.[0].hasAccepted,
-              }
-            : { hasApplication: false },
-        };
-
-        return session;
-      } catch (error) {
-        console.error("Session callback error:", error);
-        // Never throw here. Throwing can cause /api/auth/session to return non-JSON 500 and trigger CLIENT_FETCH_ERROR.
-        return session;
-      }
+      return session;
     },
 
     async redirect({ url }) {
@@ -351,7 +279,20 @@ export const authOptions: NextAuthOptions = {
       },
     },
   },
-  // Add additional configuration for OAuth state management
+  // Keep NextAuth diagnostics concise. Verbose OAuth metadata can contain
+  // long URLs and sensitive values, so debug logging is opt-in only.
+  logger: {
+    error(code, metadata) {
+      const error = metadata instanceof Error ? metadata : metadata?.error;
+      authLogger.error(`next-auth ${code}`, error);
+    },
+    warn(code) {
+      authLogger.warn(`next-auth ${code}`);
+    },
+    debug(code) {
+      authLogger.info(`next-auth ${code}`);
+    },
+  },
   useSecureCookies: process.env.NODE_ENV === "production",
-  debug: process.env.NODE_ENV === "development",
+  debug: process.env.NEXTAUTH_DEBUG === "true",
 };

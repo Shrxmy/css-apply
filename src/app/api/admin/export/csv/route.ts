@@ -126,7 +126,10 @@ async function exportMemberApplications(_status: string | null) {
     "Old CSS Member",
     "Member ID",
     "Status",
+    "Payment Review Status",
     "Payment Proof",
+    "Payment Rejection Reason",
+    "Payment Reviewed Date",
     "Applied Date",
     "Updated Date",
   ];
@@ -142,7 +145,10 @@ async function exportMemberApplications(_status: string | null) {
     formatBoolean(app.user.isOldCssMember),
     getDisplayMemberId(app.user),
     "Accepted", // All member applications in CSV are accepted
+    app.paymentStatus,
     app.paymentProof || "",
+    app.paymentRejectionReason || "",
+    formatDate(app.paymentReviewedAt),
     app.createdAt.toISOString().split("T")[0],
     app.updatedAt.toISOString().split("T")[0],
   ]);
@@ -243,6 +249,10 @@ async function exportCommitteeApplications(
     "Interview Day",
     "Interview Time",
     "Interview By",
+    "Payment Review Status",
+    "Payment Proof",
+    "Payment Rejection Reason",
+    "Payment Reviewed Date",
     "Applied Date",
     "Updated Date",
   ];
@@ -264,6 +274,10 @@ async function exportCommitteeApplications(
     app.interviewSlotDay || "",
     app.interviewSlotTimeStart || "",
     app.interviewBy || "",
+    app.paymentStatus,
+    app.paymentProof || "",
+    app.paymentRejectionReason || "",
+    formatDate(app.paymentReviewedAt),
     app.createdAt.toISOString().split("T")[0],
     app.updatedAt.toISOString().split("T")[0],
   ]);
@@ -325,6 +339,10 @@ async function exportExecutiveAssociateApplications(_status: string | null) {
     "Interview Day",
     "Interview Time",
     "Interview By",
+    "Payment Review Status",
+    "Payment Proof",
+    "Payment Rejection Reason",
+    "Payment Reviewed Date",
     "Applied Date",
     "Updated Date",
   ];
@@ -347,6 +365,10 @@ async function exportExecutiveAssociateApplications(_status: string | null) {
     app.interviewSlotDay || "",
     app.interviewSlotTimeStart || "",
     app.interviewBy || "",
+    app.paymentStatus,
+    app.paymentProof || "",
+    app.paymentRejectionReason || "",
+    formatDate(app.paymentReviewedAt),
     app.createdAt.toISOString().split("T")[0],
     app.updatedAt.toISOString().split("T")[0],
   ]);
@@ -363,11 +385,14 @@ function formatBoolean(value: boolean | null) {
   return value ? "Yes" : "No";
 }
 
-function generateCSV(headers: string[], rows: string[][]) {
-  const csvContent = [
-    headers.join(","),
-    ...rows.map((row) => row.map((cell) => `"${cell}"`).join(",")),
-  ].join("\n");
+function escapeCsvCell(value: string) {
+  const formulaSafeValue = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+  return `"${formulaSafeValue.replace(/"/g, '""')}"`;
+}
 
-  return csvContent;
+function generateCSV(headers: string[], rows: string[][]) {
+  return [
+    headers.map(escapeCsvCell).join(","),
+    ...rows.map((row) => row.map(escapeCsvCell).join(",")),
+  ].join("\n");
 }

@@ -11,47 +11,49 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const activeCycle = await prisma.recruitmentCycle.findFirst({
-      where: { isActive: true },
-      orderBy: { createdAt: "desc" },
-      select: { id: true },
-    });
-
-    const activeCycleId = activeCycle?.id ?? "__no_active_cycle__";
-
-    // Use a more efficient query with only necessary fields
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        memberApplications: {
-          where: { recruitmentCycleId: activeCycleId },
-          select: {
-            id: true,
-          },
-          take: 1,
+    // These queries are independent. Running them together avoids paying two
+    // sequential Neon network round-trips during every initial page load.
+    const [activeCycle, user] = await Promise.all([
+      prisma.recruitmentCycle.findFirst({
+        where: { isActive: true },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          applicationStart: true,
+          interviewEnd: true,
         },
-        committeeApplications: {
-          where: { recruitmentCycleId: activeCycleId },
-          select: {
-            id: true,
-            firstOptionCommittee: true,
+      }),
+      prisma.user.findUnique({
+        where: { email: session.user.email },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          memberApplications: {
+            where: { recruitmentCycle: { isActive: true } },
+            select: { id: true },
+            take: 1,
           },
-          take: 1,
-        },
-        executiveAssociateApplications: {
-          where: { recruitmentCycleId: activeCycleId },
-          select: {
-            id: true,
-            firstOptionEb: true,
+          committeeApplications: {
+            where: { recruitmentCycle: { isActive: true } },
+            select: {
+              id: true,
+              firstOptionCommittee: true,
+            },
+            take: 1,
           },
-          take: 1,
+          executiveAssociateApplications: {
+            where: { recruitmentCycle: { isActive: true } },
+            select: {
+              id: true,
+              firstOptionEb: true,
+            },
+            take: 1,
+          },
         },
-      },
-    });
+      }),
+    ]);
 
     if (!user) {
       // For new users, create a basic user record if it doesn't exist
@@ -75,6 +77,7 @@ export async function GET() {
           },
           ebRole: null,
           committeeId: null,
+          activeCycle,
         };
 
         return NextResponse.json(existingApplications);
@@ -99,6 +102,7 @@ export async function GET() {
       // ADD these for proper redirects
       ebRole: user.executiveAssociateApplications?.[0]?.firstOptionEb,
       committeeId: user.committeeApplications?.[0]?.firstOptionCommittee,
+      activeCycle,
     };
 
     return NextResponse.json(existingApplications);

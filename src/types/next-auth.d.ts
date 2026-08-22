@@ -31,6 +31,11 @@ declare module "next-auth" {
       };
       ebRole?: string;
       committeeId?: string;
+      ebProfile?: {
+        position: string;
+        committees: string[];
+        isActive: boolean;
+      } | null;
       applicationStatus: {
         member: {
           hasApplication: boolean;

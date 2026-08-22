@@ -26,7 +26,7 @@ export default function UserDashboard() {
     data: appStatus,
     isLoading: isAppLoading,
     hasAnyApplication,
-  } = useApplicationStatus(status === "authenticated");
+  } = useApplicationStatus(status !== "unauthenticated");
 
   const {
     isOpen: applicationsOpen,
@@ -87,7 +87,13 @@ export default function UserDashboard() {
 
   return (
     <div>
-      <section className="min-h-screen bg-[#F3F3FD] bg-[url('/assets/css-apply-static-images/assets/pictures/background.webp')] flex flex-col justify-between relative bg-cover bg-repeat">
+      <section
+        className="relative flex min-h-screen flex-col justify-between bg-[#F3F3FD] bg-cover bg-center bg-repeat"
+        style={{
+          backgroundImage:
+            "url('/assets/css-apply-static-images/assets/pictures/background.webp')",
+        }}
+      >
         <Header />
 
         <main className="flex w-full flex-1 flex-col items-center justify-center px-4 py-10 lg:py-16">

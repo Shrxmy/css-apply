@@ -20,7 +20,7 @@ export default function AssistantApplication() {
 
   // SWR hook — shared with user dashboard, no duplicate fetch
   const { data: appStatus, isLoading: isAppLoading } = useApplicationStatus(
-    status === "authenticated",
+    status !== "unauthenticated",
   );
 
   // Gate: redirect to /user when applications are closed

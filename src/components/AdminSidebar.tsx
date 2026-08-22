@@ -10,9 +10,27 @@ interface SidebarContentProps {
   activePage: string;
 }
 
+const PAYMENT_REVIEW_POSITIONS = new Set([
+  "president",
+  "treasurer",
+  "auditor",
+]);
+
 const SidebarContent = ({ activePage }: SidebarContentProps) => {
   const { data: session } = useSession();
   const isSuperAdmin = session?.user?.role === "super_admin";
+  const { data: currentEbData } = useSWR(
+    session?.user?.dbId
+      ? `/api/admin/eb-profiles/${session.user.dbId}`
+      : null,
+    swrFetcher,
+    { revalidateOnFocus: false, dedupingInterval: 30000 },
+  );
+  const currentPosition =
+    currentEbData?.ebProfile?.position ?? session?.user?.ebProfile?.position;
+  const canReviewPayments =
+    isSuperAdmin ||
+    PAYMENT_REVIEW_POSITIONS.has(currentPosition?.trim().toLowerCase() ?? "");
 
   const { data: countsData } = useSWR(
     session ? "/api/admin/applications/counts" : null,
@@ -298,6 +316,48 @@ const SidebarContent = ({ activePage }: SidebarContentProps) => {
               )}
             </Link>
           )}
+
+          {/* receipt review - President, Treasurer, Auditor, and Super Admin */}
+          {canReviewPayments &&
+            (activePage === "payment-reviews" ? (
+              <div
+                className="flex items-center px-4 py-3 text-gray-600 border border-gray-300 rounded-lg transition-all duration-300 transform hover:scale-[1.02] hover:shadow-md"
+                style={{ backgroundColor: "#fefefe" }}
+              >
+                <div
+                  className="w-5 h-5 mr-3 text-[#164e96] bg-current transition-colors duration-300"
+                  style={{
+                    maskImage: "url(/icons/file-text.svg)",
+                    WebkitMaskImage: "url(/icons/file-text.svg)",
+                    maskSize: "contain",
+                    maskRepeat: "no-repeat",
+                    maskPosition: "center",
+                  }}
+                />
+                <span className="text-sm text-gray-700 transition-colors duration-300">
+                  Receipt Review
+                </span>
+              </div>
+            ) : (
+              <Link
+                href="/admin/payment-reviews"
+                className="group flex items-center px-4 py-3 text-gray-600 hover:bg-blue-50 rounded-lg transition-all duration-300 transform hover:scale-[1.02] hover:shadow-md"
+              >
+                <div
+                  className="w-5 h-5 mr-3 text-gray-500 group-hover:text-[#164e96] bg-current transition-all duration-300"
+                  style={{
+                    maskImage: "url(/icons/file-text.svg)",
+                    WebkitMaskImage: "url(/icons/file-text.svg)",
+                    maskSize: "contain",
+                    maskRepeat: "no-repeat",
+                    maskPosition: "center",
+                  }}
+                />
+                <span className="text-sm text-gray-700 transition-colors duration-300">
+                  Receipt Review
+                </span>
+              </Link>
+            ))}
 
           {/* super admin - only visible to super_admin users */}
           {isSuperAdmin && (

@@ -1,4 +1,7 @@
 import { BrevoClient } from "@getbrevo/brevo";
+import { createLogger } from "@/lib/logger";
+
+const emailLogger = createLogger("email");
 
 const brevo = new BrevoClient({
     apiKey: process.env.BREVO_API_KEY || "",
@@ -49,10 +52,7 @@ export const sendEmail = async (to: string, subject: string, html: string) => {
 
         return { success: true, messageId: result.messageId };
     } catch (error) {
-        console.error(
-            "Email delivery failed",
-            error instanceof Error ? error.name : "UnknownError",
-        );
+        emailLogger.error("delivery failed", error);
         return { success: false, error };
     }
 };
@@ -68,21 +68,22 @@ export const sendEmailWithValidation = async (
         // Basic email validation
         const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
         if (!emailRegex.test(to)) {
-            throw new Error(`Invalid email address: ${to}`);
+            throw new Error("Invalid email address");
         }
 
         const result = await sendEmail(to, subject, html);
 
         if (!result.success) {
-            console.error("Email delivery returned an error", context || "unspecified");
+            emailLogger.error("delivery returned an error", result.error, {
+                context: context || "unspecified",
+            });
         }
 
         return result;
     } catch (error) {
-        console.error(
-            "Email validation or delivery failed",
-            context || (error instanceof Error ? error.name : "UnknownError"),
-        );
+        emailLogger.error("validation or delivery failed", error, {
+            context: context || "unspecified",
+        });
         return { success: false, error };
     }
 };
@@ -429,7 +430,7 @@ export const emailTemplates = {
                 To complete your membership, please open your application progress page, scan the latest payment QR shown there, download and fill out the acknowledgement receipt PDF, upload it to Google Drive, and submit the shareable link in the system.
               </p>
               <p style="font-size: 13px; margin: 10px 0 0 0;">
-                Your Member ID will be sent through a separate email and shown in the system after your payment acknowledgement receipt link is submitted.
+                Your Member ID will be sent through a separate email and shown in the system after an authorized Executive Board reviewer verifies and approves your acknowledgement receipt.
               </p>
             </div>
 
@@ -475,7 +476,7 @@ export const emailTemplates = {
                 To complete your membership, please open your application progress page, scan the latest payment QR shown there, download and fill out the acknowledgement receipt PDF, upload it to Google Drive, and submit the shareable link in the system.
               </p>
               <p style="font-size: 13px; margin: 10px 0 0 0;">
-                Your Member ID will be sent through a separate email and shown in the system after your payment acknowledgement receipt link is submitted.
+                Your Member ID will be sent through a separate email and shown in the system after an authorized Executive Board reviewer verifies and approves your acknowledgement receipt.
               </p>
             </div>
 
@@ -522,7 +523,7 @@ export const emailTemplates = {
                 To complete your membership, please open your application progress page, scan the latest payment QR shown there, download and fill out the acknowledgement receipt PDF, upload it to Google Drive, and submit the shareable link in the system.
               </p>
               <p style="font-size: 13px; margin: 10px 0 0 0;">
-                Your Member ID will be sent through a separate email and shown in the system after your payment acknowledgement receipt link is submitted.
+                Your Member ID will be sent through a separate email and shown in the system after an authorized Executive Board reviewer verifies and approves your acknowledgement receipt.
               </p>
             </div>
 
@@ -637,7 +638,7 @@ export const emailTemplates = {
                 To complete your membership, please open your application progress page, scan the latest payment QR shown there, download and fill out the acknowledgement receipt PDF, upload it to Google Drive, and submit the shareable link in the system.
               </p>
               <p style="font-size: 13px; margin: 10px 0 0 0;">
-                Your Member ID will be sent through a separate email and shown in the system after your payment acknowledgement receipt link is submitted.
+                Your Member ID will be sent through a separate email and shown in the system after an authorized Executive Board reviewer verifies and approves your acknowledgement receipt.
               </p>
             </div>
 
@@ -690,7 +691,7 @@ export const emailTemplates = {
                 To complete your membership, please open your application progress page, scan the latest payment QR shown there, download and fill out the acknowledgement receipt PDF, upload it to Google Drive, and submit the shareable link in the system.
               </p>
               <p style="font-size: 13px; margin: 10px 0 0 0;">
-                Your Member ID will be sent through a separate email and shown in the system after your payment acknowledgement receipt link is submitted.
+                Your Member ID will be sent through a separate email and shown in the system after an authorized Executive Board reviewer verifies and approves your acknowledgement receipt.
               </p>
             </div>
 
@@ -744,7 +745,7 @@ export const emailTemplates = {
                 To complete your membership, please open your application progress page, scan the latest payment QR shown there, download and fill out the acknowledgement receipt PDF, upload it to Google Drive, and submit the shareable link in the system.
               </p>
               <p style="font-size: 13px; margin: 10px 0 0 0;">
-                Your Member ID will be sent through a separate email and shown in the system after your payment acknowledgement receipt link is submitted.
+                Your Member ID will be sent through a separate email and shown in the system after an authorized Executive Board reviewer verifies and approves your acknowledgement receipt.
               </p>
             </div>
 
@@ -954,7 +955,7 @@ export const emailTemplates = {
                 To complete your membership, please open your application progress page, scan the latest payment QR shown there, download and fill out the acknowledgement receipt PDF, upload it to Google Drive, and submit the shareable link in the system.
               </p>
               <p style="font-size: 13px; margin: 10px 0 0 0;">
-                Your Member ID will be sent through a separate email and shown in the system after your payment acknowledgement receipt link is submitted.
+                Your Member ID will be sent through a separate email and shown in the system after an authorized Executive Board reviewer verifies and approves your acknowledgement receipt.
               </p>
             </div>
 
@@ -1010,7 +1011,7 @@ export const emailTemplates = {
                 To complete your membership, please open your application progress page, scan the latest payment QR shown there, download and fill out the acknowledgement receipt PDF, upload it to Google Drive, and submit the shareable link in the system.
               </p>
               <p style="font-size: 13px; margin: 10px 0 0 0;">
-                Your Member ID will be sent through a separate email and shown in the system after your payment acknowledgement receipt link is submitted.
+                Your Member ID will be sent through a separate email and shown in the system after an authorized Executive Board reviewer verifies and approves your acknowledgement receipt.
               </p>
             </div>
 
@@ -1044,7 +1045,7 @@ export const emailTemplates = {
         html: wrapEmail(
             "Your Member ID is ready",
             `
-            <p>Hi ${userName}, your payment acknowledgement receipt has been recorded.</p>
+            <p>Hi ${userName}, an authorized Executive Board reviewer has reviewed and approved your acknowledgement receipt.</p>
             
             <div class="accent-box" style="background-color: #E8F2FF; padding: 20px; border-radius: 12px; margin: 20px 0; text-align: center;">
               <p style="margin: 0 0 8px; color: #134687; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;">Member ID</p>

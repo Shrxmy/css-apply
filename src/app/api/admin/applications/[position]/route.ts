@@ -4,6 +4,9 @@ import { getServerSession } from "next-auth";
 import { prisma } from "@/lib/prisma";
 import { getPositionTitle, getRoleId } from "@/lib/eb-mapping";
 import { committeeRoles } from "@/data/committeeRoles";
+import { createLogger } from "@/lib/logger";
+
+const applicationsLogger = createLogger("api/admin/applications");
 
 const normalizeCommitteeId = (value: string) => {
   const normalizedValue = value.toLowerCase().replace(/&/g, "and");
@@ -109,7 +112,6 @@ export async function GET(
     });
     const activeCycleId = activeCycle?.id ?? "__no_active_cycle__";
 
-    // First, let's see all applications for this position
     const allCommApplications = await prisma.committeeApplication.findMany({
       where: { recruitmentCycleId: activeCycleId },
       orderBy: { createdAt: "desc" },
@@ -124,15 +126,6 @@ export async function GET(
           },
         },
       },
-    });
-
-    console.log(
-      `Found ${allCommApplications.length} total committee applications for position: ${position}`,
-    );
-    allCommApplications.forEach((app: (typeof allCommApplications)[number]) => {
-      console.log(
-        `Committee App ${app.id}: hasAccepted=${app.hasAccepted}, status=${app.status}, user=${app.user?.name}`,
-      );
     });
 
     const commApplications = allCommApplications.filter(
@@ -151,21 +144,10 @@ export async function GET(
             normalizeCommitteeId(app.secondOptionCommittee),
           );
 
-        const shouldInclude =
-          hasCommitteeAccess && !isAccepted && !isRejected && !isRedirected;
-
-        if (!shouldInclude) {
-          console.log(
-            `Excluding committee app ${app.id}: hasAccepted=${app.hasAccepted}, status=${app.status}`,
-          );
-        }
-
-        return shouldInclude;
+        return (
+          hasCommitteeAccess && !isAccepted && !isRejected && !isRedirected
+        );
       },
-    );
-
-    console.log(
-      `Filtered to ${commApplications.length} committee applications for All Applications tab`,
     );
 
     // Get all EA applications and compute whether each one is assigned to the current admin position
@@ -186,17 +168,6 @@ export async function GET(
         },
       });
 
-    console.log(
-      `Found ${allExecutiveAssociateApplications.length} total EA applications for position: ${position}`,
-    );
-    allExecutiveAssociateApplications.forEach(
-      (app: (typeof allExecutiveAssociateApplications)[number]) => {
-        console.log(
-          `EA App ${app.id}: hasAccepted=${app.hasAccepted}, status=${app.status}, user=${app.user?.name}`,
-        );
-      },
-    );
-
     const executiveAssociateApplications =
       allExecutiveAssociateApplications.filter(
         (app: (typeof allExecutiveAssociateApplications)[number]) => {
@@ -205,21 +176,9 @@ export async function GET(
           const isRejected = app.status === "failed";
           const isRedirected = app.status === "redirected";
 
-          const shouldInclude = !isAccepted && !isRejected && !isRedirected;
-
-          if (!shouldInclude) {
-            console.log(
-              `Excluding EA app ${app.id}: hasAccepted=${app.hasAccepted}, status=${app.status}`,
-            );
-          }
-
-          return shouldInclude;
+          return !isAccepted && !isRejected && !isRedirected;
         },
       );
-
-    console.log(
-      `Filtered to ${executiveAssociateApplications.length} EA applications for All Applications tab`,
-    );
 
     // get member applications
     const memberApplications = await prisma.memberApplication.findMany({
@@ -295,12 +254,19 @@ export async function GET(
       }),
     );
 
+    applicationsLogger.info("application list prepared", {
+      position,
+      members: applications.member.length,
+      committees: applications.committee.length,
+      executiveAssociates: applications.ea.length,
+    });
+
     return NextResponse.json({
       success: true,
       applications,
     });
   } catch (error) {
-    console.error("Error fetching applications:", error);
+    applicationsLogger.error("application list failed", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

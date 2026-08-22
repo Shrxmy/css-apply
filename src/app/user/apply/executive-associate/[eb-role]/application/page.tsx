@@ -28,7 +28,7 @@ export default function ExecutiveAssistantApplication() {
   const {
     data: appStatus,
     isLoading: isAppLoading,
-  } = useApplicationStatus(status === "authenticated");
+  } = useApplicationStatus(status !== "unauthenticated");
 
   // Gate: redirect to /user when applications are closed
   const applicationsOpen = useApplicationsOpen("/user");

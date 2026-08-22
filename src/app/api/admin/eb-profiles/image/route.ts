@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -8,6 +8,10 @@ import { supabase } from "@/lib/supabase";
 const BUCKET_NAME = "eb-profile-images";
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
+const BUCKET_CHECK_TTL_MS = 10 * 60 * 1000;
+
+let bucketReadyUntil = 0;
+let bucketSetupPromise: Promise<void> | null = null;
 
 type AllowedImageType = (typeof ALLOWED_IMAGE_TYPES)[number];
 
@@ -44,25 +48,39 @@ function hasValidImageSignature(bytes: Uint8Array, type: AllowedImageType) {
 }
 
 async function ensureBucket() {
-  const { data } = await supabase.storage.getBucket(BUCKET_NAME);
-  if (data) {
-    const { error } = await supabase.storage.updateBucket(BUCKET_NAME, {
-      public: false,
-      allowedMimeTypes: [...ALLOWED_IMAGE_TYPES],
-      fileSizeLimit: MAX_IMAGE_SIZE,
-    });
-    if (error) throw new Error("Unable to update EB image storage settings");
-    return;
-  }
+  if (bucketReadyUntil > Date.now()) return;
+  if (bucketSetupPromise) return bucketSetupPromise;
 
-  const { error } = await supabase.storage.createBucket(BUCKET_NAME, {
-    public: false,
-    allowedMimeTypes: [...ALLOWED_IMAGE_TYPES],
-    fileSizeLimit: MAX_IMAGE_SIZE,
-  });
+  bucketSetupPromise = (async () => {
+    const { data } = await supabase.storage.getBucket(BUCKET_NAME);
+    if (data) {
+      const { error } = await supabase.storage.updateBucket(BUCKET_NAME, {
+        public: false,
+        allowedMimeTypes: [...ALLOWED_IMAGE_TYPES],
+        fileSizeLimit: MAX_IMAGE_SIZE,
+      });
+      if (error) throw new Error("Unable to update EB image storage settings");
+    } else {
+      const { error } = await supabase.storage.createBucket(BUCKET_NAME, {
+        public: false,
+        allowedMimeTypes: [...ALLOWED_IMAGE_TYPES],
+        fileSizeLimit: MAX_IMAGE_SIZE,
+      });
 
-  if (error && !error.message.toLowerCase().includes("already")) {
-    throw new Error("Unable to initialize EB image storage");
+      if (error && !error.message.toLowerCase().includes("already")) {
+        throw new Error("Unable to initialize EB image storage");
+      }
+    }
+
+    // Cache the verified private bucket configuration instead of repeating
+    // these management calls during every phase of every picture transfer.
+    bucketReadyUntil = Date.now() + BUCKET_CHECK_TTL_MS;
+  })();
+
+  try {
+    await bucketSetupPromise;
+  } finally {
+    bucketSetupPromise = null;
   }
 }
 
@@ -137,9 +155,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "EB profile not found" }, { status: 404 });
     }
 
-    await ensureBucket();
-
     if (action === "prepare") {
+      await ensureBucket();
       const fileType = typeof payload.fileType === "string" ? payload.fileType : "";
       const fileSize = typeof payload.fileSize === "number" ? payload.fileSize : 0;
       if (!ALLOWED_IMAGE_TYPES.includes(fileType as AllowedImageType)) {
@@ -217,8 +234,11 @@ export async function POST(request: NextRequest) {
     }
 
     if (profile.imagePath && profile.imagePath !== imagePath) {
-      const { error: removeError } = await storage.remove([profile.imagePath]);
-      if (removeError) console.error("Previous EB image cleanup failed");
+      const previousImagePath = profile.imagePath;
+      after(async () => {
+        const { error: removeError } = await storage.remove([previousImagePath]);
+        if (removeError) console.error("Previous EB image cleanup failed");
+      });
     }
 
     return NextResponse.json({
@@ -264,10 +284,13 @@ export async function DELETE(request: NextRequest) {
     });
 
     if (profile.imagePath) {
-      const { error } = await supabase.storage
-        .from(BUCKET_NAME)
-        .remove([profile.imagePath]);
-      if (error) console.error("EB image cleanup failed");
+      const previousImagePath = profile.imagePath;
+      after(async () => {
+        const { error } = await supabase.storage
+          .from(BUCKET_NAME)
+          .remove([previousImagePath]);
+        if (error) console.error("EB image cleanup failed");
+      });
     }
 
     return NextResponse.json({ success: true });

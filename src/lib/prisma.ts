@@ -1,6 +1,9 @@
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
+import { createLogger } from "@/lib/logger";
+
+const databaseLogger = createLogger("database");
 
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -28,7 +31,7 @@ const pool = globalForDatabase.pgPool ?? createPool();
 
 if (!globalForDatabase.hasPgPoolErrorHandler) {
   pool.on("error", (error) => {
-    console.error("Unexpected PostgreSQL pool error", error.name);
+    databaseLogger.error("connection pool failed", error);
   });
   globalForDatabase.hasPgPoolErrorHandler = true;
 }
