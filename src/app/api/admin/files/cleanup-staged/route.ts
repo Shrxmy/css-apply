@@ -118,9 +118,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const buckets = ["executive-associate-applications", "committee-applications"];
+    const buckets = ["ea-applications", "committee-applications"];
     const candidatesByBucket: Record<string, string[]> = {
-      "executive-associate-applications": [],
+      "ea-applications": [],
       "committee-applications": [],
     };
 
@@ -151,7 +151,7 @@ export async function POST(request: NextRequest) {
     }
 
     const deletedByBucket: Record<string, string[]> = {
-      "executive-associate-applications": [],
+      "ea-applications": [],
       "committee-applications": [],
     };
 
@@ -182,11 +182,11 @@ export async function POST(request: NextRequest) {
       cutoffIso: cutoff.toISOString(),
       referencedPathCount: referencedPaths.size,
       candidates: {
-        ea: candidatesByBucket["executive-associate-applications"].length,
+        ea: candidatesByBucket["ea-applications"].length,
         committee: candidatesByBucket["committee-applications"].length,
       },
       deleted: {
-        ea: deletedByBucket["executive-associate-applications"].length,
+        ea: deletedByBucket["ea-applications"].length,
         committee: deletedByBucket["committee-applications"].length,
       },
       details: {
