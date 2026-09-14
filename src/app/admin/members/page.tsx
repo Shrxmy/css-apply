@@ -34,7 +34,6 @@ const Members = () => {
   >("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [processingId, setProcessingId] = useState<string | null>(null);
-  const [exportingIds, setExportingIds] = useState(false);
   const [pagination, setPagination] = useState({
     currentPage: 1,
     totalPages: 1,
@@ -98,31 +97,17 @@ const Members = () => {
     }
   };
 
-  const handleDigitalIdExport = async () => {
-    try {
-      setExportingIds(true);
-      const response = await fetch("/api/admin/digital-ids/export");
-      if (!response.ok) {
-        const data = await response.json().catch(() => null);
-        throw new Error(data?.error || "Failed to export digital IDs");
-      }
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `css-digital-ids-${new Date().toISOString().split("T")[0]}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      toast.success("Printable digital IDs exported");
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to export digital IDs",
-      );
-    } finally {
-      setExportingIds(false);
+  const handleDigitalIdExport = () => {
+    const printWindow = window.open(
+      "/admin/members/print",
+      "_blank",
+      "noopener,noreferrer",
+    );
+    if (!printWindow) {
+      toast.error("Please allow pop-ups to open the printable ID layout");
+      return;
     }
+    toast.success("Printable ID layout opened");
   };
 
   const handlePageChange = (page: number) => {
@@ -208,10 +193,9 @@ const Members = () => {
             <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
               <button
                 onClick={handleDigitalIdExport}
-                disabled={exportingIds}
-                className="w-full rounded-lg bg-[#044FAF] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#033B85] disabled:cursor-wait disabled:opacity-60 sm:w-auto"
+                className="w-full rounded-lg bg-[#044FAF] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#033B85] sm:w-auto"
               >
-                {exportingIds ? "Preparing IDs..." : "Export Printable IDs"}
+                Print / Export IDs
               </button>
               <button
                 onClick={handleCSVExport}

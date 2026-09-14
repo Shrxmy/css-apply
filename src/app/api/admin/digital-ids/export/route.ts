@@ -46,7 +46,7 @@ function getRoleTitle(user: {
   return "Official Member";
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user || !isAdminRole(session.user.role)) {
@@ -164,6 +164,26 @@ export async function GET() {
         { error: "No eligible digital IDs found for the active cycle" },
         { status: 404 },
       );
+    }
+
+    if (new URL(request.url).searchParams.get("format") === "print-data") {
+      return NextResponse.json({
+        schoolYear: cycle.schoolYear,
+        membershipExpiration: cycle.membershipExpiration,
+        members: members.map((member) => ({
+          memberId: member.memberId,
+          schoolYear: member.schoolYear,
+          roleTitle: member.roleTitle,
+          issueDate: member.issueDate.toISOString(),
+          expirationDate: member.expirationDate?.toISOString() || null,
+          name: member.name,
+          studentNumber: member.studentNumber,
+          section: member.section,
+          photo: member.photo
+            ? `data:image/png;base64,${member.photo.toString("base64")}`
+            : null,
+        })),
+      });
     }
 
     const pdf = await createDigitalIdPdf(members);
