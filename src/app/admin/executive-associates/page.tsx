@@ -37,16 +37,15 @@ const EAs = () => {
   const [eas, setEAs] = useState<EA[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<{
+    applicationId: string;
+    action: "evaluate" | "accept" | "reject";
+  } | null>(null);
   const [showRedirectModal, setShowRedirectModal] = useState(false);
   const [selectedEA, setSelectedEA] = useState<EA | null>(null);
   const [redirectTo, setRedirectTo] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<
-    | "all"
-    | "accepted"
-    | "pending"
-    | "rejected"
-    | "redirected"
-    | "no-schedule"
+    "all" | "accepted" | "pending" | "rejected" | "redirected" | "no-schedule"
   >("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState({
@@ -92,7 +91,9 @@ const EAs = () => {
 
   const handleCSVExport = async () => {
     try {
-      const response = await fetch(`/api/admin/export/csv?type=executive-associate`);
+      const response = await fetch(
+        `/api/admin/export/csv?type=executive-associate`,
+      );
       if (response.ok) {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
@@ -141,6 +142,12 @@ const EAs = () => {
           No Schedule
         </span>
       );
+    } else if (!ea.status) {
+      return (
+        <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-[#E8F2FF] text-[#044FAF]">
+          Interview
+        </span>
+      );
     } else {
       return (
         <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-[#FFE7B4]/40 text-[#5B4515]">
@@ -163,7 +170,7 @@ const EAs = () => {
     }
   };
 
-  const handleEAAction = useCallback(
+  const executeEAAction = useCallback(
     async (
       applicationId: string,
       action: "evaluate" | "accept" | "reject" | "redirect",
@@ -193,7 +200,8 @@ const EAs = () => {
         });
 
         if (response.ok) {
-          if (action === "evaluate") toast.success("Application set to evaluating");
+          if (action === "evaluate")
+            toast.success("Application set to evaluating");
           if (action === "accept") toast.success("Application accepted");
           if (action === "reject") toast.success("Application rejected");
           if (action === "redirect") toast.success("Application redirected");
@@ -212,6 +220,20 @@ const EAs = () => {
       }
     },
     [fetchEAs, redirectTo],
+  );
+
+  const handleEAAction = useCallback(
+    async (
+      applicationId: string,
+      action: "evaluate" | "accept" | "reject" | "redirect",
+    ) => {
+      if (action === "redirect") {
+        await executeEAAction(applicationId, action);
+        return;
+      }
+      setPendingAction({ applicationId, action });
+    },
+    [executeEAAction],
   );
 
   if (status === "loading") {
@@ -344,44 +366,50 @@ const EAs = () => {
                           </button>
                         )}
 
-                        {(!ea.status || ea.status === "pending") && !ea.hasAccepted && !ea.redirection && (
-                          <button
-                            onClick={() => handleEAAction(ea.id, "evaluate")}
-                            disabled={processingId === ea.id}
-                            className="px-2.5 py-1 text-xs text-[#134687] border border-[#005FD9]/15 rounded hover:bg-[#F3F3FD] disabled:opacity-50 transition-all duration-200"
-                          >
-                            {processingId === ea.id ? "Processing..." : "Evaluate"}
-                          </button>
-                        )}
-
-                        {ea.status === "evaluating" && !ea.hasAccepted && !ea.redirection && (
-                          <div className="flex flex-wrap gap-1">
+                        {(!ea.status || ea.status === "pending") &&
+                          !ea.hasAccepted &&
+                          !ea.redirection && (
                             <button
-                              onClick={() => handleEAAction(ea.id, "accept")}
+                              onClick={() => handleEAAction(ea.id, "evaluate")}
                               disabled={processingId === ea.id}
                               className="px-2.5 py-1 text-xs text-[#134687] border border-[#005FD9]/15 rounded hover:bg-[#F3F3FD] disabled:opacity-50 transition-all duration-200"
                             >
-                              Accept
+                              {processingId === ea.id
+                                ? "Processing..."
+                                : "Evaluate"}
                             </button>
-                            <button
-                              onClick={() => handleEAAction(ea.id, "reject")}
-                              disabled={processingId === ea.id}
-                              className="px-2.5 py-1 text-xs text-[#134687]/60 border border-[#005FD9]/10 rounded hover:bg-[#F3F3FD]/50 disabled:opacity-50 transition-all duration-200"
-                            >
-                              Reject
-                            </button>
-                            <button
-                              onClick={() => {
-                                setShowRedirectModal(true);
-                                setSelectedEA(ea);
-                              }}
-                              disabled={processingId === ea.id}
-                              className="px-2.5 py-1 text-xs text-[#134687]/60 border border-[#005FD9]/10 rounded hover:bg-[#F3F3FD]/50 disabled:opacity-50 transition-all duration-200"
-                            >
-                              Redirect
-                            </button>
-                          </div>
-                        )}
+                          )}
+
+                        {ea.status === "evaluating" &&
+                          !ea.hasAccepted &&
+                          !ea.redirection && (
+                            <div className="flex flex-wrap gap-1">
+                              <button
+                                onClick={() => handleEAAction(ea.id, "accept")}
+                                disabled={processingId === ea.id}
+                                className="px-2.5 py-1 text-xs text-[#134687] border border-[#005FD9]/15 rounded hover:bg-[#F3F3FD] disabled:opacity-50 transition-all duration-200"
+                              >
+                                Accept
+                              </button>
+                              <button
+                                onClick={() => handleEAAction(ea.id, "reject")}
+                                disabled={processingId === ea.id}
+                                className="px-2.5 py-1 text-xs text-[#134687]/60 border border-[#005FD9]/10 rounded hover:bg-[#F3F3FD]/50 disabled:opacity-50 transition-all duration-200"
+                              >
+                                Reject
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setShowRedirectModal(true);
+                                  setSelectedEA(ea);
+                                }}
+                                disabled={processingId === ea.id}
+                                className="px-2.5 py-1 text-xs text-[#134687]/60 border border-[#005FD9]/10 rounded hover:bg-[#F3F3FD]/50 disabled:opacity-50 transition-all duration-200"
+                              >
+                                Redirect
+                              </button>
+                            </div>
+                          )}
                       </div>
                     </div>
                   </div>
@@ -442,10 +470,67 @@ const EAs = () => {
         )}
       </div>
 
+      {pendingAction && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[#134687]/35 p-4 backdrop-blur-sm"
+          role="presentation"
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-[#005FD9]/15 bg-white p-6 shadow-[0_20px_60px_-15px_rgba(4,79,175,0.35)]"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="ea-action-confirmation-title"
+          >
+            <h3
+              id="ea-action-confirmation-title"
+              className="mb-2 text-lg font-semibold text-[#134687]"
+            >
+              Confirm application action
+            </h3>
+            <p className="mb-6 text-sm leading-relaxed text-[#134687]/70">
+              Are you sure you want to{" "}
+              <strong className="text-[#134687]">
+                {pendingAction.action === "accept"
+                  ? "accept"
+                  : pendingAction.action === "reject"
+                    ? "reject"
+                    : "mark for evaluation"}
+              </strong>{" "}
+              this application?
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setPendingAction(null)}
+                className="rounded-lg border border-[#005FD9]/15 px-4 py-2 text-sm font-semibold text-[#134687] hover:bg-[#F3F8FF]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={processingId === pendingAction.applicationId}
+                onClick={async () => {
+                  const action = pendingAction;
+                  setPendingAction(null);
+                  await executeEAAction(action.applicationId, action.action);
+                }}
+                className={`rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 ${pendingAction.action === "reject" ? "bg-red-600 hover:bg-red-700" : "bg-[#134687] hover:bg-[#044FAF]"}`}
+              >
+                {processingId === pendingAction.applicationId
+                  ? "Processing..."
+                  : "Confirm"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showRedirectModal && selectedEA && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#134687]/35 backdrop-blur-sm px-4">
           <div className="w-full max-w-md rounded-2xl border border-[#005FD9]/15 bg-white p-6 shadow-[0_20px_60px_-15px_rgba(4,79,175,0.35)]">
-            <h3 className="text-lg font-semibold text-[#134687] mb-1">Redirect Application</h3>
+            <h3 className="text-lg font-semibold text-[#134687] mb-1">
+              Redirect Application
+            </h3>
             <p className="text-sm text-[#134687]/70 mb-4">
               Redirect {selectedEA.user.name}&apos;s application to:
             </p>
@@ -462,9 +547,9 @@ const EAs = () => {
                 {roles
                   .filter((role) => role.id !== selectedEA.firstOptionEb)
                   .map((role) => (
-                  <option key={role.id} value={role.id}>
-                    {role.title}
-                  </option>
+                    <option key={role.id} value={role.id}>
+                      {role.title}
+                    </option>
                   ))}
               </optgroup>
               <optgroup label="Committee Staff Roles">
