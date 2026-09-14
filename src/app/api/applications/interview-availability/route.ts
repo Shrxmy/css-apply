@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { getPositionTitle, getRoleId } from "@/lib/eb-mapping";
 import { generateInterviewAvailability } from "@/lib/interview-availability";
 import { prisma } from "@/lib/prisma";
+import { getManilaDateKey } from "@/lib/manila-date";
 
 export const dynamic = "force-dynamic";
 
@@ -175,8 +176,8 @@ export async function GET(request: NextRequest) {
         interviewBy: { equals: value, mode: "insensitive" as const },
       })),
     };
-    const startDate = cycle.interviewStart.toISOString().slice(0, 10);
-    const endDate = cycle.interviewEnd.toISOString().slice(0, 10);
+    const startDate = getManilaDateKey(cycle.interviewStart);
+    const endDate = getManilaDateKey(cycle.interviewEnd);
 
     const [unavailableBlocks, committeeBookings, executiveBookings] =
       await Promise.all([

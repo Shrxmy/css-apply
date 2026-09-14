@@ -101,7 +101,13 @@ export async function POST(request: NextRequest) {
         result.application.ebRole,
         new Date(`${slot.interviewSlotDay}T00:00:00+08:00`).toLocaleDateString(
           "en-US",
-          { weekday: "long", year: "numeric", month: "long", day: "numeric" },
+          {
+            weekday: "long",
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+            timeZone: "Asia/Manila",
+          },
         ),
         `${slot.interviewSlotTimeStart} - ${slot.interviewSlotTimeEnd}`,
         result.profile.meetingLink || undefined,

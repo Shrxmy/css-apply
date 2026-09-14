@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { getPositionTitle, getRoleId } from "@/lib/eb-mapping";
 import { prisma } from "@/lib/prisma";
+import { getManilaDateKey } from "@/lib/manila-date";
 
 interface UnavailableSlotInput {
   day?: unknown;
@@ -76,10 +77,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const interviewStart = activeCycle.interviewStart
-      .toISOString()
-      .slice(0, 10);
-    const interviewEnd = activeCycle.interviewEnd.toISOString().slice(0, 10);
+    const interviewStart = getManilaDateKey(activeCycle.interviewStart);
+    const interviewEnd = getManilaDateKey(activeCycle.interviewEnd);
     const position = getPositionTitle(operator.ebProfile.position);
     const normalizedSlots = rawSlots.map((rawSlot, index) => {
       const slot = rawSlot as UnavailableSlotInput;

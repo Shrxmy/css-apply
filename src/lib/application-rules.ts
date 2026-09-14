@@ -3,6 +3,7 @@ import { committeeRoles } from "@/data/committeeRoles";
 import { roles } from "@/data/ebRoles";
 import { getPositionTitle, getRoleId } from "@/lib/eb-mapping";
 import { prisma } from "@/lib/prisma";
+import { getManilaDateKey } from "@/lib/manila-date";
 
 const BUSINESS_TIME_ZONE = "Asia/Manila";
 const EA_AVAILABILITY_CONFIG_KEY = "available_executive_associate_roles";
@@ -53,7 +54,7 @@ function getBusinessDateKey(date = new Date()) {
 }
 
 function getStoredDateKey(date: Date) {
-  return date.toISOString().slice(0, 10);
+  return getManilaDateKey(date);
 }
 
 export async function getActiveCycle(

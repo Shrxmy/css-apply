@@ -1,4 +1,5 @@
 import { getRoleId } from "@/lib/eb-mapping";
+import { getManilaDateKey } from "@/lib/manila-date";
 
 export interface InterviewAvailabilitySlot {
   id: string;
@@ -43,7 +44,7 @@ const SLOT_END_MINUTES = 21 * 60;
 const SLOT_DURATION_MINUTES = 30;
 
 function storedDateKey(date: Date) {
-  return date.toISOString().slice(0, 10);
+  return getManilaDateKey(date);
 }
 
 function parseTime(value: string | null) {
