@@ -97,6 +97,13 @@ const getEARedirectionMessage = (redirection: string): string => {
 const getApplicationMemberId = (application: Application) =>
   application.user.memberships?.[0]?.memberId ?? "Not issued";
 
+const getInterviewAssignmentLabel = (application: Application) =>
+  application.interviewSlotDay &&
+  application.interviewSlotTimeStart &&
+  application.interviewSlotTimeEnd
+    ? "Interviewer pending"
+    : "Awaiting applicant schedule";
+
 // Helper function to get EB role full name
 const getEBRoleFullName = (roleId: string): string => {
   if (!roleId || roleId.trim() === "") return "No choice";
@@ -1076,7 +1083,7 @@ const Applications = () => {
                                 className="px-2.5 py-1 text-xs text-[#134687]/25 rounded cursor-not-allowed w-full sm:w-auto border border-[#005FD9]/10 bg-[#F3F3FD]/50"
                                 disabled
                               >
-                                No Interviewer
+                                {getInterviewAssignmentLabel(application)}
                               </button>
                             )}
 
@@ -1345,7 +1352,7 @@ const Applications = () => {
                                 className="px-2.5 py-1 text-xs text-[#134687]/25 rounded cursor-not-allowed w-full sm:w-auto border border-[#005FD9]/10 bg-[#F3F3FD]/50"
                                 disabled
                               >
-                                No Interviewer
+                                {getInterviewAssignmentLabel(application)}
                               </button>
                             )}
 
