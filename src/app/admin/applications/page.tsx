@@ -163,6 +163,11 @@ const Applications = () => {
   }>({ committee: [], ea: [], member: [] });
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<{
+    applicationId: string;
+    type: "committee" | "executive-associate" | "member";
+    action: "accept" | "reject" | "redirect" | "evaluate";
+  } | null>(null);
   const [showRedirectModal, setShowRedirectModal] = useState(false);
   const [selectedApplication, setSelectedApplication] =
     useState<Application | null>(null);
@@ -329,8 +334,8 @@ const Applications = () => {
     fetchApplications,
   ]);
 
-  // Memoized application action handler
-  const handleApplicationAction = useCallback(
+  // Executes an action after any required confirmation has been completed.
+  const executeApplicationAction = useCallback(
     async (
       applicationId: string,
       type: "committee" | "executive-associate" | "member",
@@ -387,6 +392,21 @@ const Applications = () => {
     [redirectTo, ebData?.position, fetchApplications],
   );
 
+  const handleApplicationAction = useCallback(
+    async (
+      applicationId: string,
+      type: "committee" | "executive-associate" | "member",
+      action: "accept" | "reject" | "redirect" | "evaluate",
+    ) => {
+      if (action === "redirect") {
+        await executeApplicationAction(applicationId, type, action);
+        return;
+      }
+      setPendingAction({ applicationId, type, action });
+    },
+    [executeApplicationAction],
+  );
+
   // Memoized status badge component
   const getStatusBadge = useCallback((application: Application) => {
     if (application.type === "member") {
@@ -436,6 +456,12 @@ const Applications = () => {
       return (
         <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-[#044FAF]/10 text-[#044FAF]">
           Accepted
+        </span>
+      );
+    } else if (!application.status) {
+      return (
+        <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-[#E8F2FF] text-[#044FAF]">
+          Interview
         </span>
       );
     } else if (application.status === "evaluating") {
@@ -1481,6 +1507,66 @@ const Applications = () => {
           })()}
         </div>
       </div>
+
+      {/* ACTION CONFIRMATION MODAL */}
+      {pendingAction && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="presentation"
+        >
+          <div
+            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="application-action-confirmation-title"
+          >
+            <h3
+              id="application-action-confirmation-title"
+              className="mb-2 text-lg font-semibold text-[#134687]"
+            >
+              Confirm application action
+            </h3>
+            <p className="mb-6 text-sm leading-relaxed text-[#134687]/70">
+              Are you sure you want to{" "}
+              <strong className="text-[#134687]">
+                {pendingAction.action === "accept"
+                  ? "accept"
+                  : pendingAction.action === "reject"
+                    ? "reject"
+                    : "mark for evaluation"}
+              </strong>{" "}
+              this application? This will update its recruitment status.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setPendingAction(null)}
+                className="rounded-lg border border-[#005FD9]/15 px-4 py-2 text-sm font-semibold text-[#134687] hover:bg-[#F3F8FF]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={processingId === pendingAction.applicationId}
+                onClick={async () => {
+                  const action = pendingAction;
+                  setPendingAction(null);
+                  await executeApplicationAction(
+                    action.applicationId,
+                    action.type,
+                    action.action,
+                  );
+                }}
+                className={`rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 ${pendingAction.action === "reject" ? "bg-red-600 hover:bg-red-700" : "bg-[#134687] hover:bg-[#044FAF]"}`}
+              >
+                {processingId === pendingAction.applicationId
+                  ? "Processing..."
+                  : "Confirm"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* REDIRECT MODAL */}
       {showRedirectModal && selectedApplication && (
