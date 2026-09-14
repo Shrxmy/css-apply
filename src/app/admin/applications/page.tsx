@@ -455,19 +455,29 @@ const Applications = () => {
 
   const handleDownloadCV = async (application: Application) => {
     try {
-      // Use the new download endpoint that forces download
       const downloadUrl = `/api/admin/download-pdf?applicationId=${application.id}&type=cv&applicationType=${application.type}`;
+      const response = await fetch(downloadUrl);
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        throw new Error(body?.error || "CV file could not be downloaded");
+      }
 
-      // Create a temporary link to download the file
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
       const link = document.createElement("a");
-      link.href = downloadUrl;
+      link.href = objectUrl;
       link.download = `${application.user.name}_CV.pdf`;
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1_000);
     } catch (error) {
       adminApplicationsLogger.error("CV download failed", error);
-      toast.error("Error downloading CV");
+      toast.error(
+        error instanceof Error ? error.message : "Error downloading CV",
+      );
     }
   };
 
@@ -1023,12 +1033,21 @@ const Applications = () => {
                           <div className="flex flex-col items-start sm:items-end gap-2 w-full sm:w-auto">
                             {/* Download Buttons */}
                             <div className="flex gap-1 flex-wrap">
-                              <button
-                                onClick={() => handleDownloadCV(application)}
-                                className="px-2.5 py-1 text-xs text-[#134687] border border-[#005FD9]/15 rounded hover:bg-[#F3F3FD] transition-all duration-200"
-                              >
-                                CV
-                              </button>
+                              {application.cvDownloadUrl ? (
+                                <button
+                                  onClick={() => handleDownloadCV(application)}
+                                  className="px-2.5 py-1 text-xs text-[#134687] border border-[#005FD9]/15 rounded hover:bg-[#F3F3FD] transition-all duration-200"
+                                >
+                                  CV
+                                </button>
+                              ) : (
+                                <span
+                                  title="This application does not have a CV uploaded yet."
+                                  className="px-2.5 py-1 text-xs text-[#134687]/35 border border-[#005FD9]/10 rounded bg-[#F3F3FD]/50"
+                                >
+                                  CV not uploaded
+                                </span>
+                              )}
                               {application.portfolioDownloadUrl && (
                                 <button
                                   onClick={() =>
@@ -1292,12 +1311,21 @@ const Applications = () => {
                           <div className="flex flex-col items-start sm:items-end gap-2 w-full sm:w-auto">
                             {/* Download Buttons */}
                             <div className="flex gap-1 flex-wrap">
-                              <button
-                                onClick={() => handleDownloadCV(application)}
-                                className="px-2.5 py-1 text-xs text-[#134687] border border-[#005FD9]/15 rounded hover:bg-[#F3F3FD] transition-all duration-200"
-                              >
-                                CV
-                              </button>
+                              {application.cvDownloadUrl ? (
+                                <button
+                                  onClick={() => handleDownloadCV(application)}
+                                  className="px-2.5 py-1 text-xs text-[#134687] border border-[#005FD9]/15 rounded hover:bg-[#F3F3FD] transition-all duration-200"
+                                >
+                                  CV
+                                </button>
+                              ) : (
+                                <span
+                                  title="This application does not have a CV uploaded yet."
+                                  className="px-2.5 py-1 text-xs text-[#134687]/35 border border-[#005FD9]/10 rounded bg-[#F3F3FD]/50"
+                                >
+                                  CV not uploaded
+                                </span>
+                              )}
                               {application.portfolioDownloadUrl && (
                                 <button
                                   onClick={() =>
