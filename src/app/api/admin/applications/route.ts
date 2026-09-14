@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
     // Get EB profile of the logged in user to find their accessible committees
     let accessibleCommittees: Set<string> | null = null;
     let interviewerValues: string[] = [];
-    if (!isSuperAdmin && session.user.dbId) {
+    if (session.user.dbId) {
       const ebProfile = await prisma.eBProfile.findFirst({
         where: { userId: session.user.dbId },
         select: { position: true, committees: true },
@@ -282,7 +282,7 @@ export async function GET(request: NextRequest) {
         recruitmentCycleId: activeCycleId,
       };
 
-      if (!isSuperAdmin) {
+      if (interviewerValues.length > 0 || !isSuperAdmin) {
         whereClause.AND = [
           interviewerCondition || { id: "__no_assigned_interviewer__" },
         ];
@@ -460,7 +460,7 @@ export async function GET(request: NextRequest) {
         });
       }
 
-      if (!isSuperAdmin) {
+      if (interviewerValues.length > 0 || !isSuperAdmin) {
         andConditions.push(
           interviewerCondition || { id: "__no_assigned_interviewer__" },
         );

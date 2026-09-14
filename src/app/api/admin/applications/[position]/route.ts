@@ -133,12 +133,10 @@ export async function GET(
         // Include applications that are NOT truly processed
         const isRejected = app.status === "failed";
         const isRedirected = app.status === "redirected";
-        const isAssigned =
-          isSuperAdmin ||
-          Boolean(
-            app.interviewBy &&
-              assignmentValues.includes(app.interviewBy.toLowerCase()),
-          );
+        const isAssigned = Boolean(
+          app.interviewBy &&
+            assignmentValues.includes(app.interviewBy.toLowerCase()),
+        );
 
         const hasCommitteeAccess =
           isSuperAdmin ||
@@ -176,12 +174,10 @@ export async function GET(
         (app: (typeof allExecutiveAssociateApplications)[number]) => {
           const isRejected = app.status === "failed";
           const isRedirected = app.status === "redirected";
-          const isAssigned =
-            isSuperAdmin ||
-            Boolean(
-              app.interviewBy &&
-                assignmentValues.includes(app.interviewBy.toLowerCase()),
-            );
+          const isAssigned = Boolean(
+            app.interviewBy &&
+              assignmentValues.includes(app.interviewBy.toLowerCase()),
+          );
 
           return isAssigned && !isRejected && !isRedirected;
         },
