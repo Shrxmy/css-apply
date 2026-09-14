@@ -566,6 +566,12 @@ export default function DigitalIdCard({
                 height={82}
                 className="absolute right-5 top-5 z-20 h-auto w-[82px] object-contain drop-shadow-[0_8px_14px_rgba(4,25,65,0.25)]"
               />
+              <div className="absolute bottom-[84px] left-1/2 z-20 w-[230px] -translate-x-1/2 text-center text-white">
+                <div className="h-6 border-b border-white/85" />
+                <span className="mt-1 block text-[8px] font-semibold uppercase tracking-[0.14em] text-blue-100">
+                  Member Signature
+                </span>
+              </div>
               <div
                 className="absolute bottom-8 left-1/2 z-20 h-12 w-[230px] -translate-x-1/2"
                 dangerouslySetInnerHTML={{ __html: backBarcodeSvg }}

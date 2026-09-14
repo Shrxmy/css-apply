@@ -422,6 +422,23 @@ async function drawBack(
       48,
     ),
   );
+  page.drawLine({
+    start: { x: x + 19, y: y + 96 },
+    end: { x: x + CARD_WIDTH - 19, y: y + 96 },
+    thickness: 0.65,
+    color: COLORS.white,
+    opacity: 0.9,
+  });
+  centeredText(
+    page,
+    "MEMBER SIGNATURE",
+    regular,
+    3.8,
+    x + 10,
+    CARD_WIDTH - 20,
+    y + 84,
+    rgb(0.8, 0.9, 1),
+  );
   page.drawImage(barcode, {
     x: x + 13,
     y: y + 40,

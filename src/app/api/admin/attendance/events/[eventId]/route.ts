@@ -159,6 +159,73 @@ export async function GET(
   }
 }
 
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ eventId: string }> },
+) {
+  try {
+    const authorization = await authorizeAttendanceOperator({
+      superAdminOnly: true,
+    });
+    if (authorization.response) return authorization.response;
+
+    const { eventId } = await params;
+    const result = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT 1 FROM "AttendanceEvent" WHERE "id" = ${eventId} FOR UPDATE`;
+      const event = await tx.attendanceEvent.findUnique({
+        where: { id: eventId },
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          _count: { select: { rosterEntries: true, attendances: true } },
+        },
+      });
+      if (!event) return { error: "Event not found", status: 404 } as const;
+
+      // These relations intentionally use RESTRICT in the schema so that
+      // attendance cannot disappear accidentally. A deliberate event delete
+      // removes the dependent scan history and snapshot in one transaction.
+      await tx.attendanceScanAttempt.deleteMany({ where: { eventId } });
+      await tx.eventAttendance.deleteMany({ where: { eventId } });
+      await tx.attendanceEventRoster.deleteMany({ where: { eventId } });
+      await tx.attendanceEvent.delete({ where: { id: eventId } });
+      await addAttendanceAudit(
+        tx,
+        authorization.operator.id,
+        "ATTENDANCE_EVENT_DELETED",
+        "attendance_event",
+        eventId,
+        {
+          title: event.title,
+          status: event.status,
+          rosterCount: event._count.rosterEntries,
+          attendanceCount: event._count.attendances,
+        },
+      );
+
+      return { deleted: true, status: 200 } as const;
+    });
+
+    if ("error" in result) {
+      return NextResponse.json(
+        { error: result.error },
+        { status: result.status },
+      );
+    }
+    return NextResponse.json({ deleted: true });
+  } catch (error) {
+    console.error(
+      "Delete attendance event failed",
+      error instanceof Error ? error.name : "UnknownError",
+    );
+    return NextResponse.json(
+      { error: "Attendance event could not be deleted" },
+      { status: 500 },
+    );
+  }
+}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ eventId: string }> },

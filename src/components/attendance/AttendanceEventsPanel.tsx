@@ -12,6 +12,7 @@ import {
   Play,
   RefreshCw,
   Square,
+  Trash2,
 } from "lucide-react";
 import { FormEvent, useState } from "react";
 import { toast } from "sonner";
@@ -179,6 +180,35 @@ export default function AttendanceEventsPanel({
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Roster refresh failed",
+      );
+    } finally {
+      setChangingId(null);
+    }
+  }
+
+  async function deleteEvent(event: AttendanceEvent) {
+    const confirmed = window.confirm(
+      `Delete “${event.title}”? This permanently removes its roster, attendance records, scan history, and reports.`,
+    );
+    if (!confirmed) return;
+
+    setChangingId(event.id);
+    try {
+      const response = await fetch(`/api/admin/attendance/events/${event.id}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        throw new Error(
+          await readError(response, "Attendance event could not be deleted"),
+        );
+      }
+      toast.success("Attendance event deleted");
+      await onReload();
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Attendance event could not be deleted",
       );
     } finally {
       setChangingId(null);
@@ -560,6 +590,16 @@ export default function AttendanceEventsPanel({
                       <Archive className="h-3.5 w-3.5" /> Archive
                     </button>
                   )}
+                {canManage && (
+                  <button
+                    type="button"
+                    disabled={changingId === event.id}
+                    onClick={() => void deleteEvent(event)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" /> Delete
+                  </button>
+                )}
               </div>
             </article>
           ))}
