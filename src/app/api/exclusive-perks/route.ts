@@ -1,6 +1,4 @@
-import { unstable_cache } from "next/cache";
 import { NextResponse } from "next/server";
-import { EXCLUSIVE_PERKS_CACHE_TAG } from "@/lib/cache-tags";
 import {
   EXCLUSIVE_PERKS_CONFIG_KEY,
   isLocalPerkImagePath,
@@ -8,19 +6,14 @@ import {
 } from "@/lib/exclusive-perks";
 import { prisma } from "@/lib/prisma";
 
-const getCachedExclusivePerksConfig = unstable_cache(
-  async () =>
-    prisma.systemConfig.findUnique({
-      where: { key: EXCLUSIVE_PERKS_CONFIG_KEY },
-      select: { value: true },
-    }),
-  ["public-exclusive-perks-v1"],
-  { revalidate: 300, tags: [EXCLUSIVE_PERKS_CACHE_TAG] },
-);
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const config = await getCachedExclusivePerksConfig();
+    const config = await prisma.systemConfig.findUnique({
+      where: { key: EXCLUSIVE_PERKS_CONFIG_KEY },
+      select: { value: true },
+    });
     const items = parseExclusivePerks(config?.value);
 
     return NextResponse.json(
@@ -39,8 +32,7 @@ export async function GET() {
       },
       {
         headers: {
-          "Cache-Control":
-            "public, max-age=300, s-maxage=300, stale-while-revalidate=3600",
+          "Cache-Control": "no-store, max-age=0",
         },
       },
     );
