@@ -137,7 +137,7 @@ export async function GET(request: NextRequest) {
         // It's just a file path, determine bucket based on application type
         bucketName =
           applicationType === "executive-associate"
-            ? "executive-associate-applications"
+            ? "ea-applications"
             : "committee-applications";
         filePath = supabaseFilePath;
       }

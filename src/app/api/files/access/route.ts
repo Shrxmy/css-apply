@@ -130,7 +130,7 @@ export async function GET(request: NextRequest) {
         // It's just a file path, use the bucket name
         const bucketName =
           applicationType === "executive-associate"
-            ? "executive-associate-applications"
+            ? "ea-applications"
             : "committee-applications";
 
         const { data, error } = await supabase.storage
