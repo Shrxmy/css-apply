@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
+import { APPLICATION_STORAGE_BUCKETS } from "@/lib/application-storage";
 
 // GET CV download link for EA and Committee applications
 export async function GET(request: NextRequest) {
@@ -143,7 +144,9 @@ export async function GET(request: NextRequest) {
       } else {
         // It's just a file path, use the old method
         const bucketName =
-          type === "executive-associate" ? "ea-applications" : "committee-applications";
+          type === "executive-associate"
+            ? APPLICATION_STORAGE_BUCKETS.executiveAssociate
+            : APPLICATION_STORAGE_BUCKETS.committee;
 
         const { data, error } = await supabase.storage
           .from(bucketName)

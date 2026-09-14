@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
+import { APPLICATION_STORAGE_BUCKETS } from "@/lib/application-storage";
 
 // GET file access for authenticated users (their own files)
 export async function GET(request: NextRequest) {
@@ -130,8 +131,8 @@ export async function GET(request: NextRequest) {
         // It's just a file path, use the bucket name
         const bucketName =
           applicationType === "executive-associate"
-            ? "ea-applications"
-            : "committee-applications";
+            ? APPLICATION_STORAGE_BUCKETS.executiveAssociate
+            : APPLICATION_STORAGE_BUCKETS.committee;
 
         const { data, error } = await supabase.storage
           .from(bucketName)

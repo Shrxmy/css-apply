@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { supabase } from "@/lib/supabase";
+import { APPLICATION_STORAGE_BUCKETS } from "@/lib/application-storage";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createLogger } from "@/lib/logger";
@@ -115,8 +116,8 @@ export async function POST(request: NextRequest) {
     // Determine the bucket and application type
     const bucketName =
       applicationType === "executive-associate"
-        ? "ea-applications"
-        : "committee-applications";
+        ? APPLICATION_STORAGE_BUCKETS.executiveAssociate
+        : APPLICATION_STORAGE_BUCKETS.committee;
 
     // Generate unique file name
     const timestamp = Date.now();

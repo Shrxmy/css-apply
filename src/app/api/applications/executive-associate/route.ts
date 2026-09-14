@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth/next";
 import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
+import { APPLICATION_STORAGE_BUCKETS } from "@/lib/application-storage";
 import { getPositionTitle } from "@/lib/eb-mapping";
 import { executiveAssociateApplicationSchema } from "@/lib/schemas";
 import { isMembershipExpired } from "@/lib/membership-expiration";
@@ -312,7 +313,7 @@ export async function DELETE() {
     const cvPath = normalizeStoragePath(application.supabaseFilePath);
     if (cvPath) {
       const { error: storageError } = await supabase.storage
-        .from("ea-applications")
+        .from(APPLICATION_STORAGE_BUCKETS.executiveAssociate)
         .remove([cvPath]);
       if (storageError) {
         console.error(

@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
+import { APPLICATION_STORAGE_BUCKETS } from "@/lib/application-storage";
 
 type StorageListItem = {
   name: string;
@@ -118,10 +119,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const buckets = ["ea-applications", "committee-applications"];
+    const buckets = [
+      APPLICATION_STORAGE_BUCKETS.executiveAssociate,
+      APPLICATION_STORAGE_BUCKETS.committee,
+    ];
     const candidatesByBucket: Record<string, string[]> = {
-      "ea-applications": [],
-      "committee-applications": [],
+      [APPLICATION_STORAGE_BUCKETS.executiveAssociate]: [],
+      [APPLICATION_STORAGE_BUCKETS.committee]: [],
     };
 
     for (const bucket of buckets) {
@@ -151,8 +155,8 @@ export async function POST(request: NextRequest) {
     }
 
     const deletedByBucket: Record<string, string[]> = {
-      "ea-applications": [],
-      "committee-applications": [],
+      [APPLICATION_STORAGE_BUCKETS.executiveAssociate]: [],
+      [APPLICATION_STORAGE_BUCKETS.committee]: [],
     };
 
     if (!dryRun) {
@@ -182,12 +186,12 @@ export async function POST(request: NextRequest) {
       cutoffIso: cutoff.toISOString(),
       referencedPathCount: referencedPaths.size,
       candidates: {
-        ea: candidatesByBucket["ea-applications"].length,
-        committee: candidatesByBucket["committee-applications"].length,
+        ea: candidatesByBucket[APPLICATION_STORAGE_BUCKETS.executiveAssociate].length,
+        committee: candidatesByBucket[APPLICATION_STORAGE_BUCKETS.committee].length,
       },
       deleted: {
-        ea: deletedByBucket["ea-applications"].length,
-        committee: deletedByBucket["committee-applications"].length,
+        ea: deletedByBucket[APPLICATION_STORAGE_BUCKETS.executiveAssociate].length,
+        committee: deletedByBucket[APPLICATION_STORAGE_BUCKETS.committee].length,
       },
       details: {
         candidatePathsByBucket: candidatesByBucket,

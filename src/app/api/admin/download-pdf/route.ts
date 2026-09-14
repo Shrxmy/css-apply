@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
+import { APPLICATION_STORAGE_BUCKETS } from "@/lib/application-storage";
 
 // GET PDF file with download headers for forced download
 export async function GET(request: NextRequest) {
@@ -137,8 +138,8 @@ export async function GET(request: NextRequest) {
         // It's just a file path, determine bucket based on application type
         bucketName =
           applicationType === "executive-associate"
-            ? "ea-applications"
-            : "committee-applications";
+            ? APPLICATION_STORAGE_BUCKETS.executiveAssociate
+            : APPLICATION_STORAGE_BUCKETS.committee;
         filePath = supabaseFilePath;
       }
 
