@@ -28,6 +28,7 @@ interface EA {
   interviewSlotDay?: string;
   interviewSlotTimeStart?: string;
   interviewSlotTimeEnd?: string;
+  interviewBy?: string;
   cvDownloadUrl?: string;
   createdAt: string;
 }
@@ -347,6 +348,9 @@ const EAs = () => {
                               {ea.interviewSlotTimeStart}
                             </div>
                           )}
+                          <div>
+                            Interviewer: {ea.interviewBy || "Not assigned"}
+                          </div>
                           {ea.redirection && (
                             <div>Redirected to: {ea.redirection}</div>
                           )}

@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { committeeRoles } from "@/data/committeeRoles";
+import { getPositionTitle, getRoleId } from "@/lib/eb-mapping";
 
 const normalizeCommitteeId = (value: string): string => {
   const normalizedValue = value.toLowerCase().replace(/&/g, "and");
@@ -46,17 +47,39 @@ export async function GET(_request: NextRequest) {
 
     // Get EB profile of the logged in user to find their accessible committees
     let accessibleCommittees: Set<string> | null = null;
+    let interviewerValues: string[] = [];
     if (!isSuperAdmin && session.user.dbId) {
       const ebProfile = await prisma.eBProfile.findFirst({
         where: { userId: session.user.dbId },
-        select: { committees: true },
+        select: { position: true, committees: true },
       });
       if (ebProfile) {
         accessibleCommittees = new Set(
           ebProfile.committees.map(normalizeCommitteeId),
         );
+        interviewerValues = Array.from(
+          new Set(
+            [
+              ebProfile.position,
+              getPositionTitle(ebProfile.position),
+              getRoleId(ebProfile.position),
+            ]
+              .filter(Boolean)
+              .map((value) => value.toLowerCase()),
+          ),
+        );
       }
     }
+
+    const interviewerCondition = isSuperAdmin
+      ? undefined
+      : interviewerValues.length
+        ? {
+            OR: interviewerValues.map((value) => ({
+              interviewBy: { equals: value, mode: "insensitive" as const },
+            })),
+          }
+        : { id: "__no_assigned_interviewer__" };
 
     // 1. Pending Members (hasAccepted: false)
     const memberCount = await prisma.memberApplication.count({
@@ -72,6 +95,7 @@ export async function GET(_request: NextRequest) {
         recruitmentCycleId: activeCycleId,
         hasAccepted: false,
         OR: [{ status: null }, { status: "pending" }, { status: "evaluating" }],
+        ...(interviewerCondition ? { AND: interviewerCondition } : {}),
       },
     });
 
@@ -84,6 +108,7 @@ export async function GET(_request: NextRequest) {
     if (accessibleCommittees) {
       const accessibleList = Array.from(accessibleCommittees);
       committeeConditions.AND = [
+        ...(interviewerCondition ? [interviewerCondition] : []),
         {
           OR: [
             { status: null },
@@ -99,10 +124,15 @@ export async function GET(_request: NextRequest) {
         },
       ];
     } else {
-      committeeConditions.OR = [
-        { status: null },
-        { status: "pending" },
-        { status: "evaluating" },
+      committeeConditions.AND = [
+        ...(interviewerCondition ? [interviewerCondition] : []),
+        {
+          OR: [
+            { status: null },
+            { status: "pending" },
+            { status: "evaluating" },
+          ],
+        },
       ];
     }
 

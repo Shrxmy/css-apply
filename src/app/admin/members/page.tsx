@@ -34,6 +34,11 @@ const Members = () => {
   >("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<{
+    applicationId: string;
+    memberName: string;
+    action: "accept" | "reject";
+  } | null>(null);
   const [pagination, setPagination] = useState({
     currentPage: 1,
     totalPages: 1,
@@ -266,7 +271,11 @@ const Members = () => {
                         <div className="flex flex-wrap gap-1.5">
                           <button
                             onClick={() =>
-                              handleMemberAction(member.id, "accept")
+                              setPendingAction({
+                                applicationId: member.id,
+                                memberName: member.user.name,
+                                action: "accept",
+                              })
                             }
                             disabled={processingId === member.id}
                             className="px-2.5 py-1 text-xs text-[#134687] border border-[#005FD9]/15 rounded hover:bg-[#F3F3FD] disabled:opacity-50 transition-colors"
@@ -275,7 +284,11 @@ const Members = () => {
                           </button>
                           <button
                             onClick={() =>
-                              handleMemberAction(member.id, "reject")
+                              setPendingAction({
+                                applicationId: member.id,
+                                memberName: member.user.name,
+                                action: "reject",
+                              })
                             }
                             disabled={processingId === member.id}
                             className="px-2.5 py-1 text-xs text-[#134687]/60 border border-[#005FD9]/10 rounded hover:bg-[#F3F3FD]/50 disabled:opacity-50 transition-colors"
@@ -342,6 +355,48 @@ const Members = () => {
           </div>
         )}
       </div>
+
+      {pendingAction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="member-action-title"
+            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
+          >
+            <h2 id="member-action-title" className="text-lg font-semibold text-[#134687]">
+              {pendingAction.action === "accept" ? "Accept member?" : "Reject member?"}
+            </h2>
+            <p className="mt-2 text-sm leading-relaxed text-[#134687]/70">
+              {pendingAction.action === "accept"
+                ? `Accept ${pendingAction.memberName} as a CSS member? This will issue their membership eligibility and cannot be undone casually.`
+                : `Reject ${pendingAction.memberName}'s membership application?`}
+            </p>
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setPendingAction(null)}
+                className="rounded-lg border border-[#005FD9]/15 px-4 py-2 text-sm font-medium text-[#134687] hover:bg-[#F3F3FD]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={processingId === pendingAction.applicationId}
+                onClick={() => {
+                  const action = pendingAction.action;
+                  const applicationId = pendingAction.applicationId;
+                  setPendingAction(null);
+                  void handleMemberAction(applicationId, action);
+                }}
+                className={`rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50 ${pendingAction.action === "accept" ? "bg-[#044FAF] hover:bg-[#033B85]" : "bg-red-600 hover:bg-red-700"}`}
+              >
+                Confirm {pendingAction.action === "accept" ? "accept" : "reject"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -402,9 +402,9 @@ const Staffs = () => {
                                 : ""}
                             </div>
                           )}
-                          {staff.interviewBy && (
-                            <div>Interviewer: {staff.interviewBy}</div>
-                          )}
+                          <div>
+                            Interviewer: {staff.interviewBy || "Not assigned"}
+                          </div>
                           {staff.redirection && (
                             <div className="text-[#044FAF]/70">
                               {getRedirectionMessage(staff.redirection)}:{" "}

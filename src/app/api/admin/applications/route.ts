@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { sendEmail, emailTemplates } from "@/lib/email";
 import { committeeRoles } from "@/data/committeeRoles";
+import { getPositionTitle, getRoleId } from "@/lib/eb-mapping";
 import { ensureCycleMemberId } from "@/lib/member-id";
 import { createLogger } from "@/lib/logger";
 
@@ -64,17 +65,37 @@ export async function GET(request: NextRequest) {
 
     // Get EB profile of the logged in user to find their accessible committees
     let accessibleCommittees: Set<string> | null = null;
+    let interviewerValues: string[] = [];
     if (!isSuperAdmin && session.user.dbId) {
       const ebProfile = await prisma.eBProfile.findFirst({
         where: { userId: session.user.dbId },
-        select: { committees: true },
+        select: { position: true, committees: true },
       });
       if (ebProfile) {
         accessibleCommittees = new Set(
           ebProfile.committees.map(normalizeCommitteeId),
         );
+        interviewerValues = Array.from(
+          new Set(
+            [
+              ebProfile.position,
+              getPositionTitle(ebProfile.position),
+              getRoleId(ebProfile.position),
+            ]
+              .filter(Boolean)
+              .map((value) => value.toLowerCase()),
+          ),
+        );
       }
     }
+
+    const interviewerCondition = interviewerValues.length
+      ? {
+          OR: interviewerValues.map((value) => ({
+            interviewBy: { equals: value, mode: "insensitive" as const },
+          })),
+        }
+      : null;
 
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "10");
@@ -261,6 +282,12 @@ export async function GET(request: NextRequest) {
         recruitmentCycleId: activeCycleId,
       };
 
+      if (!isSuperAdmin) {
+        whereClause.AND = [
+          interviewerCondition || { id: "__no_assigned_interviewer__" },
+        ];
+      }
+
       // Filter by status if provided
       if (status === "accepted") {
         whereClause.hasAccepted = true;
@@ -431,6 +458,12 @@ export async function GET(request: NextRequest) {
             { interviewSlotTimeStart: "" },
           ],
         });
+      }
+
+      if (!isSuperAdmin) {
+        andConditions.push(
+          interviewerCondition || { id: "__no_assigned_interviewer__" },
+        );
       }
 
       if (andConditions.length > 0) {

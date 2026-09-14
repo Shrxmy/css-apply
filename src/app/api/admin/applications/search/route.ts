@@ -195,9 +195,14 @@ export async function GET(request: NextRequest) {
     // Filter committee applications (exclude truly processed ones)
     const commApplications = allCommApplications.filter(
       (app: (typeof allCommApplications)[number]) => {
-        const isAccepted = app.hasAccepted && app.status === "passed";
         const isRejected = app.status === "failed";
         const isRedirected = app.status === "redirected";
+        const isAssigned =
+          isSuperAdmin ||
+          Boolean(
+            app.interviewBy &&
+              assignmentValues.includes(app.interviewBy.toLowerCase()),
+          );
 
         const hasCommitteeAccess =
           isSuperAdmin ||
@@ -208,9 +213,7 @@ export async function GET(request: NextRequest) {
             normalizeCommitteeId(app.secondOptionCommittee),
           );
 
-        return (
-          hasCommitteeAccess && !isAccepted && !isRejected && !isRedirected
-        );
+        return hasCommitteeAccess && isAssigned && !isRejected && !isRedirected;
       },
     );
 
@@ -269,11 +272,16 @@ export async function GET(request: NextRequest) {
     const executiveAssociateApplications =
       allExecutiveAssociateApplications.filter(
         (app: (typeof allExecutiveAssociateApplications)[number]) => {
-          const isAccepted = app.hasAccepted && app.status === "passed";
           const isRejected = app.status === "failed";
           const isRedirected = app.status === "redirected";
+          const isAssigned =
+            isSuperAdmin ||
+            Boolean(
+              app.interviewBy &&
+                assignmentValues.includes(app.interviewBy.toLowerCase()),
+            );
 
-          return !isAccepted && !isRejected && !isRedirected;
+          return isAssigned && !isRejected && !isRedirected;
         },
       );
 
