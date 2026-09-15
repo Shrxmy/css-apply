@@ -40,7 +40,7 @@ const EAs = () => {
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<{
     applicationId: string;
-    action: "evaluate" | "accept" | "reject";
+    action: "evaluate" | "accept" | "reject" | "redirect";
   } | null>(null);
   const [showRedirectModal, setShowRedirectModal] = useState(false);
   const [selectedEA, setSelectedEA] = useState<EA | null>(null);
@@ -228,11 +228,8 @@ const EAs = () => {
       applicationId: string,
       action: "evaluate" | "accept" | "reject" | "redirect",
     ) => {
-      if (action === "redirect") {
-        await executeEAAction(applicationId, action);
-        return;
-      }
       setPendingAction({ applicationId, action });
+      if (action === "redirect") setShowRedirectModal(false);
     },
     [executeEAAction],
   );
@@ -498,7 +495,9 @@ const EAs = () => {
                   ? "accept"
                   : pendingAction.action === "reject"
                     ? "reject"
-                    : "mark for evaluation"}
+                    : pendingAction.action === "redirect"
+                      ? "redirect"
+                      : "mark for evaluation"}
               </strong>{" "}
               this application?
             </p>

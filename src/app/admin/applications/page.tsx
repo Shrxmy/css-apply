@@ -399,8 +399,7 @@ const Applications = () => {
       action: "accept" | "reject" | "redirect" | "evaluate",
     ) => {
       if (action === "redirect") {
-        await executeApplicationAction(applicationId, type, action);
-        return;
+        setShowRedirectModal(false);
       }
       setPendingAction({ applicationId, type, action });
     },
@@ -1533,7 +1532,9 @@ const Applications = () => {
                   ? "accept"
                   : pendingAction.action === "reject"
                     ? "reject"
-                    : "mark for evaluation"}
+                    : pendingAction.action === "redirect"
+                      ? "redirect"
+                      : "mark for evaluation"}
               </strong>{" "}
               this application? This will update its recruitment status.
             </p>
