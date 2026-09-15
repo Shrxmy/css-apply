@@ -785,6 +785,19 @@ export async function PUT(request: NextRequest) {
       if (updatedApplication?.user?.email && updatedApplication?.user?.name) {
         try {
           if (
+            action === "evaluate" &&
+            updatedApplication?.firstOptionCommittee
+          ) {
+            const emailTemplate = emailTemplates.committeeEvaluating(
+              updatedApplication.user.name,
+              updatedApplication.firstOptionCommittee,
+            );
+            await sendEmail(
+              updatedApplication.user.email,
+              emailTemplate.subject,
+              emailTemplate.html,
+            );
+          } else if (
             action === "accept" &&
             updatedApplication?.user?.id &&
             updatedApplication?.firstOptionCommittee
@@ -980,7 +993,17 @@ export async function PUT(request: NextRequest) {
       // Send appropriate email based on action
       if (updatedApplication?.user?.email && updatedApplication?.user?.name) {
         try {
-          if (
+          if (action === "evaluate" && updatedApplication?.ebRole) {
+            const emailTemplate = emailTemplates.executiveAssistantEvaluating(
+              updatedApplication.user.name,
+              updatedApplication.ebRole,
+            );
+            await sendEmail(
+              updatedApplication.user.email,
+              emailTemplate.subject,
+              emailTemplate.html,
+            );
+          } else if (
             action === "accept" &&
             updatedApplication?.user?.id &&
             updatedApplication?.ebRole
