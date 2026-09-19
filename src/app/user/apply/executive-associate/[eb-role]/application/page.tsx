@@ -14,6 +14,7 @@ import LoadingScreen from "@/components/LoadingScreen";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import FormProcessingOverlay from "@/components/FormProcessingOverlay";
 import DateOfBirthInput from "@/components/DateOfBirthInput";
+import { supabaseClient } from "@/lib/supabase-client";
 
 export default function ExecutiveAssistantApplication() {
   const router = useRouter();
@@ -251,21 +252,28 @@ export default function ExecutiveAssistantApplication() {
 
     try {
       setUploading({ cv: true });
-      const uploadFormData = new FormData();
-      uploadFormData.append("file", selectedCvFile);
-      uploadFormData.append("studentNumber", formData.studentNumber);
-      uploadFormData.append("section", formData.section);
-      uploadFormData.append("fileType", "cv");
-      uploadFormData.append("applicationType", "executive-associate");
-
-      const uploadResponse = await fetch("/api/files/upload", {
+      const prepareResponse = await fetch("/api/files/upload-url", {
         method: "POST",
-        body: uploadFormData,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          studentNumber: formData.studentNumber,
+          fileType: "cv",
+          applicationType: "executive-associate",
+          fileSize: selectedCvFile.size,
+        }),
       });
-
-      const uploadResult = await uploadResponse.json();
-      if (!uploadResponse.ok) {
-        setError(uploadResult.error || "Failed to upload CV");
+      const uploadResult = await prepareResponse.json();
+      if (!prepareResponse.ok) {
+        setError(uploadResult.error || "Failed to prepare CV upload");
+        setLoading(false);
+        setUploading({ cv: false });
+        return;
+      }
+      const { error: storageError } = await supabaseClient.storage
+        .from(uploadResult.bucketName)
+        .uploadToSignedUrl(uploadResult.filePath, uploadResult.token, selectedCvFile);
+      if (storageError) {
+        setError("Failed to upload CV. Please try again.");
         setLoading(false);
         setUploading({ cv: false });
         return;

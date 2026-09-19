@@ -15,6 +15,7 @@ import { parseFullName } from "@/lib/name-parsing";
 import { useFormPersistence } from "@/lib/useFormPersistence";
 import { useApplicationStatus } from "@/lib/useApplicationStatus";
 import { useApplicationsOpen } from "@/lib/useApplicationsOpen";
+import { supabaseClient } from "@/lib/supabase-client";
 
 export default function CommitteeApplication() {
   const router = useRouter();
@@ -293,60 +294,36 @@ export default function CommitteeApplication() {
 
       setUploading({ cv: true, portfolio: shouldUploadPortfolio });
 
-      const cvUploadFormData = new FormData();
-      cvUploadFormData.append("file", selectedFiles.cv);
-      cvUploadFormData.append("studentNumber", formData.studentNumber);
-      cvUploadFormData.append("section", formData.section);
-      cvUploadFormData.append("fileType", "cv");
-      cvUploadFormData.append("applicationType", "committee");
-
-      const uploadCvPromise = fetch("/api/files/upload", {
-        method: "POST",
-        body: cvUploadFormData,
-      });
-
-      const uploadPortfolioPromise = shouldUploadPortfolio
-        ? (() => {
-            const portfolioUploadFormData = new FormData();
-            portfolioUploadFormData.append("file", selectedFiles.portfolio!);
-            portfolioUploadFormData.append(
-              "studentNumber",
-              formData.studentNumber,
-            );
-            portfolioUploadFormData.append("section", formData.section);
-            portfolioUploadFormData.append("fileType", "portfolio");
-            portfolioUploadFormData.append("applicationType", "committee");
-
-            return fetch("/api/files/upload", {
-              method: "POST",
-              body: portfolioUploadFormData,
-            });
-          })()
-        : null;
-
-      const [cvUploadResponse, portfolioUploadResponse] =
-        await Promise.all([uploadCvPromise, uploadPortfolioPromise]);
-
-      const cvUploadResult = await cvUploadResponse.json();
-      if (!cvUploadResponse.ok) {
-        setError(cvUploadResult.error || "Failed to upload CV");
-        setLoading(false);
-        setUploading({ cv: false, portfolio: false });
-        return;
-      }
-
-      let portfolioPath = "";
-      if (portfolioUploadResponse) {
-        const portfolioUploadResult = await portfolioUploadResponse.json();
-        if (!portfolioUploadResponse.ok) {
-          setError(portfolioUploadResult.error || "Failed to upload Portfolio");
-          setLoading(false);
-          setUploading({ cv: false, portfolio: false });
-          return;
+      const prepareAndUpload = async (file: File, fileType: "cv" | "portfolio") => {
+        const prepareResponse = await fetch("/api/files/upload-url", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            studentNumber: formData.studentNumber,
+            fileType,
+            applicationType: "committee",
+            fileSize: file.size,
+          }),
+        });
+        const uploadResult = await prepareResponse.json();
+        if (!prepareResponse.ok) {
+          throw new Error(uploadResult.error || `Failed to prepare ${fileType} upload`);
         }
+        const { error: storageError } = await supabaseClient.storage
+          .from(uploadResult.bucketName)
+          .uploadToSignedUrl(uploadResult.filePath, uploadResult.token, file);
+        if (storageError) throw new Error(`Failed to upload ${fileType}`);
+        return uploadResult.filePath as string;
+      };
 
-        portfolioPath = portfolioUploadResult.filePath;
-      }
+      const [cvPath, portfolioPath] = await Promise.all([
+        prepareAndUpload(selectedFiles.cv, "cv"),
+        shouldUploadPortfolio
+          ? prepareAndUpload(selectedFiles.portfolio!, "portfolio")
+          : Promise.resolve(""),
+      ]);
+
+      setUploading({ cv: false, portfolio: false });
 
       setUploading({ cv: false, portfolio: false });
 
@@ -366,7 +343,7 @@ export default function CommitteeApplication() {
           isOldCssMember: formData.isOldCssMember,
           firstOptionCommittee: committeeId,
           secondOptionCommittee: formData.secondChoice,
-          cv: cvUploadResult.filePath,
+          cv: cvPath,
           portfolio: portfolioPath || undefined,
         }),
       });
