@@ -4,23 +4,12 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { sendEmail, emailTemplates } from "@/lib/email";
-import { committeeRoles } from "@/data/committeeRoles";
 import { getPositionTitle, getRoleId } from "@/lib/eb-mapping";
 import { ensureCycleMemberId } from "@/lib/member-id";
 import { createLogger } from "@/lib/logger";
 
 const applicationsLogger = createLogger("api/admin/applications");
 
-const normalizeCommitteeId = (value: string) => {
-  const normalizedValue = value.toLowerCase().replace(/&/g, "and");
-  const committee = committeeRoles.find(
-    ({ id, title }) =>
-      id.toLowerCase() === normalizedValue ||
-      title.toLowerCase().replace(/&/g, "and") === normalizedValue,
-  );
-
-  return committee?.id ?? value;
-};
 import { applicationActionSchema } from "@/lib/schemas";
 
 // Type definitions for raw query results
@@ -67,18 +56,14 @@ export async function GET(request: NextRequest) {
     // assignment-scoped even for a Super Admin.
     const canViewAll = isSuperAdmin && searchParams.get("scope") === "all";
 
-    // Get EB profile of the logged in user to find their accessible committees
-    let accessibleCommittees: Set<string> | null = null;
+    // Derive assignment visibility from the authenticated user's EB profile.
     let interviewerValues: string[] = [];
     if (session.user.dbId) {
-      const ebProfile = await prisma.eBProfile.findFirst({
+      const ebProfile = await prisma.eBProfile.findUnique({
         where: { userId: session.user.dbId },
-        select: { position: true, committees: true },
+        select: { position: true },
       });
       if (ebProfile) {
-        accessibleCommittees = new Set(
-          ebProfile.committees.map(normalizeCommitteeId),
-        );
         interviewerValues = Array.from(
           new Set(
             [
@@ -87,7 +72,7 @@ export async function GET(request: NextRequest) {
               getRoleId(ebProfile.position),
             ]
               .filter(Boolean)
-              .map((value) => value.toLowerCase()),
+              .map((value) => value.trim().toLowerCase()),
           ),
         );
       }
@@ -382,36 +367,8 @@ export async function GET(request: NextRequest) {
       // To avoid OR collisions, compile conditions into an AND array if needed
       const andConditions: Prisma.CommitteeApplicationWhereInput[] = [];
 
-      // Enforce accessible committees
-      if (accessibleCommittees && !canViewAll) {
-        const accessibleList = Array.from(accessibleCommittees);
-
-        if (committee && committee !== "all") {
-          // If they selected a committee, check if they have access to it
-          if (!accessibleCommittees.has(normalizeCommitteeId(committee))) {
-            return NextResponse.json({
-              success: true,
-              applications: [],
-              pagination: {
-                currentPage: page,
-                totalPages: 0,
-                totalCount: 0,
-                limit: limit,
-                hasNextPage: false,
-                hasPreviousPage: false,
-              },
-            });
-          }
-        } else {
-          // If they selected "all" committees, restrict to their accessible ones
-          andConditions.push({
-            OR: [
-              { firstOptionCommittee: { in: accessibleList } },
-              { redirection: { in: accessibleList } },
-            ],
-          });
-        }
-      }
+      // Visibility is enforced by interviewer assignment below. Committee
+      // membership must not hide an application explicitly assigned to this EB.
 
       // Filter by committee if provided
       if (committee && committee !== "all") {

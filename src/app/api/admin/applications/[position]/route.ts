@@ -149,7 +149,7 @@ export async function GET(
             normalizeCommitteeId(app.secondOptionCommittee),
           );
 
-        return hasCommitteeAccess && (isSuperAdmin || isAssigned) && !isRejected && !isRedirected;
+        return (isSuperAdmin || isAssigned) && !isRejected && !isRedirected;
       },
     );
 
