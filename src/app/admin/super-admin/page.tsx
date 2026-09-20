@@ -412,13 +412,13 @@ function SuperAdminApplicationsTab() {
   };
 
   const labelFor = (application: SuperAdminApplication) => {
-    if (application.type === "member") return "Member";
+    if (application.type === "member") return "Member Application";
     if (application.type === "committee") {
       const committee = committeeRoles.find((role) => role.id === application.firstOptionCommittee);
-      return `${committee?.title || application.firstOptionCommittee || "Committee"} Staff`;
+      return `Committee Staff · ${committee?.title || application.firstOptionCommittee || "Unspecified Committee"}`;
     }
     const role = ebRoles.find((item) => item.id === application.ebRole);
-    return `${role?.title || application.ebRole || "Executive Associate"} EA`;
+    return `Executive Associate · ${role?.title || application.ebRole || "Unspecified Role"}`;
   };
   const statusFor = (application: SuperAdminApplication) => application.redirection ? "Redirected" : application.hasAccepted ? "Accepted" : application.status === "failed" ? "Rejected" : application.status === "evaluating" ? "Evaluating" : "Pending";
 
