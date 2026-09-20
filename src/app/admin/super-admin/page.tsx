@@ -340,6 +340,7 @@ interface SuperAdminApplication {
   interviewBy?: string | null;
   interviewSlotDay?: string | null;
   interviewSlotTimeStart?: string | null;
+  interviewSlotTimeEnd?: string | null;
   cvDownloadUrl?: string | null;
   portfolioDownloadUrl?: string | null;
 }
@@ -485,6 +486,7 @@ function SuperAdminApplicationsTab() {
           <dl className="mt-3 space-y-1 text-xs text-[#134687]/70">
             <div><dt className="inline font-semibold text-[#134687]">Type / Position: </dt><dd className="inline">{labelFor(application)}</dd></div>
             <div><dt className="inline font-semibold text-[#134687]">Interviewer: </dt><dd className="inline">{application.interviewBy || "Not assigned"}</dd></div>
+            {application.interviewSlotDay && application.interviewSlotTimeStart && <div><dt className="inline font-semibold text-[#134687]">Interview: </dt><dd className="inline">{application.interviewSlotDay} at {application.interviewSlotTimeStart}{application.interviewSlotTimeEnd ? ` - ${application.interviewSlotTimeEnd}` : ""}</dd></div>}
           </dl>
           <div className="mt-3 flex flex-wrap gap-1.5">
             {application.cvDownloadUrl && <button type="button" onClick={() => void downloadFile(application.cvDownloadUrl!)} className="rounded-md border border-[#005FD9]/15 bg-[#F3F8FF] px-2.5 py-1 text-xs font-semibold text-[#044FAF]">CV</button>}
