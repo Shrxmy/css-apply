@@ -671,6 +671,9 @@ export default function CommitteeApplication() {
                 <div className="flex gap-4 lg:gap-2 items-center">
                   <div className="text-black text-xs lg:text-sm font-Inter font-normal">
                     Curriculum Vitae (in pdf):
+                    <span className="mt-1 block text-[10px] text-[#134687]/55 lg:text-xs">
+                      Maximum file size: 10 MB
+                    </span>
                   </div>
                   <div className="text-black lg:text-xs font-Inter lg:w-50">
                     {selectedFiles.cv ? (
@@ -727,6 +730,9 @@ export default function CommitteeApplication() {
                   <div className="flex gap-4 lg:gap-2 items-center">
                     <div className="text-black text-xs lg:text-sm font-Inter font-normal">
                       Portfolio (in pdf):
+                      <span className="mt-1 block text-[10px] text-[#134687]/55 lg:text-xs">
+                        Maximum file size: 10 MB
+                      </span>
                     </div>
                     <div className="text-black lg:text-xs font-Inter lg:w-50">
                       {selectedFiles.portfolio ? (
