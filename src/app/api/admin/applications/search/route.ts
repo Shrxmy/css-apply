@@ -117,22 +117,23 @@ export async function GET(request: NextRequest) {
       member: [],
     };
 
-    const positionTitle = getPositionTitle(position);
-    const roleId = getRoleId(position);
-    const assignmentValues = [position, positionTitle, roleId]
-      .filter(Boolean)
-      .map((value) => value.toLowerCase());
-
-    const ebProfile = await prisma.eBProfile.findFirst({
-      where: {
-        OR: [
-          { position: { equals: position, mode: "insensitive" } },
-          { position: { equals: positionTitle, mode: "insensitive" } },
-          { position: { equals: roleId, mode: "insensitive" } },
-        ],
-      },
-      select: { committees: true },
-    });
+    // Ignore the client-provided position for authorization. Access must be
+    // derived from the authenticated user's own EB profile.
+    const ebProfile = session.user.dbId
+      ? await prisma.eBProfile.findFirst({
+          where: { userId: session.user.dbId },
+          select: { position: true, committees: true },
+        })
+      : null;
+    const assignmentValues = ebProfile
+      ? [
+          ebProfile.position,
+          getPositionTitle(ebProfile.position),
+          getRoleId(ebProfile.position),
+        ]
+          .filter(Boolean)
+          .map((value) => value.toLowerCase())
+      : [];
     const accessibleCommittees = new Set(
       ebProfile?.committees.map(normalizeCommitteeId) ?? [],
     );
@@ -211,7 +212,7 @@ export async function GET(request: NextRequest) {
             normalizeCommitteeId(app.secondOptionCommittee),
           );
 
-        return hasCommitteeAccess && isAssigned && !isRejected && !isRedirected;
+        return hasCommitteeAccess && (isSuperAdmin || isAssigned) && !isRejected && !isRedirected;
       },
     );
 
@@ -277,7 +278,7 @@ export async function GET(request: NextRequest) {
               assignmentValues.includes(app.interviewBy.toLowerCase()),
           );
 
-          return isAssigned && !isRejected && !isRedirected;
+          return (isSuperAdmin || isAssigned) && !isRejected && !isRedirected;
         },
       );
 
