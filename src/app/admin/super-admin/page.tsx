@@ -356,10 +356,10 @@ function SuperAdminApplicationsTab() {
     setLoading(true);
     try {
       const responses = await Promise.all([
-        fetch("/api/admin/applications?type=committee&limit=1000"),
-        fetch("/api/admin/applications?type=executive-associate&limit=1000"),
-        fetch("/api/admin/applications?type=member&status=pending&limit=1000"),
-        fetch("/api/admin/applications?type=member&status=accepted&limit=1000"),
+        fetch("/api/admin/applications?type=committee&limit=1000&scope=all"),
+        fetch("/api/admin/applications?type=executive-associate&limit=1000&scope=all"),
+        fetch("/api/admin/applications?type=member&status=pending&limit=1000&scope=all"),
+        fetch("/api/admin/applications?type=member&status=accepted&limit=1000&scope=all"),
       ]);
       const payloads = await Promise.all(responses.map((response) => response.json()));
       const all = [
