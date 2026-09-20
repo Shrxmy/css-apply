@@ -62,6 +62,10 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get("status");
     const committee = searchParams.get("committee");
     const isSuperAdmin = userRole === "super_admin";
+    // Super Admin has all-application access only when explicitly requested by
+    // the Super Admin application-management view. EB Management remains
+    // assignment-scoped even for a Super Admin.
+    const canViewAll = isSuperAdmin && searchParams.get("scope") === "all";
 
     // Get EB profile of the logged in user to find their accessible committees
     let accessibleCommittees: Set<string> | null = null;
@@ -282,7 +286,7 @@ export async function GET(request: NextRequest) {
         recruitmentCycleId: activeCycleId,
       };
 
-      if (!isSuperAdmin) {
+      if (!canViewAll) {
         whereClause.AND = [
           interviewerCondition || { id: "__no_assigned_interviewer__" },
         ];
@@ -379,7 +383,7 @@ export async function GET(request: NextRequest) {
       const andConditions: Prisma.CommitteeApplicationWhereInput[] = [];
 
       // Enforce accessible committees
-      if (accessibleCommittees && !isSuperAdmin) {
+      if (accessibleCommittees && !canViewAll) {
         const accessibleList = Array.from(accessibleCommittees);
 
         if (committee && committee !== "all") {
@@ -460,7 +464,7 @@ export async function GET(request: NextRequest) {
         });
       }
 
-      if (!isSuperAdmin) {
+      if (!canViewAll) {
         andConditions.push(
           interviewerCondition || { id: "__no_assigned_interviewer__" },
         );
