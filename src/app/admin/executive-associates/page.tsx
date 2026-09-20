@@ -171,6 +171,26 @@ const EAs = () => {
     }
   };
 
+  const handleResetSchedule = async (ea: EA) => {
+    if (!window.confirm(`Reset ${ea.user.name}'s interview schedule? Their application will remain unchanged.`)) return;
+    setProcessingId(ea.id);
+    try {
+      const response = await fetch("/api/admin/applications/reset-schedule", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ applicationId: ea.id, type: "executive-associate" }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Failed to reset schedule");
+      toast.success("Interview schedule reset");
+      await fetchEAs();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to reset schedule");
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
   const executeEAAction = useCallback(
     async (
       applicationId: string,
@@ -364,6 +384,15 @@ const EAs = () => {
                             className="px-2.5 py-1 text-xs text-[#134687] border border-[#005FD9]/15 rounded hover:bg-[#F3F3FD] transition-colors"
                           >
                             CV
+                          </button>
+                        )}
+                        {ea.interviewSlotDay && ea.interviewSlotTimeStart && (
+                          <button
+                            onClick={() => void handleResetSchedule(ea)}
+                            disabled={processingId === ea.id}
+                            className="px-2.5 py-1 text-xs text-[#8A5A00] border border-[#D6A326]/30 rounded hover:bg-[#FFF8E7] disabled:opacity-50 transition-colors"
+                          >
+                            Reset Schedule
                           </button>
                         )}
 

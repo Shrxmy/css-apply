@@ -216,6 +216,26 @@ const Staffs = () => {
     }
   };
 
+  const handleResetSchedule = async (staff: CommitteeStaff) => {
+    if (!window.confirm(`Reset ${staff.user.name}'s interview schedule? Their application will remain unchanged.`)) return;
+    setProcessingId(staff.id);
+    try {
+      const response = await fetch("/api/admin/applications/reset-schedule", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ applicationId: staff.id, type: "committee" }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Failed to reset schedule");
+      toast.success("Interview schedule reset");
+      await fetchStaffs();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to reset schedule");
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
   const handleStaffAction = useCallback(
     async (
       applicationId: string,
@@ -438,6 +458,15 @@ const Staffs = () => {
                               className="px-2.5 py-1 text-xs text-[#134687] border border-[#005FD9]/15 rounded hover:bg-[#F3F3FD] transition-colors"
                             >
                               Portfolio
+                            </button>
+                          )}
+                          {staff.interviewSlotDay && staff.interviewSlotTimeStart && (
+                            <button
+                              onClick={() => void handleResetSchedule(staff)}
+                              disabled={processingId === staff.id}
+                              className="px-2.5 py-1 text-xs text-[#8A5A00] border border-[#D6A326]/30 rounded hover:bg-[#FFF8E7] disabled:opacity-50 transition-colors"
+                            >
+                              Reset Schedule
                             </button>
                           )}
                         </div>
