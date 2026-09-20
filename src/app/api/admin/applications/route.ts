@@ -282,7 +282,7 @@ export async function GET(request: NextRequest) {
         recruitmentCycleId: activeCycleId,
       };
 
-      if (interviewerValues.length > 0 || !isSuperAdmin) {
+      if (!isSuperAdmin) {
         whereClause.AND = [
           interviewerCondition || { id: "__no_assigned_interviewer__" },
         ];
@@ -379,7 +379,7 @@ export async function GET(request: NextRequest) {
       const andConditions: Prisma.CommitteeApplicationWhereInput[] = [];
 
       // Enforce accessible committees
-      if (accessibleCommittees) {
+      if (accessibleCommittees && !isSuperAdmin) {
         const accessibleList = Array.from(accessibleCommittees);
 
         if (committee && committee !== "all") {
@@ -460,7 +460,7 @@ export async function GET(request: NextRequest) {
         });
       }
 
-      if (interviewerValues.length > 0 || !isSuperAdmin) {
+      if (!isSuperAdmin) {
         andConditions.push(
           interviewerCondition || { id: "__no_assigned_interviewer__" },
         );

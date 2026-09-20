@@ -328,11 +328,105 @@ function UserAvatar({
 
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
-type Tab = "users" | "settings" | "email";
+interface SuperAdminApplication {
+  id: string;
+  type: "member" | "committee" | "executive-associate";
+  status?: string | null;
+  hasAccepted?: boolean;
+  firstOptionCommittee?: string;
+  ebRole?: string;
+  redirection?: string | null;
+  user: { name: string; email: string; studentNumber: string; section?: string | null };
+  cvDownloadUrl?: string | null;
+  portfolioDownloadUrl?: string | null;
+}
+
+function SuperAdminApplicationsTab() {
+  const [applications, setApplications] = useState<SuperAdminApplication[]>([]);
+  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [pending, setPending] = useState<{ application: SuperAdminApplication; action: "evaluate" | "accept" | "reject" | "redirect" | "reset" } | null>(null);
+  const [redirectTarget, setRedirectTarget] = useState("");
+  const [processing, setProcessing] = useState(false);
+
+  const loadApplications = useCallback(async () => {
+    setLoading(true);
+    try {
+      const responses = await Promise.all([
+        fetch("/api/admin/applications?type=committee&limit=1000"),
+        fetch("/api/admin/applications?type=executive-associate&limit=1000"),
+        fetch("/api/admin/applications?type=member&status=pending&limit=1000"),
+        fetch("/api/admin/applications?type=member&status=accepted&limit=1000"),
+      ]);
+      const payloads = await Promise.all(responses.map((response) => response.json()));
+      const all = [
+        ...(payloads[0].applications || []).map((application: SuperAdminApplication) => ({ ...application, type: "committee" as const })),
+        ...(payloads[1].applications || []).map((application: SuperAdminApplication) => ({ ...application, type: "executive-associate" as const })),
+        ...(payloads[2].applications || []).map((application: SuperAdminApplication) => ({ ...application, type: "member" as const })),
+        ...(payloads[3].applications || []).map((application: SuperAdminApplication) => ({ ...application, type: "member" as const })),
+      ];
+      setApplications(Array.from(new Map(all.map((application) => [`${application.type}:${application.id}`, application])).values()));
+    } catch {
+      toast.error("Failed to load applications");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void loadApplications(); }, [loadApplications]);
+
+  const visibleApplications = applications.filter((application) => {
+    const query = search.trim().toLowerCase();
+    return !query || [application.user.name, application.user.email, application.user.studentNumber, application.firstOptionCommittee, application.ebRole].some((value) => value?.toLowerCase().includes(query));
+  });
+
+  const executeAction = async () => {
+    if (!pending) return;
+    setProcessing(true);
+    try {
+      let response: Response;
+      if (pending.action === "reset") {
+        response = await fetch("/api/admin/applications/reset", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ applicationId: pending.application.id, type: pending.application.type }) });
+      } else {
+        response = await fetch("/api/admin/applications", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ applicationId: pending.application.id, type: pending.application.type, action: pending.action, ...(pending.action === "redirect" ? { redirection: redirectTarget } : {}) }) });
+      }
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Action failed");
+      const actionLabel = pending.action === "evaluate" ? "set to evaluation" : `${pending.action}ed`;
+      toast.success(pending.action === "reset" ? "Application reset" : `Application ${actionLabel}`);
+      setPending(null); setRedirectTarget(""); await loadApplications();
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Action failed"); }
+    finally { setProcessing(false); }
+  };
+
+  const labelFor = (application: SuperAdminApplication) => application.type === "member" ? "Member" : application.type === "committee" ? `${application.firstOptionCommittee || "Committee"} Staff` : `${application.ebRole || "Executive Associate"} EA`;
+  const statusFor = (application: SuperAdminApplication) => application.redirection ? "Redirected" : application.hasAccepted ? "Accepted" : application.status === "failed" ? "Rejected" : application.status === "evaluating" ? "Evaluating" : "Pending";
+
+  return <div className="space-y-5">
+    <div className="flex flex-col gap-3 rounded-xl border border-[#005FD9]/10 bg-white p-5 md:flex-row md:items-end md:justify-between">
+      <div><h2 className="text-lg font-bold text-[#134687]">All Applications</h2><p className="text-xs text-[#134687]/50">Super Admin view · all applications regardless of interviewer assignment</p></div>
+      <div className="flex gap-2"><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name, email, or student number" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm md:w-80" /><button onClick={() => void loadApplications()} className="rounded-lg border border-[#005FD9]/15 px-3 py-2 text-sm text-[#134687] hover:bg-[#F3F3FD]">Refresh</button></div>
+    </div>
+    <div className="overflow-x-auto rounded-xl border border-[#005FD9]/10 bg-white">
+      <table className="min-w-[1100px] w-full text-left text-sm"><thead className="bg-[#F3F8FF] text-xs uppercase tracking-wider text-[#134687]/60"><tr><th className="px-4 py-3">Applicant</th><th className="px-4 py-3">Type / Position</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Interviewer</th><th className="px-4 py-3">Files</th><th className="px-4 py-3">Actions</th></tr></thead><tbody className="divide-y divide-[#005FD9]/10">
+        {loading ? <tr><td colSpan={6} className="px-4 py-10 text-center text-[#134687]/50">Loading applications...</td></tr> : visibleApplications.map((application) => <tr key={`${application.type}:${application.id}`} className="align-top hover:bg-[#F9FBFF]"><td className="px-4 py-4"><div className="font-semibold text-[#134687]">{application.user.name}</div><div className="text-xs text-[#134687]/60">{application.user.email}</div><div className="font-mono text-xs text-[#134687]/50">{application.user.studentNumber}</div></td><td className="px-4 py-4 text-[#134687]">{labelFor(application)}</td><td className="px-4 py-4"><span className="rounded-full bg-[#E8F2FF] px-2 py-1 text-xs font-semibold text-[#044FAF]">{statusFor(application)}</span></td><td className="px-4 py-4 text-xs text-[#134687]/70">{(application as SuperAdminApplication & { interviewBy?: string }).interviewBy || "Not assigned"}</td><td className="px-4 py-4"><div className="flex gap-2">{application.cvDownloadUrl && <a href={application.cvDownloadUrl} target="_blank" rel="noreferrer" className="text-xs font-medium text-[#044FAF] underline">CV</a>}{application.portfolioDownloadUrl && <a href={application.portfolioDownloadUrl} target="_blank" rel="noreferrer" className="text-xs font-medium text-[#044FAF] underline">Portfolio</a>}</div></td><td className="px-4 py-4"><div className="flex min-w-[360px] flex-wrap gap-1"><button onClick={() => setPending({ application, action: "evaluate" })} disabled={application.type === "member" || Boolean(application.hasAccepted)} className="rounded border border-[#005FD9]/15 px-2 py-1 text-xs text-[#134687] disabled:opacity-30">Evaluate</button><button onClick={() => setPending({ application, action: "accept" })} disabled={Boolean(application.hasAccepted)} className="rounded border border-[#005FD9]/15 px-2 py-1 text-xs text-[#134687] disabled:opacity-30">Accept</button><button onClick={() => setPending({ application, action: "reject" })} disabled={Boolean(application.hasAccepted)} className="rounded border border-red-200 px-2 py-1 text-xs text-red-600 disabled:opacity-30">Reject</button><button onClick={() => setPending({ application, action: "redirect" })} disabled={application.type === "member" || Boolean(application.hasAccepted)} className="rounded border border-[#005FD9]/15 px-2 py-1 text-xs text-[#134687] disabled:opacity-30">Redirect</button><button onClick={() => setPending({ application, action: "reset" })} className="rounded border border-red-200 px-2 py-1 text-xs text-red-600">Reset</button></div></td></tr>)}
+        {!loading && visibleApplications.length === 0 && <tr><td colSpan={6} className="px-4 py-10 text-center text-[#134687]/50">No applications found.</td></tr>}
+      </tbody></table>
+    </div>
+    {pending && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><div role="dialog" aria-modal="true" className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"><h3 className="text-lg font-semibold text-[#134687]">Confirm {pending.action}</h3>{pending.action === "redirect" && <select value={redirectTarget} onChange={(event) => setRedirectTarget(event.target.value)} className="mt-4 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"><option value="">Select destination</option><option value="member">Member</option>{committeeRoles.map((role) => <option key={role.id} value={`committee-${role.id}`}>{role.title} Staff</option>)}{ebRoles.map((role) => <option key={role.id} value={role.id}>{role.title} EA</option>)}</select>}<p className="mt-3 text-sm text-[#134687]/70">{pending.action === "reset" ? "This permanently removes the application and its stored files." : `Apply ${pending.action} to ${pending.application.user.name}'s application?`}</p><div className="mt-6 flex justify-end gap-2"><button onClick={() => { setPending(null); setRedirectTarget(""); }} className="rounded-lg border border-gray-300 px-4 py-2 text-sm">Cancel</button><button onClick={() => void executeAction()} disabled={processing || (pending.action === "redirect" && !redirectTarget)} className="rounded-lg bg-[#044FAF] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{processing ? "Processing..." : "Confirm"}</button></div></div></div>}
+  </div>;
+}
+
+// ─── Main Page ───────────────────────────────────────────────────────────────
+
+type Tab = "users" | "applications" | "settings" | "email";
 type SettingsSection = "general" | "executive-board" | "recruitment";
 
 const isTab = (value: string | null): value is Tab =>
-  value === "users" || value === "settings" || value === "email";
+  value === "users" ||
+  value === "applications" ||
+  value === "settings" ||
+  value === "email";
 
 const isSettingsSection = (value: string | null): value is SettingsSection =>
   value === "general" || value === "executive-board" || value === "recruitment";
@@ -574,6 +668,7 @@ export default function SuperAdminDashboard() {
           <div className="flex flex-wrap gap-2">
             {[
               { key: "users" as Tab, label: "User Database" },
+              { key: "applications" as Tab, label: "All Applications" },
               { key: "settings" as Tab, label: "Configuration" },
               { key: "email" as Tab, label: "Email Test" },
             ].map((tab) => (
@@ -595,6 +690,8 @@ export default function SuperAdminDashboard() {
         <div className="mb-5 rounded-xl border border-[#005FD9]/10 bg-white p-5">
           {activeTab === "users" ? (
             <UsersTab />
+          ) : activeTab === "applications" ? (
+            <SuperAdminApplicationsTab />
           ) : activeTab === "settings" ? (
             <SettingsTab
               settingsSection={settingsSection}
