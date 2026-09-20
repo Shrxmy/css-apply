@@ -302,11 +302,16 @@ export default function SchedulePageContent() {
                     <div className="bg-white rounded-lg border border-[#164E96] overflow-hidden">
                       <div className="overflow-x-auto divide-y divide-[#164E96]">
                         {/* Header Row */}
-                        <div className="flex min-w-fit">
+                        <div className="grid min-w-fit" style={{ gridTemplateColumns: "5rem minmax(0, 1fr)" }}>
                           <div className="sticky left-0 bg-white z-10 px-2 py-1.5 font-inter font-semibold text-xs text-[#134687] flex items-center justify-center text-center w-12.5 lg:w-20 shrink-0 border-r border-[#164E96]">
                             Time
                           </div>
-                          <div className="flex flex-1 divide-x divide-[#164E96] border-l border-[#164E96]">
+                          <div
+                            className="grid flex-1 divide-x divide-[#164E96] border-l border-[#164E96]"
+                            style={{
+                              gridTemplateColumns: `repeat(${Object.keys(groupedSlots).length}, minmax(0, 1fr))`,
+                            }}
+                          >
                             {Object.entries(groupedSlots)
                               .sort(
                                 ([a], [b]) =>
@@ -322,7 +327,7 @@ export default function SchedulePageContent() {
                                 return (
                                   <div
                                     key={date}
-                                    className="bg-[#164E96] p-1.5 text-center shrink-0 w-12.5 lg:w-auto lg:flex-1 lg:shrink"
+                                    className="min-w-0 bg-[#164E96] p-1.5 text-center"
                                   >
                                     <div className="font-inter font-semibold text-xs text-white">
                                       {dayName}
@@ -384,7 +389,7 @@ export default function SchedulePageContent() {
                                 return (
                                   <div
                                     key={date}
-                                    className={`min-h-9 shrink-0 w-12.5 lg:w-auto lg:flex-1 lg:shrink ${isUnavailable && prevUnavailable ? "-mt-px" : ""}`}
+                                    className="min-w-0 min-h-9"
                                   >
                                     {slotForThisTime ? (
                                       <button
@@ -422,7 +427,7 @@ export default function SchedulePageContent() {
                                           "Selected"
                                         ) : isAvailable ? (
                                           <>
-                                            <span className="hidden max-w-full truncate px-1 text-[8px] lg:block">
+                                            <span className="hidden min-w-0 max-w-full truncate px-1 text-center text-[8px] lg:block">
                                               {slotForThisTime.assignedEB}
                                             </span>
                                             <span className="text-[8px] lg:hidden">
@@ -440,7 +445,7 @@ export default function SchedulePageContent() {
                             );
 
                             return (
-                              <div key={timeIndex} className="flex min-w-fit">
+                              <div key={timeIndex} className="grid min-w-fit" style={{ gridTemplateColumns: "5rem minmax(0, 1fr)" }}>
                                 <div className="sticky left-0 bg-white z-10 px-2 py-1 text-center w-12.5 lg:w-20 shrink-0 border-r border-[#164E96]">
                                   <div className="font-inter text-[11px] text-[#134687]">
                                     {timeSlot.displayTime}
@@ -449,7 +454,12 @@ export default function SchedulePageContent() {
                                     {timeSlot.endDisplayTime}
                                   </div>
                                 </div>
-                                <div className="flex flex-1 divide-x divide-[#164E96] border-l border-[#164E96]">
+                                <div
+                                  className="grid min-w-0 divide-x divide-[#164E96] border-l border-[#164E96]"
+                                  style={{
+                                    gridTemplateColumns: `repeat(${sortedEntries.length}, minmax(0, 1fr))`,
+                                  }}
+                                >
                                   {rowCells}
                                 </div>
                               </div>
