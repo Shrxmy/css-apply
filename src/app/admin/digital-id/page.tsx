@@ -69,12 +69,12 @@ export default function AdminDigitalIdPage() {
   }
 
   return (
-    <div className="flex min-h-screen overflow-x-hidden bg-[#F3F3FD] bg-[url('/assets/css-apply-static-images/assets/pictures/background.webp')] bg-cover bg-repeat">
+    <div className="flex h-dvh overflow-hidden bg-[#F3F3FD] bg-[url('/assets/css-apply-static-images/assets/pictures/background.webp')] bg-cover bg-repeat">
       <MobileSidebar>
         <SidebarContent activePage="digital-id" />
       </MobileSidebar>
 
-      <main className="min-w-0 flex-1 px-6 pb-10 pt-28 md:px-8 md:pt-10">
+      <main className="min-w-0 flex-1 overflow-y-auto px-6 pb-10 pt-28 md:px-8 md:pt-10">
         <div className="mx-auto flex max-w-4xl flex-col items-center gap-6">
           <div className="w-full rounded-xl border border-[#005FD9]/10 bg-[#F8FAFF] p-5">
             <div className="inline-flex rounded-full bg-[#E8F2FF] px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-[#044FAF]">
