@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { signOut } from "next-auth/react";
 import useSWR from "swr";
-import { ScanLine } from "lucide-react";
+import { CreditCard, ScanLine } from "lucide-react";
 
 const swrFetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -429,6 +429,22 @@ const SidebarContent = ({ activePage }: SidebarContentProps) => {
           )}
         </div>
       </nav>
+
+      {/* personal digital ID */}
+      {activePage === "digital-id" ? (
+        <div className="mx-4 mb-2 flex items-center rounded-lg border border-gray-300 bg-[#fefefe] px-4 py-3 text-gray-700">
+          <CreditCard className="mr-3 h-5 w-5 text-[#164e96]" />
+          <span className="text-sm">My Digital ID</span>
+        </div>
+      ) : (
+        <Link
+          href="/admin/digital-id"
+          className="group mx-4 mb-2 flex items-center rounded-lg px-4 py-3 text-gray-600 transition-all hover:bg-blue-50"
+        >
+          <CreditCard className="mr-3 h-5 w-5 text-gray-500 group-hover:text-[#164e96]" />
+          <span className="text-sm text-gray-700">My Digital ID</span>
+        </Link>
+      )}
 
       {/* logout button */}
       <div className="p-4 border-t shrink-0">

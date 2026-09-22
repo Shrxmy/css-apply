@@ -35,6 +35,9 @@ export async function GET() {
           studentNumber: true,
           section: true,
           role: true,
+          ebProfile: {
+            select: { position: true, isActive: true },
+          },
           memberships: {
             where: { recruitmentCycle: { isActive: true } },
             select: { memberId: true, photoPath: true, createdAt: true },
@@ -100,6 +103,7 @@ export async function GET() {
 
     const memberApp = user.memberApplications?.[0];
     const committeeApp = user.committeeApplications?.[0];
+    const ebProfile = user.ebProfile?.isActive ? user.ebProfile : null;
     const eaApp = user.executiveAssociateApplications?.[0];
 
     // Determine if any application has paymentStatus === "approved"
@@ -119,6 +123,10 @@ export async function GET() {
     } else if (memberApp && memberApp.paymentStatus === "approved") {
       approvedAppType = "member";
       roleTitle = "Official Member";
+    }
+
+    if (approvedAppType && ebProfile && (user.role === "admin" || user.role === "super_admin")) {
+      roleTitle = `Executive Board - ${getPositionTitle(ebProfile.position)}`;
     }
 
     if (!approvedAppType) {
