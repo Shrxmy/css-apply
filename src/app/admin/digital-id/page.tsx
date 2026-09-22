@@ -31,13 +31,24 @@ export default function AdminDigitalIdPage() {
   const { status } = useSession();
   const router = useRouter();
   const [data, setData] = useState<DigitalIdResponse | null>(null);
+  const [studentNumber, setStudentNumber] = useState("");
+  const [section, setSection] = useState("");
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileMessage, setProfileMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const loadDigitalId = async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/user/digital-id", { cache: "no-store" });
-      setData((await response.json()) as DigitalIdResponse);
+      const [idResponse, profileResponse] = await Promise.all([
+        fetch("/api/user/digital-id", { cache: "no-store" }),
+        fetch("/api/admin/profile", { cache: "no-store" }),
+      ]);
+      const idData = (await idResponse.json()) as DigitalIdResponse;
+      const profileData = (await profileResponse.json()) as { user?: { studentNumber?: string | null; section?: string | null } };
+      setData(idData);
+      setStudentNumber(profileData.user?.studentNumber || idData.user?.studentNumber || "");
+      setSection(profileData.user?.section || idData.user?.section || "");
     } catch {
       setData({ isEligible: false, reason: "Unable to load your Digital ID." });
     } finally {
@@ -84,6 +95,43 @@ export default function AdminDigitalIdPage() {
               Refresh ID
             </button>
           </div>
+
+          <form
+            onSubmit={async (event) => {
+              event.preventDefault();
+              setSavingProfile(true);
+              setProfileMessage(null);
+              try {
+                const response = await fetch("/api/admin/profile", {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ studentNumber, section }),
+                });
+                const result = (await response.json()) as { user?: { studentNumber?: string; section?: string | null }; error?: string };
+                if (!response.ok) throw new Error(result.error || "Failed to save profile");
+                setStudentNumber(result.user?.studentNumber || studentNumber);
+                setSection(result.user?.section || "");
+                setProfileMessage("Profile details updated.");
+                await loadDigitalId();
+              } catch (error) {
+                setProfileMessage(error instanceof Error ? error.message : "Failed to save profile");
+              } finally {
+                setSavingProfile(false);
+              }
+            }}
+            className="w-full max-w-xl rounded-xl border border-[#005FD9]/10 bg-white p-5 shadow-sm"
+          >
+            <h2 className="font-poppins text-base font-semibold text-[#134687]">Update EB Details</h2>
+            <p className="mt-1 text-xs leading-5 text-[#134687]/60">These details appear on your CSS Digital ID. Use N/A if you do not have a student number.</p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <label className="text-xs font-semibold text-[#134687]">Student Number<input value={studentNumber} onChange={(event) => setStudentNumber(event.target.value)} maxLength={10} className="mt-1 w-full rounded-lg border border-[#005FD9]/15 px-3 py-2 text-sm font-normal outline-none focus:border-[#044FAF]" /></label>
+              <label className="text-xs font-semibold text-[#134687]">Section<input value={section} onChange={(event) => setSection(event.target.value)} maxLength={100} className="mt-1 w-full rounded-lg border border-[#005FD9]/15 px-3 py-2 text-sm font-normal outline-none focus:border-[#044FAF]" /></label>
+            </div>
+            <div className="mt-4 flex items-center justify-between gap-3">
+              <p className={`text-xs ${profileMessage?.includes("updated") ? "text-emerald-700" : "text-red-600"}`}>{profileMessage}</p>
+              <button type="submit" disabled={savingProfile} className="rounded-lg bg-[#134687] px-4 py-2 text-xs font-semibold text-white disabled:opacity-50">{savingProfile ? "Saving..." : "Save Details"}</button>
+            </div>
+          </form>
 
           {data?.isEligible && data.memberId && data.user ? (
             <DigitalIdCard
