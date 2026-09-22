@@ -125,7 +125,13 @@ export async function GET() {
       roleTitle = "Official Member";
     }
 
-    if (approvedAppType && ebProfile && (user.role === "admin" || user.role === "super_admin")) {
+    const isExecutiveBoardMember = Boolean(
+      ebProfile && (user.role === "admin" || user.role === "super_admin"),
+    );
+    if (isExecutiveBoardMember && ebProfile) {
+      // Executive Board members receive their CSS Digital ID through their
+      // active EB profile and do not need to pay a membership fee.
+      approvedAppType = approvedAppType || "member";
       roleTitle = `Executive Board - ${getPositionTitle(ebProfile.position)}`;
     }
 
