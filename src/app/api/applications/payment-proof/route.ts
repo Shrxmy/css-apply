@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
         include: {
           memberApplications: {
             where: { recruitmentCycleId: cycle.id, hasAccepted: true },
-            select: { id: true, paymentStatus: true, redirection: true },
+            select: { id: true, paymentStatus: true },
             take: 2,
           },
           committeeApplications: {
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
         ...user.memberApplications.map((application) => ({
           id: application.id,
           paymentStatus: application.paymentStatus,
-          redirection: application.redirection,
+          redirection: null,
           type: "member" as const,
         })),
         ...user.committeeApplications.map((application) => ({
