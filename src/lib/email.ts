@@ -930,6 +930,21 @@ export const emailTemplates = {
         ),
     }),
 
+    interviewScheduleCancelled: (
+        ebName: string,
+        applicantName: string,
+        interviewType: string,
+    ): EmailTemplate => ({
+        subject: `CSSApply - Interview Schedule Reset - ${applicantName}`,
+        html: wrapEmail(
+            `Hello, ${ebName}!`,
+            `
+            <p>The interview schedule for <strong>${applicantName}</strong>'s ${interviewType} application has been reset.</p>
+            <p>The previously selected interview slot is no longer booked. Please wait for the applicant to select a new available slot.</p>
+            `,
+        ),
+    }),
+
     // Member redirection templates
     committeeRedirectedToMember: (
         userName: string,

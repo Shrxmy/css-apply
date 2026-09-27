@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getPositionTitle, getRoleId } from "@/lib/eb-mapping";
+import { emailTemplates, sendEmailWithValidation } from "@/lib/email";
 
 export async function POST(request: NextRequest) {
   try {
@@ -37,11 +38,21 @@ export async function POST(request: NextRequest) {
       body.type === "committee"
         ? await prisma.committeeApplication.findUnique({
             where: { id: body.applicationId },
-            select: { id: true, interviewBy: true },
+            select: {
+              id: true,
+              interviewBy: true,
+              studentNumber: true,
+              user: { select: { name: true } },
+            },
           })
         : await prisma.executiveAssociateApplication.findUnique({
             where: { id: body.applicationId },
-            select: { id: true, interviewBy: true },
+            select: {
+              id: true,
+              interviewBy: true,
+              studentNumber: true,
+              user: { select: { name: true } },
+            },
           });
 
     if (!application) {
@@ -96,6 +107,38 @@ export async function POST(request: NextRequest) {
         where: { id: body.applicationId },
         data,
       });
+    }
+
+    if (application.interviewBy) {
+      const interviewer = await prisma.eBProfile.findFirst({
+        where: {
+          OR: [
+            { position: application.interviewBy },
+            { position: getPositionTitle(application.interviewBy) },
+            { position: getRoleId(application.interviewBy) },
+          ],
+          isActive: true,
+        },
+        select: { user: { select: { name: true, email: true } } },
+      });
+
+      if (interviewer?.user.email) {
+        try {
+          const template = emailTemplates.interviewScheduleCancelled(
+            interviewer.user.name,
+            application.user.name,
+            body.type === "committee" ? "Committee Staff" : "Executive Associate",
+          );
+          await sendEmailWithValidation(
+            interviewer.user.email,
+            template.subject,
+            template.html,
+            "Interview schedule reset notification",
+          );
+        } catch (emailError) {
+          console.error("Interview schedule reset email failed", emailError);
+        }
+      }
     }
 
     return NextResponse.json({ success: true });
