@@ -35,17 +35,17 @@ export async function POST(request: NextRequest) {
         include: {
           memberApplications: {
             where: { recruitmentCycleId: cycle.id, hasAccepted: true },
-            select: { id: true, paymentStatus: true },
+            select: { id: true, paymentStatus: true, redirection: true },
             take: 2,
           },
           committeeApplications: {
             where: { recruitmentCycleId: cycle.id, hasAccepted: true },
-            select: { id: true, paymentStatus: true },
+            select: { id: true, paymentStatus: true, redirection: true },
             take: 2,
           },
           executiveAssociateApplications: {
             where: { recruitmentCycleId: cycle.id, hasAccepted: true },
-            select: { id: true, paymentStatus: true },
+            select: { id: true, paymentStatus: true, redirection: true },
             take: 2,
           },
         },
@@ -56,16 +56,19 @@ export async function POST(request: NextRequest) {
         ...user.memberApplications.map((application) => ({
           id: application.id,
           paymentStatus: application.paymentStatus,
+          redirection: application.redirection,
           type: "member" as const,
         })),
         ...user.committeeApplications.map((application) => ({
           id: application.id,
           paymentStatus: application.paymentStatus,
+          redirection: application.redirection,
           type: "committee" as const,
         })),
         ...user.executiveAssociateApplications.map((application) => ({
           id: application.id,
           paymentStatus: application.paymentStatus,
+          redirection: application.redirection,
           type: "executive-associate" as const,
         })),
       ];
@@ -73,11 +76,23 @@ export async function POST(request: NextRequest) {
       if (acceptedApplications.length === 0) {
         throw new Error("NO_ACCEPTED_APPLICATION");
       }
-      if (acceptedApplications.length > 1) {
+
+      // A redirected source application may remain accepted for historical
+      // tracking while the applicant's redirected destination is accepted too.
+      // Receipt submission must target the destination, not the source.
+      const activeAcceptedApplications = acceptedApplications.filter(
+        (application) => !application.redirection,
+      );
+      const applicationsToUse =
+        activeAcceptedApplications.length > 0
+          ? activeAcceptedApplications
+          : acceptedApplications;
+
+      if (applicationsToUse.length > 1) {
         throw new Error("MULTIPLE_ACCEPTED_APPLICATIONS");
       }
 
-      const application = acceptedApplications[0];
+      const application = applicationsToUse[0];
       if (application.paymentStatus === "pending") {
         throw new Error("RECEIPT_ALREADY_PENDING");
       }
