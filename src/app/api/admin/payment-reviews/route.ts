@@ -239,9 +239,12 @@ export async function PATCH(request: NextRequest) {
     const { applicationId, applicationType, action, rejectionReason } = parsed.data;
     const result = await prisma.$transaction(async (tx) => {
       const lockKey = `payment-review:${cycle.id}:${applicationType}:${applicationId}`;
-      await tx.$executeRaw(Prisma.sql`
-        SELECT pg_advisory_xact_lock(hashtext(${lockKey}))
+      const lockResult = await tx.$queryRaw<Array<{ locked: boolean }>>(Prisma.sql`
+        SELECT pg_try_advisory_xact_lock(hashtext(${lockKey})) AS locked
       `);
+      if (!lockResult[0]?.locked) {
+        throw new Error("REVIEW_IN_PROGRESS");
+      }
 
       const baseWhere = {
         id: applicationId,
@@ -380,6 +383,10 @@ export async function PATCH(request: NextRequest) {
       },
       RECEIPT_ALREADY_REVIEWED: {
         error: "This acknowledgement receipt is no longer pending",
+        status: 409,
+      },
+      REVIEW_IN_PROGRESS: {
+        error: "This receipt is currently being reviewed. Please wait and try again.",
         status: 409,
       },
     };
