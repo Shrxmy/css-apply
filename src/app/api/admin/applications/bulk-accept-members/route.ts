@@ -71,7 +71,7 @@ export async function POST(_request: NextRequest) {
         });
       }
       return accepted;
-    });
+    }, { maxWait: 10_000, timeout: 30_000 });
 
     await Promise.all(
       acceptedApplications.map(async (application) => {
