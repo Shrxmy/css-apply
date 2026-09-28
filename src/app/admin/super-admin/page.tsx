@@ -356,6 +356,7 @@ function SuperAdminApplicationsTab() {
   const [processing, setProcessing] = useState(false);
   const [exportType, setExportType] = useState<"member" | "committee" | "executive-associate">("member");
   const [exportPosition, setExportPosition] = useState("all");
+  const [exportFormat, setExportFormat] = useState<"csv" | "pdf">("csv");
 
   const loadApplications = useCallback(async () => {
     setLoading(true);
@@ -405,7 +406,7 @@ function SuperAdminApplicationsTab() {
         : [{ value: "all", label: "All Members" }];
 
   const handleExport = () => {
-    const params = new URLSearchParams({ type: exportType, status: "accepted" });
+    const params = new URLSearchParams({ type: exportType, status: "accepted", format: exportFormat });
     if (exportType === "committee") params.set("committee", exportPosition);
     if (exportType === "executive-associate") params.set("role", exportPosition);
     const link = document.createElement("a");
@@ -528,12 +529,20 @@ function SuperAdminApplicationsTab() {
             <option key={option.value} value={option.value}>{option.label}</option>
           ))}
         </select>
+        <select
+          value={exportFormat}
+          onChange={(event) => setExportFormat(event.target.value as typeof exportFormat)}
+          className="rounded-lg border border-[#005FD9]/15 px-3 py-2 text-sm text-[#134687] outline-none focus:border-[#044FAF]"
+        >
+          <option value="csv">CSV</option>
+          <option value="pdf">PDF</option>
+        </select>
         <button
           type="button"
           onClick={handleExport}
           className="rounded-lg bg-[#044FAF] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#033B85]"
         >
-          Export CSV
+          Export {exportFormat.toUpperCase()}
         </button>
       </div>
     </div>

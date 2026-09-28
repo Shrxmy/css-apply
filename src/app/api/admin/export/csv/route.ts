@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getDisplayMemberId } from "@/lib/member-id";
+import { generateApplicationExportPdf } from "@/lib/application-export-pdf";
 
 async function getActiveCycleId() {
   const activeCycle = await prisma.recruitmentCycle.findFirst({
@@ -32,6 +33,7 @@ export async function GET(request: NextRequest) {
     const committee = searchParams.get("committee"); // specific committee for committee staff
     const status = searchParams.get("status"); // all, accepted, pending, rejected
     const role = searchParams.get("role"); // specific EA role
+    const format = searchParams.get("format") === "pdf" ? "pdf" : "csv";
 
     if (!type) {
       return NextResponse.json(
@@ -64,6 +66,22 @@ export async function GET(request: NextRequest) {
           { error: "Invalid type parameter" },
           { status: 400 },
         );
+    }
+
+    if (format === "pdf") {
+      const { headers, rows } = parseCsv(csvData);
+      const pdf = await generateApplicationExportPdf({
+        title: `${type === "member" ? "Members" : type === "committee" ? "Committee Staff" : "Executive Associates"} Export`,
+        subtitle: `${type === "committee" && committee && committee !== "all" ? `Position: ${committee}` : type === "executive-associate" && role && role !== "all" ? `Position: ${role}` : "All positions"} • Accepted applications`,
+        headers,
+        rows,
+      });
+      return new NextResponse(Buffer.from(pdf), {
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `attachment; filename="${filename.replace(/\.csv$/, ".pdf")}"`,
+        },
+      });
     }
 
     return new NextResponse(csvData, {
@@ -379,6 +397,40 @@ async function exportExecutiveAssociateApplications(
   ]);
 
   return generateCSV(headers, rows);
+}
+
+function parseCsv(csv: string) {
+  const records: string[][] = [];
+  let record: string[] = [];
+  let value = "";
+  let quoted = false;
+
+  for (let index = 0; index < csv.length; index += 1) {
+    const character = csv[index];
+    const next = csv[index + 1];
+    if (character === '"' && quoted && next === '"') {
+      value += '"';
+      index += 1;
+    } else if (character === '"') {
+      quoted = !quoted;
+    } else if (character === "," && !quoted) {
+      record.push(value);
+      value = "";
+    } else if (character === "\n" && !quoted) {
+      record.push(value);
+      records.push(record);
+      record = [];
+      value = "";
+    } else if (character !== "\r") {
+      value += character;
+    }
+  }
+  if (value || record.length) {
+    record.push(value);
+    records.push(record);
+  }
+
+  return { headers: records[0] || [], rows: records.slice(1) };
 }
 
 function formatDate(date: Date | null) {

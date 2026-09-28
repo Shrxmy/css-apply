@@ -173,7 +173,7 @@ export default function PaymentReviewsPage() {
         </header>
 
         <section>
-          <div className="mb-5 rounded-xl border border-[#005FD9]/10 bg-white p-5">
+          <div className="mb-4 rounded-xl border border-[#005FD9]/10 bg-white p-3">
             <div className="w-full sm:w-fit">
               <label
                 htmlFor="payment-review-status"
@@ -232,7 +232,7 @@ export default function PaymentReviewsPage() {
                   <article
                     key={`${review.applicationType}-${review.id}`}
                     aria-busy={isProcessing}
-                    className="relative overflow-hidden rounded-lg border border-[#005FD9]/10 p-4 transition-colors hover:bg-[#F3F3FD]/50"
+                    className="relative overflow-hidden rounded-lg border border-[#005FD9]/10 p-3 transition-colors hover:bg-[#F3F3FD]/50"
                   >
                     <FormProcessingOverlay
                       active={isProcessing}
@@ -250,8 +250,8 @@ export default function PaymentReviewsPage() {
                         isProcessing ? "opacity-45 grayscale" : "opacity-100"
                       }`}
                     >
-                      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-                        <div className="min-w-0 space-y-2">
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                        <div className="min-w-0 space-y-1">
                           <div className="flex flex-wrap items-center gap-2">
                             <h2 className="text-sm font-semibold text-[#134687]">
                               {review.user.name}
@@ -283,22 +283,22 @@ export default function PaymentReviewsPage() {
                           )}
                         </div>
 
-                        <div className="flex w-full flex-col gap-3 lg:w-auto lg:min-w-64">
+                        <div className="flex w-full flex-col gap-2 lg:w-80 lg:shrink-0">
                           <a
                             href={review.paymentProof}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="rounded-lg border border-[#134687]/20 px-4 py-2.5 text-center text-sm font-semibold text-[#134687] hover:bg-[#F3F3FD]"
+                            className="rounded-lg border border-[#134687]/20 px-3 py-2 text-xs font-semibold text-[#134687] hover:bg-[#F3F3FD]"
                           >
                             Open Receipt in Google Drive
                           </a>
 
                           {selectedStatus === "pending" && !isRejecting && (
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="grid grid-cols-3 gap-2">
                               <button
                                 type="button"
                                 onClick={() => void reviewReceipt(review, "approve")}
-                                className="rounded-lg bg-[#134687] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#0d3569]"
+                                className="rounded-lg bg-[#134687] px-2 py-2 text-xs font-semibold text-white hover:bg-[#0d3569]"
                               >
                                 Approve
                               </button>
@@ -309,7 +309,7 @@ export default function PaymentReviewsPage() {
                                   setReviewAction("needs_revision");
                                   setRejectionReason("");
                                 }}
-                                className="rounded-lg border border-amber-200 px-4 py-2.5 text-sm font-semibold text-amber-700 hover:bg-amber-50"
+                                className="rounded-lg border border-amber-200 px-2 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-50"
                               >
                                 Needs Revision
                               </button>
@@ -320,7 +320,7 @@ export default function PaymentReviewsPage() {
                                   setReviewAction("reject");
                                   setRejectionReason("");
                                 }}
-                                className="rounded-lg border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-50"
+                                className="rounded-lg border border-red-200 px-2 py-2 text-xs font-semibold text-red-700 hover:bg-red-50"
                               >
                                 Reject
                               </button>
