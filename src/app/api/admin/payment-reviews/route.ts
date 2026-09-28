@@ -317,7 +317,7 @@ export async function PATCH(request: NextRequest) {
           ? await ensureCycleMemberId(tx, application.user.id, cycle.id)
           : null;
       return { action, memberId, user: application.user };
-    });
+    }, { maxWait: 10_000, timeout: 15_000 });
 
     if (result.action === "approve" && result.memberId) {
       try {
@@ -388,10 +388,12 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: response.error }, { status: response.status });
     }
 
-    console.error(
-      "Review payment receipt failed",
-      error instanceof Error ? error.name : "UnknownError",
-    );
+    console.error("Review payment receipt failed", {
+      name: error instanceof Error ? error.name : "UnknownError",
+      message: error instanceof Error ? error.message : String(error),
+      code: error instanceof Prisma.PrismaClientKnownRequestError ? error.code : undefined,
+      meta: error instanceof Prisma.PrismaClientKnownRequestError ? error.meta : undefined,
+    });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
