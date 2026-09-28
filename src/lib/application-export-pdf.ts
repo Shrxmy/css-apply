@@ -10,6 +10,7 @@ const COLORS = {
   ink: rgb(27 / 255, 48 / 255, 75 / 255),
   muted: rgb(92 / 255, 113 / 255, 139 / 255),
   white: rgb(1, 1, 1),
+  background: rgb(243 / 255, 243 / 255, 253 / 255),
 } as const;
 
 const PAGE_MARGIN = 36;
@@ -88,13 +89,22 @@ function wrapText(
 }
 
 function drawWatermark(page: PDFPage, watermark: PDFImage) {
-  const size = 360;
+  const pageWidth = PageSizes.A4[0];
+  const pageHeight = PageSizes.A4[1];
+  page.drawRectangle({
+    x: 0,
+    y: 0,
+    width: pageWidth,
+    height: pageHeight,
+    color: COLORS.background,
+  });
+  const size = 410;
   page.drawImage(watermark, {
-    x: (PageSizes.A4[0] - size) / 2,
-    y: (PageSizes.A4[1] - size) / 2 - 15,
+    x: (pageWidth - size) / 2,
+    y: (pageHeight - size) / 2 - 10,
     width: size,
     height: size,
-    opacity: 0.055,
+    opacity: 0.095,
   });
 }
 
@@ -109,6 +119,22 @@ function drawHeader(
 ) {
   const pageWidth = PageSizes.A4[0];
   const pageHeight = PageSizes.A4[1];
+  page.drawRectangle({
+    x: 0,
+    y: pageHeight - 8,
+    width: pageWidth,
+    height: 8,
+    color: COLORS.blue,
+  });
+  page.drawRectangle({
+    x: PAGE_MARGIN - 8,
+    y: pageHeight - 126,
+    width: pageWidth - PAGE_MARGIN * 2 + 16,
+    height: 112,
+    color: COLORS.white,
+    borderColor: COLORS.line,
+    borderWidth: 0.8,
+  });
   page.drawImage(assets.logo, {
     x: PAGE_MARGIN,
     y: pageHeight - 68,
@@ -117,28 +143,28 @@ function drawHeader(
   });
   page.drawText("CSSApply", {
     x: 166,
-    y: pageHeight - 45,
-    size: 17,
+    y: pageHeight - 44,
+    size: 19,
     font: bold,
     color: COLORS.navy,
   });
   page.drawText(title, {
     x: PAGE_MARGIN,
-    y: pageHeight - 94,
-    size: 15,
+    y: pageHeight - 91,
+    size: 16,
     font: bold,
     color: COLORS.navy,
   });
   page.drawText(subtitle, {
     x: PAGE_MARGIN,
-    y: pageHeight - 110,
-    size: 8.5,
+    y: pageHeight - 109,
+    size: 8.8,
     font: regular,
     color: COLORS.muted,
   });
   page.drawLine({
-    start: { x: PAGE_MARGIN, y: pageHeight - 122 },
-    end: { x: pageWidth - PAGE_MARGIN, y: pageHeight - 122 },
+    start: { x: PAGE_MARGIN, y: pageHeight - 124 },
+    end: { x: pageWidth - PAGE_MARGIN, y: pageHeight - 124 },
     thickness: 1.2,
     color: COLORS.blue,
   });
@@ -169,7 +195,7 @@ function drawField(
     height,
     color: COLORS.white,
     borderColor: COLORS.line,
-    borderWidth: 0.7,
+    borderWidth: 0.8,
   });
   page.drawText(label.toUpperCase(), {
     x: x + 8,
@@ -243,7 +269,7 @@ export async function generateApplicationExportPdf({
       x: PAGE_MARGIN,
       y: PageSizes.A4[1] - 174,
       width: contentWidth,
-      height: 30,
+      height: 32,
       color: COLORS.navy,
     });
     page.drawText(recordName || `Record ${rowIndex + 1}`, {
