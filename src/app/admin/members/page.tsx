@@ -34,6 +34,7 @@ const Members = () => {
   >("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [bulkProcessing, setBulkProcessing] = useState(false);
   const [pendingAction, setPendingAction] = useState<{
     applicationId: string;
     memberName: string;
@@ -79,6 +80,36 @@ const Members = () => {
   useEffect(() => {
     setCurrentPage(1);
   }, [selectedStatus]);
+
+  const handleAcceptAll = async () => {
+    if (
+      !window.confirm(
+        "Accept all pending member applications in the active recruitment cycle? This will issue membership eligibility and cannot be undone casually.",
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setBulkProcessing(true);
+      const response = await fetch(
+        "/api/admin/applications/bulk-accept-members",
+        { method: "POST" },
+      );
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to accept members");
+      }
+      toast.success(`${result.acceptedCount} member applications accepted`);
+      await fetchMembers();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to accept members",
+      );
+    } finally {
+      setBulkProcessing(false);
+    }
+  };
 
   const handleCSVExport = async () => {
     try {
@@ -196,6 +227,13 @@ const Members = () => {
               </select>
             </div>
             <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+              <button
+                onClick={handleAcceptAll}
+                disabled={bulkProcessing}
+                className="w-full rounded-lg bg-[#044FAF] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#033B85] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+              >
+                {bulkProcessing ? "Accepting..." : "Accept All Pending"}
+              </button>
               <button
                 onClick={handleDigitalIdExport}
                 className="w-full rounded-lg bg-[#044FAF] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#033B85] sm:w-auto"
