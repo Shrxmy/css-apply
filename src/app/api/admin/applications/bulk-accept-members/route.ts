@@ -1,11 +1,38 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ensureCycleMemberId } from "@/lib/member-id";
 import { emailTemplates, sendEmail } from "@/lib/email";
 
-export async function POST(_request: NextRequest) {
+type AcceptedApplication = {
+  user: { id: string; name: string; email: string };
+};
+
+const BATCH_SIZE = 20;
+
+async function sendAcceptanceEmails(applications: AcceptedApplication[]) {
+  await Promise.all(
+    applications.map(async (application) => {
+      if (!application.user.email || !application.user.name) return;
+      try {
+        const template = emailTemplates.memberAccepted(
+          application.user.name,
+          application.user.id,
+        );
+        await sendEmail(
+          application.user.email,
+          template.subject,
+          template.html,
+        );
+      } catch (error) {
+        console.error("Bulk member acceptance email failed", error);
+      }
+    }),
+  );
+}
+
+export async function POST() {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
@@ -30,71 +57,59 @@ export async function POST(_request: NextRequest) {
       );
     }
 
-    const acceptedApplications = await prisma.$transaction(async (tx) => {
-      const pendingApplications = await tx.memberApplication.findMany({
-        where: {
-          recruitmentCycleId: activeCycle.id,
-          hasAccepted: false,
+    const pendingApplications = await prisma.memberApplication.findMany({
+      where: {
+        recruitmentCycleId: activeCycle.id,
+        hasAccepted: false,
+      },
+      select: {
+        id: true,
+        studentNumber: true,
+        recruitmentCycleId: true,
+        user: {
+          select: { id: true, name: true, email: true },
         },
-        select: {
-          id: true,
-          studentNumber: true,
-          recruitmentCycleId: true,
-          user: {
-            select: { id: true, name: true, email: true },
-          },
-        },
-      });
+      },
+      orderBy: { createdAt: "asc" },
+    });
 
-      const accepted = [];
-      for (const application of pendingApplications) {
-        const updatedApplication = await tx.memberApplication.update({
-          where: { id: application.id },
-          data: { hasAccepted: true },
-        });
-        const memberId = await ensureCycleMemberId(
-          tx,
-          application.user.id,
-          application.recruitmentCycleId,
-        );
-        await tx.memberApplication.deleteMany({
-          where: {
-            studentNumber: application.studentNumber,
-            recruitmentCycleId: application.recruitmentCycleId,
-            id: { not: application.id },
-          },
-        });
-        accepted.push({
-          ...updatedApplication,
-          memberId,
-          user: application.user,
-        });
-      }
-      return accepted;
-    }, { maxWait: 10_000, timeout: 30_000 });
+    let acceptedCount = 0;
+    for (let index = 0; index < pendingApplications.length; index += BATCH_SIZE) {
+      const batch = pendingApplications.slice(index, index + BATCH_SIZE);
+      const acceptedApplications = await prisma.$transaction(async (tx) => {
+        const accepted: AcceptedApplication[] = [];
 
-    await Promise.all(
-      acceptedApplications.map(async (application) => {
-        if (!application.user.email || !application.user.name) return;
-        try {
-          const template = emailTemplates.memberAccepted(
-            application.user.name,
+        for (const application of batch) {
+          const result = await tx.memberApplication.updateMany({
+            where: { id: application.id, hasAccepted: false },
+            data: { hasAccepted: true },
+          });
+          if (result.count === 0) continue;
+          await ensureCycleMemberId(
+            tx,
             application.user.id,
+            application.recruitmentCycleId,
           );
-          await sendEmail(
-            application.user.email,
-            template.subject,
-            template.html,
-          );
-        } catch (error) {
-          console.error("Bulk member acceptance email failed", error);
+          await tx.memberApplication.deleteMany({
+            where: {
+              studentNumber: application.studentNumber,
+              recruitmentCycleId: application.recruitmentCycleId,
+              id: { not: application.id },
+            },
+          });
+          accepted.push({ user: application.user });
         }
-      }),
-    );
+
+        return accepted;
+      }, { maxWait: 10_000, timeout: 15_000 });
+
+      await sendAcceptanceEmails(acceptedApplications);
+      acceptedCount += acceptedApplications.length;
+    }
 
     return NextResponse.json({
       success: true,
-      acceptedCount: acceptedApplications.length,
+      acceptedCount,
     });
   } catch (error) {
     console.error("Bulk member acceptance failed", error);
