@@ -101,7 +101,9 @@ export default function MemberProgressPageContent() {
   useEffect(() => {
     const fetchApplicationData = async () => {
       try {
-        const response = await fetch("/api/applications/member");
+        const response = await fetch("/api/applications/member", {
+          cache: "no-store",
+        });
         if (response.ok) {
           const data = await response.json();
           setApplicationData(data);
@@ -114,6 +116,20 @@ export default function MemberProgressPageContent() {
     };
 
     fetchApplicationData();
+    const refresh = () => {
+      if (document.visibilityState === "visible") {
+        void fetchApplicationData();
+      }
+    };
+    const interval = window.setInterval(refresh, 15000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
   }, []);
 
   if (loading) {
