@@ -354,6 +354,8 @@ function SuperAdminApplicationsTab() {
   const [pending, setPending] = useState<{ application: SuperAdminApplication; action: "evaluate" | "accept" | "reject" | "redirect" | "reset" } | null>(null);
   const [redirectTarget, setRedirectTarget] = useState("");
   const [processing, setProcessing] = useState(false);
+  const [exportType, setExportType] = useState<"member" | "committee" | "executive-associate">("member");
+  const [exportPosition, setExportPosition] = useState("all");
 
   const loadApplications = useCallback(async () => {
     setLoading(true);
@@ -394,6 +396,25 @@ function SuperAdminApplicationsTab() {
   useEffect(() => {
     setCurrentPage((page) => Math.min(page, totalPages));
   }, [totalPages]);
+
+  const exportPositionOptions =
+    exportType === "committee"
+      ? [{ value: "all", label: "All Staff Committees" }, ...committeeRoles.map((role) => ({ value: role.id, label: `${role.title} Staff` }))]
+      : exportType === "executive-associate"
+        ? [{ value: "all", label: "All Executive Associates" }, ...ebRoles.map((role) => ({ value: role.id, label: role.title }))]
+        : [{ value: "all", label: "All Members" }];
+
+  const handleExport = () => {
+    const params = new URLSearchParams({ type: exportType, status: "accepted" });
+    if (exportType === "committee") params.set("committee", exportPosition);
+    if (exportType === "executive-associate") params.set("role", exportPosition);
+    const link = document.createElement("a");
+    link.href = `/api/admin/export/csv?${params.toString()}`;
+    link.download = "";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
 
   const executeAction = async () => {
     if (!pending) return;
@@ -478,6 +499,43 @@ function SuperAdminApplicationsTab() {
     <div className="flex flex-col gap-4 rounded-xl border border-[#005FD9]/10 bg-[#F8FAFF] p-5 md:flex-row md:items-end md:justify-between">
       <div><div className="mb-2 inline-flex rounded-full bg-[#E8F2FF] px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-[#044FAF]">Super Admin</div><h2 className="text-xl font-bold text-[#134687] font-poppins">All Applications</h2><p className="mt-1 text-xs text-[#134687]/55">Review every application, regardless of interviewer assignment.</p></div>
       <div className="flex w-full gap-2 md:w-auto"><input value={search} onChange={(event) => { setSearch(event.target.value); setCurrentPage(1); }} placeholder="Search applicants..." className="min-w-0 flex-1 rounded-lg border border-[#005FD9]/15 bg-white px-3 py-2 text-sm text-[#134687] outline-none focus:border-[#044FAF] focus:ring-2 focus:ring-[#044FAF]/10 md:w-72" /><button onClick={() => void loadApplications()} className="rounded-lg bg-[#134687] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#044FAF]">Refresh</button></div>
+    </div>
+    <div className="rounded-xl border border-[#005FD9]/10 bg-white p-4">
+      <div className="mb-3">
+        <h3 className="text-sm font-semibold text-[#134687]">Export applications by position</h3>
+        <p className="mt-1 text-xs text-[#134687]/55">Download accepted applicants with their submitted form details, interview, payment, and redirection fields.</p>
+      </div>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <select
+          value={exportType}
+          onChange={(event) => {
+            const value = event.target.value as typeof exportType;
+            setExportType(value);
+            setExportPosition("all");
+          }}
+          className="rounded-lg border border-[#005FD9]/15 px-3 py-2 text-sm text-[#134687] outline-none focus:border-[#044FAF]"
+        >
+          <option value="member">Members</option>
+          <option value="committee">Committee Staff</option>
+          <option value="executive-associate">Executive Associates</option>
+        </select>
+        <select
+          value={exportPosition}
+          onChange={(event) => setExportPosition(event.target.value)}
+          className="min-w-0 flex-1 rounded-lg border border-[#005FD9]/15 px-3 py-2 text-sm text-[#134687] outline-none focus:border-[#044FAF]"
+        >
+          {exportPositionOptions.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={handleExport}
+          className="rounded-lg bg-[#044FAF] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#033B85]"
+        >
+          Export CSV
+        </button>
+      </div>
     </div>
     <div className="hidden min-w-0 overflow-hidden rounded-xl border border-[#005FD9]/10 bg-white md:block">
       <table className="w-full min-w-0 table-fixed text-left text-xs"><colgroup><col className="w-[24%]" /><col className="w-[18%]" /><col className="w-[10%]" /><col className="w-[16%]" /><col className="w-[12%]" /><col className="w-[20%]" /></colgroup><thead className="bg-[#134687] text-[10px] uppercase tracking-widest text-white/80"><tr><th className="px-4 py-3">Applicant</th><th className="px-4 py-3">Type / Position</th><th className="px-4 py-3 text-center">Status</th><th className="px-4 py-3 text-center">Interviewer</th><th className="px-4 py-3 text-center">Files</th><th className="px-4 py-3 text-center">Actions</th></tr></thead><tbody className="divide-y divide-[#005FD9]/10">

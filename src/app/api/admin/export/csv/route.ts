@@ -31,6 +31,7 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get("type"); // member, committee, ea
     const committee = searchParams.get("committee"); // specific committee for committee staff
     const status = searchParams.get("status"); // all, accepted, pending, rejected
+    const role = searchParams.get("role"); // specific EA role
 
     if (!type) {
       return NextResponse.json(
@@ -54,8 +55,8 @@ export async function GET(request: NextRequest) {
         break;
 
       case "executive-associate":
-        csvData = await exportExecutiveAssociateApplications(status);
-        filename = `accepted-executive-associate-applications-${new Date().toISOString().split("T")[0]}.csv`;
+        csvData = await exportExecutiveAssociateApplications(status, role);
+        filename = `accepted-executive-associate-applications-${role || "all"}-${new Date().toISOString().split("T")[0]}.csv`;
         break;
 
       default:
@@ -285,12 +286,16 @@ async function exportCommitteeApplications(
   return generateCSV(headers, rows);
 }
 
-async function exportExecutiveAssociateApplications(_status: string | null) {
+async function exportExecutiveAssociateApplications(
+  _status: string | null,
+  role: string | null,
+) {
   const activeCycleId = await getActiveCycleId();
   const whereClause: Record<string, unknown> = {
     hasAccepted: true, // Only export accepted EA applications
     redirection: null, // Exclude redirected applications
     recruitmentCycleId: activeCycleId,
+    ...(role && role !== "all" ? { ebRole: role } : {}),
   };
 
   // Note: For EA applications, we only export accepted ones that were NOT redirected
