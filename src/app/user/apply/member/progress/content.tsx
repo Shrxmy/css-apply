@@ -24,7 +24,7 @@ export default function MemberProgressPageContent() {
       id: string;
       hasAccepted?: boolean;
       paymentProof?: string;
-      paymentStatus?: "not_submitted" | "pending" | "approved" | "rejected";
+      paymentStatus?: "not_submitted" | "pending" | "approved" | "rejected" | "needs_revision";
       paymentRejectionReason?: string;
       createdAt: string;
     } | null;
@@ -54,7 +54,9 @@ export default function MemberProgressPageContent() {
     applicationData?.application?.paymentStatus ?? "not_submitted";
   const isPaymentApproved = paymentStatus === "approved";
   const canSubmitPaymentProof =
-    paymentStatus === "not_submitted" || paymentStatus === "rejected";
+    paymentStatus === "not_submitted" ||
+    paymentStatus === "rejected" ||
+    paymentStatus === "needs_revision";
 
   const handlePaymentProofSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -197,7 +199,7 @@ export default function MemberProgressPageContent() {
                             "Approved — refresh to view")
                           : paymentStatus === "pending"
                             ? "Awaiting Executive Board approval"
-                            : paymentStatus === "rejected"
+                            : paymentStatus === "rejected" || paymentStatus === "needs_revision"
                               ? "Receipt needs resubmission"
                               : "Submit acknowledgement receipt first"}
                     </span>
@@ -296,6 +298,11 @@ export default function MemberProgressPageContent() {
                         Download acknowledgement receipt PDF
                       </a>
                     </div>
+                  )}
+                  {paymentStatus === "needs_revision" && (
+                    <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-center text-sm text-amber-800">
+                      Revision requested: {applicationData.application?.paymentRejectionReason || "Please review and resubmit your receipt."}
+                    </p>
                   )}
                   {canSubmitPaymentProof ? (
                     <form

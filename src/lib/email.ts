@@ -1058,6 +1058,25 @@ export const emailTemplates = {
         ),
     }),
 
+    acknowledgementReceiptNeedsRevision: (
+        userName: string,
+        reason: string,
+    ): EmailTemplate => ({
+        subject: "CSSApply - Acknowledgement Receipt Needs Revision",
+        html: wrapEmail(
+            `Application Update - ${userName}`,
+            `
+            <p>Hi ${userName}, your acknowledgement receipt was reviewed by an authorized Executive Board reviewer.</p>
+            <p>Please revise your submission and upload a new Google Drive link. Your application was not rejected.</p>
+            <div class="accent-box" style="background-color: #FFF8E7; border-left: 4px solid #D6A326; padding: 18px; border-radius: 8px;">
+              <p style="margin: 0 0 6px; color: #8A5A00; font-weight: 700;">Requested revision</p>
+              <p style="margin: 0; color: #5B4515;">${reason}</p>
+            </div>
+            <p>Please log in to CSSApply, correct the receipt as instructed, and submit the updated acknowledgement receipt for review.</p>
+            `,
+        ),
+    }),
+
     // Member ID Released template
     memberIdReleased: (userName: string, memberId: string): EmailTemplate => ({
         subject: "CSSApply - Your Member ID",

@@ -9,7 +9,7 @@ import LoadingSpinner from "@/components/LoadingSpinner";
 import FormProcessingOverlay from "@/components/FormProcessingOverlay";
 import AdminEmptyState from "@/components/AdminEmptyState";
 
-type ReviewStatus = "pending" | "approved" | "rejected";
+type ReviewStatus = "pending" | "approved" | "rejected" | "needs_revision";
 type ApplicationType = "member" | "committee" | "executive-associate";
 
 interface PaymentReview {
@@ -61,6 +61,7 @@ export default function PaymentReviewsPage() {
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
+  const [reviewAction, setReviewAction] = useState<"reject" | "needs_revision">("reject");
 
   const fetchReviews = useCallback(async () => {
     setLoading(true);
@@ -107,10 +108,10 @@ export default function PaymentReviewsPage() {
 
   const reviewReceipt = async (
     review: PaymentReview,
-    action: "approve" | "reject",
+    action: "approve" | "reject" | "needs_revision",
   ) => {
-    if (action === "reject" && !rejectionReason.trim()) {
-      toast.error("Enter a reason before rejecting the receipt");
+    if (action !== "approve" && !rejectionReason.trim()) {
+      toast.error("Enter a reason before submitting the receipt review");
       return;
     }
 
@@ -123,7 +124,7 @@ export default function PaymentReviewsPage() {
           applicationId: review.id,
           applicationType: review.applicationType,
           action,
-          rejectionReason: action === "reject" ? rejectionReason.trim() : undefined,
+          rejectionReason: action !== "approve" ? rejectionReason.trim() : undefined,
         }),
       });
       const data = await parseResponse(response);
@@ -136,9 +137,12 @@ export default function PaymentReviewsPage() {
       toast.success(
         action === "approve"
           ? "Receipt approved and Member ID released"
-          : "Receipt rejected; the applicant can resubmit",
+          : action === "needs_revision"
+            ? "Revision request sent to the applicant"
+            : "Receipt rejected; the applicant can resubmit",
       );
       setRejectingId(null);
+      setReviewAction("reject");
       setRejectionReason("");
       await fetchReviews();
     } catch (error) {
@@ -184,6 +188,7 @@ export default function PaymentReviewsPage() {
                   setSelectedStatus(event.target.value as ReviewStatus);
                   setCurrentPage(1);
                   setRejectingId(null);
+                  setReviewAction("reject");
                   setRejectionReason("");
                 }}
                 className="w-full rounded-lg border border-[#005FD9]/15 px-3 py-2 text-sm text-[#134687] focus:outline-none focus:ring-2 focus:ring-[#044FAF]/20 sm:w-auto"
@@ -191,6 +196,7 @@ export default function PaymentReviewsPage() {
                 <option value="pending">Pending</option>
                 <option value="approved">Approved</option>
                 <option value="rejected">Rejected</option>
+                <option value="needs_revision">Needs Revision</option>
               </select>
             </div>
           </div>
@@ -232,7 +238,9 @@ export default function PaymentReviewsPage() {
                       active={isProcessing}
                       label={
                         isRejecting
-                          ? "Rejecting acknowledgement receipt..."
+                          ? reviewAction === "needs_revision"
+                            ? "Sending revision request..."
+                            : "Rejecting acknowledgement receipt..."
                           : "Approving acknowledgement receipt..."
                       }
                     />
@@ -298,6 +306,18 @@ export default function PaymentReviewsPage() {
                                 type="button"
                                 onClick={() => {
                                   setRejectingId(review.id);
+                                  setReviewAction("needs_revision");
+                                  setRejectionReason("");
+                                }}
+                                className="rounded-lg border border-amber-200 px-4 py-2.5 text-sm font-semibold text-amber-700 hover:bg-amber-50"
+                              >
+                                Needs Revision
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setRejectingId(review.id);
+                                  setReviewAction("reject");
                                   setRejectionReason("");
                                 }}
                                 className="rounded-lg border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-50"
@@ -308,12 +328,12 @@ export default function PaymentReviewsPage() {
                           )}
 
                           {selectedStatus === "pending" && isRejecting && (
-                            <div className="space-y-2 rounded-lg bg-red-50 p-3">
+                            <div className={`space-y-2 rounded-lg p-3 ${reviewAction === "needs_revision" ? "bg-amber-50" : "bg-red-50"}`}>
                               <label
                                 htmlFor={`rejection-${review.id}`}
-                                className="block text-xs font-semibold text-red-800"
+                                className={`block text-xs font-semibold ${reviewAction === "needs_revision" ? "text-amber-800" : "text-red-800"}`}
                               >
-                                Why is this receipt invalid?
+                                {reviewAction === "needs_revision" ? "What needs to be fixed?" : "Why is this receipt invalid?"}
                               </label>
                               <textarea
                                 id={`rejection-${review.id}`}
@@ -327,15 +347,16 @@ export default function PaymentReviewsPage() {
                               <div className="grid grid-cols-2 gap-2">
                                 <button
                                   type="button"
-                                  onClick={() => void reviewReceipt(review, "reject")}
-                                  className="rounded-lg bg-red-700 px-3 py-2 text-sm font-semibold text-white"
+                                  onClick={() => void reviewReceipt(review, reviewAction)}
+                                  className={`rounded-lg px-3 py-2 text-sm font-semibold text-white ${reviewAction === "needs_revision" ? "bg-amber-600" : "bg-red-700"}`}
                                 >
-                                  Confirm Reject
+                                  {reviewAction === "needs_revision" ? "Send Revision Request" : "Confirm Reject"}
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => {
                                     setRejectingId(null);
+                                    setReviewAction("reject");
                                     setRejectionReason("");
                                   }}
                                   className="rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-700"

@@ -48,7 +48,7 @@ export default function EAProgressPageContent() {
       createdAt: string;
       updatedAt: string;
       paymentProof?: string;
-      paymentStatus?: "not_submitted" | "pending" | "approved" | "rejected";
+      paymentStatus?: "not_submitted" | "pending" | "approved" | "rejected" | "needs_revision";
       paymentRejectionReason?: string;
     };
     user: {
@@ -83,7 +83,9 @@ export default function EAProgressPageContent() {
     applicationData?.application?.paymentStatus ?? "not_submitted";
   const isPaymentApproved = paymentStatus === "approved";
   const canSubmitPaymentProof =
-    paymentStatus === "not_submitted" || paymentStatus === "rejected";
+    paymentStatus === "not_submitted" ||
+    paymentStatus === "rejected" ||
+    paymentStatus === "needs_revision";
 
   const handlePaymentProofSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -368,7 +370,7 @@ export default function EAProgressPageContent() {
       ? memberIdDisplay
       : paymentStatus === "pending"
         ? "Awaiting Executive Board approval"
-        : paymentStatus === "rejected"
+        : paymentStatus === "rejected" || paymentStatus === "needs_revision"
           ? "Receipt needs resubmission"
           : "Submit acknowledgement receipt first";
   const hideMeetingAccess =
@@ -770,6 +772,11 @@ export default function EAProgressPageContent() {
                         Download acknowledgement receipt PDF
                       </a>
                     </div>
+                  )}
+                  {paymentStatus === "needs_revision" && (
+                    <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-center text-sm text-amber-800">
+                      Revision requested: {application.paymentRejectionReason || "Please review and resubmit your receipt."}
+                    </p>
                   )}
                   {canSubmitPaymentProof ? (
                     <form

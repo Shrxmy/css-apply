@@ -46,7 +46,7 @@ export default function CommitteeProgressPageContent() {
       createdAt: string;
       updatedAt: string;
       paymentProof?: string;
-      paymentStatus?: "not_submitted" | "pending" | "approved" | "rejected";
+      paymentStatus?: "not_submitted" | "pending" | "approved" | "rejected" | "needs_revision";
       paymentRejectionReason?: string;
     };
     user: {
@@ -81,7 +81,9 @@ export default function CommitteeProgressPageContent() {
     applicationData?.application?.paymentStatus ?? "not_submitted";
   const isPaymentApproved = paymentStatus === "approved";
   const canSubmitPaymentProof =
-    paymentStatus === "not_submitted" || paymentStatus === "rejected";
+    paymentStatus === "not_submitted" ||
+    paymentStatus === "rejected" ||
+    paymentStatus === "needs_revision";
 
   const handlePaymentProofSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -369,7 +371,7 @@ export default function CommitteeProgressPageContent() {
       ? memberIdDisplay
       : paymentStatus === "pending"
         ? "Awaiting Executive Board approval"
-        : paymentStatus === "rejected"
+        : paymentStatus === "rejected" || paymentStatus === "needs_revision"
           ? "Receipt needs resubmission"
           : "Submit acknowledgement receipt first";
   const hideMeetingAccess =
@@ -771,6 +773,11 @@ export default function CommitteeProgressPageContent() {
                       </a>
                     </div>
                   )}
+                  {paymentStatus === "needs_revision" && (
+                    <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-center text-sm text-amber-800">
+                      Revision requested: {application.paymentRejectionReason || "Please review and resubmit your receipt."}
+                    </p>
+                  )}
                   {canSubmitPaymentProof ? (
                     <form
                       onSubmit={handlePaymentProofSubmit}
@@ -892,6 +899,14 @@ export default function CommitteeProgressPageContent() {
                 className="bg-[#134687] border-[#0d3569] border-2  text-white px-15 py-3 rounded-lg font-inter font-semibold text-xs lg:text-sm hover:bg-[#0d3569] transition-all duration-150 active:scale-95 whitespace-nowrap"
               >
                 Schedule Interview
+              </button>
+            )}
+            {committeeId === "technology" && application.hasFinishedInterview && (
+              <button
+                onClick={() => router.push("/user/exam/techdev")}
+                className="bg-[#0B6E4F] border-[#07553D] border-2 text-white px-6 py-3 rounded-lg font-inter font-semibold text-xs lg:text-sm hover:bg-[#07553D] transition-all duration-150 active:scale-95 whitespace-nowrap"
+              >
+                Open TechDev Examination
               </button>
             )}
             {canDeleteApplication() && (

@@ -10,7 +10,7 @@ import { emailTemplates, sendEmail } from "@/lib/email";
 import { committeeRoles } from "@/data/committeeRoles";
 import { roles } from "@/data/ebRoles";
 
-const REVIEW_STATUSES = new Set(["pending", "approved", "rejected"]);
+const REVIEW_STATUSES = new Set(["pending", "approved", "rejected", "needs_revision"]);
 const PAYMENT_REVIEW_POSITIONS = new Set([
   "president",
   "treasurer",
@@ -290,11 +290,16 @@ export async function PATCH(request: NextRequest) {
       }
 
       const reviewData = {
-        paymentStatus: action === "approve" ? "approved" : "rejected",
+        paymentStatus:
+          action === "approve"
+            ? "approved"
+            : action === "needs_revision"
+              ? "needs_revision"
+              : "rejected",
         paymentReviewedAt: new Date(),
         paymentReviewedBy: reviewer.id,
         paymentRejectionReason:
-          action === "reject" ? rejectionReason!.trim() : null,
+          action === "approve" ? null : rejectionReason!.trim(),
       };
       if (applicationType === "member") {
         await tx.memberApplication.update({ where: { id: applicationId }, data: reviewData });
@@ -329,9 +334,29 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
+    if (result.action === "needs_revision") {
+      try {
+        const template = emailTemplates.acknowledgementReceiptNeedsRevision(
+          result.user.name || "Applicant",
+          rejectionReason!.trim(),
+        );
+        await sendEmail(result.user.email, template.subject, template.html);
+      } catch (emailError) {
+        console.error(
+          "Receipt revision email failed",
+          emailError instanceof Error ? emailError.name : "UnknownError",
+        );
+      }
+    }
+
     return NextResponse.json({
       success: true,
-      paymentStatus: result.action === "approve" ? "approved" : "rejected",
+      paymentStatus:
+        result.action === "approve"
+          ? "approved"
+          : result.action === "needs_revision"
+            ? "needs_revision"
+            : "rejected",
       memberId: result.memberId,
     });
   } catch (error) {

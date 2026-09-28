@@ -100,15 +100,16 @@ export const paymentReviewActionSchema = z
   .object({
     applicationId: z.string().min(1, "Application ID is required"),
     applicationType: z.enum(["member", "committee", "executive-associate"]),
-    action: z.enum(["approve", "reject"]),
+    action: z.enum(["approve", "reject", "needs_revision"]),
     rejectionReason: z.string().trim().max(500).optional(),
   })
   .refine(
     ({ action, rejectionReason }) =>
-      action !== "reject" || Boolean(rejectionReason?.trim()),
+      (action !== "reject" && action !== "needs_revision") ||
+      Boolean(rejectionReason?.trim()),
     {
       path: ["rejectionReason"],
-      message: "A rejection reason is required",
+      message: "A reason is required",
     },
   );
 
