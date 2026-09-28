@@ -9,7 +9,7 @@ type AcceptedApplication = {
   user: { id: string; name: string; email: string };
 };
 
-const BATCH_SIZE = 20;
+const BATCH_SIZE = 5;
 
 async function sendAcceptanceEmails(applications: AcceptedApplication[]) {
   await Promise.all(
@@ -101,7 +101,7 @@ export async function POST() {
         }
 
         return accepted;
-      }, { maxWait: 10_000, timeout: 15_000 });
+      }, { maxWait: 10_000, timeout: 10_000 });
 
       await sendAcceptanceEmails(acceptedApplications);
       acceptedCount += acceptedApplications.length;
