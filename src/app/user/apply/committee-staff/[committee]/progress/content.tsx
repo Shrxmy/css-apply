@@ -150,9 +150,10 @@ export default function CommitteeProgressPageContent() {
 
   const fetchApplicationData = async () => {
     try {
-      const response = await fetch("/api/applications/committee-staff", {
-        cache: "no-store",
-      });
+      const response = await fetch(
+        `/api/applications/committee-staff?t=${Date.now()}`,
+        { cache: "no-store" },
+      );
       if (response.ok) {
         const data = await response.json();
         if (data.redirectTo && window.location.pathname !== data.redirectTo) {

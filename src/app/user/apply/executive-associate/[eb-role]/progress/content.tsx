@@ -152,9 +152,10 @@ export default function EAProgressPageContent() {
 
   const fetchApplicationData = async () => {
     try {
-      const response = await fetch("/api/applications/executive-associate", {
-        cache: "no-store",
-      });
+      const response = await fetch(
+        `/api/applications/executive-associate?t=${Date.now()}`,
+        { cache: "no-store" },
+      );
       if (response.ok) {
         const data = await response.json();
         if (data.redirectTo && window.location.pathname !== data.redirectTo) {

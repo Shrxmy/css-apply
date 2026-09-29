@@ -15,6 +15,9 @@ import {
   lockApplicantCycle,
 } from "@/lib/application-rules";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 function normalizeStoragePath(fileRef: string | null | undefined) {
   if (!fileRef) return null;
   if (!fileRef.startsWith("http")) return fileRef;
@@ -253,7 +256,8 @@ export async function GET() {
         )?.meetingLink ?? null;
     }
 
-    return NextResponse.json({
+    return NextResponse.json(
+      {
       hasApplication: Boolean(application),
       application,
       redirectTo,
@@ -272,7 +276,11 @@ export async function GET() {
             : [],
       },
       meetingLink,
-    });
+      },
+      {
+        headers: { "Cache-Control": "private, no-store, max-age=0" },
+      },
+    );
   } catch (error) {
     console.error(
       "Get committee application error",
