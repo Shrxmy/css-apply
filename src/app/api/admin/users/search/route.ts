@@ -35,6 +35,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const activeCycle = await prisma.recruitmentCycle.findFirst({
+      where: { isActive: true },
+      select: { id: true },
+    });
+    const activeCycleId = activeCycle?.id ?? "__no_active_cycle__";
+
     // Search users by name, email, or student number
     const users = await prisma.user.findMany({
       where: {
@@ -60,6 +66,11 @@ export async function GET(request: NextRequest) {
         ],
       },
       include: {
+        memberships: {
+          where: { recruitmentCycleId: activeCycleId },
+          select: { memberId: true },
+          take: 1,
+        },
         ebProfile: {
           select: {
             id: true,
