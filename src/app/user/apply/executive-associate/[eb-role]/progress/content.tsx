@@ -127,6 +127,23 @@ export default function EAProgressPageContent() {
     }
   };
 
+  const getRedirectionHref = (redirection?: string) => {
+    if (!redirection) return null;
+    if (redirection.toLowerCase() === "member") {
+      return "/user/apply/member/progress";
+    }
+
+    const committeeId = redirection.startsWith("committee-")
+      ? redirection.replace("committee-", "")
+      : committeeRolesSubmitted.find(
+            (committee) =>
+              committee.id === redirection || committee.title === redirection,
+          )?.id;
+    return committeeId
+      ? `/user/apply/committee-staff/${encodeURIComponent(committeeId)}/progress`
+      : null;
+  };
+
   const getRedirectionDisplayName = (redirection?: string) => {
     if (!redirection) return "";
     if (redirection.toLowerCase() === "member") return "Member";
@@ -157,6 +174,14 @@ export default function EAProgressPageContent() {
       });
       if (response.ok) {
         const data = await response.json();
+        const destinationHref =
+          data.application?.hasAccepted && data.application?.redirection
+            ? getRedirectionHref(data.application.redirection)
+            : null;
+        if (destinationHref && window.location.pathname !== destinationHref) {
+          router.replace(destinationHref);
+          return;
+        }
         setApplicationData(data);
 
         setScheduledTime("");
