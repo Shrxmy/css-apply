@@ -205,6 +205,32 @@ export async function GET() {
     }
 
     const application = user.committeeApplications[0] ?? null;
+    let redirectTo: string | null = null;
+    if (!application) {
+      const [acceptedEa, acceptedMember] = await Promise.all([
+        prisma.executiveAssociateApplication.findFirst({
+          where: {
+            studentNumber: user.studentNumber ?? "",
+            recruitmentCycle: { isActive: true },
+            hasAccepted: true,
+          },
+          select: { ebRole: true },
+        }),
+        prisma.memberApplication.findFirst({
+          where: {
+            studentNumber: user.studentNumber ?? "",
+            recruitmentCycle: { isActive: true },
+            hasAccepted: true,
+          },
+          select: { id: true },
+        }),
+      ]);
+      redirectTo = acceptedEa
+        ? `/user/apply/executive-associate/${encodeURIComponent(acceptedEa.ebRole)}/progress`
+        : acceptedMember
+          ? "/user/apply/member/progress"
+          : null;
+    }
     const membership = user.memberships[0];
     const hasValidMembership =
       Boolean(membership) &&
@@ -230,6 +256,7 @@ export async function GET() {
     return NextResponse.json({
       hasApplication: Boolean(application),
       application,
+      redirectTo,
       user: {
         id: user.id,
         studentNumber: user.studentNumber,

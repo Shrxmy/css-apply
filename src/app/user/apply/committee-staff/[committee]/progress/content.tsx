@@ -180,6 +180,10 @@ export default function CommitteeProgressPageContent() {
       });
       if (response.ok) {
         const data = await response.json();
+        if (data.redirectTo && window.location.pathname !== data.redirectTo) {
+          router.replace(data.redirectTo);
+          return;
+        }
         const destinationHref =
           data.application?.hasAccepted && data.application?.redirection
             ? getRedirectionHref(data.application.redirection)

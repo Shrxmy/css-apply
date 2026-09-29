@@ -136,8 +136,10 @@ export async function POST(request: NextRequest) {
     const eaRoleId = getEaRoleIdFromRedirection(redirection);
 
     if (decision === "accept") {
+      let deleteSourceApplication = false;
       if (isMemberRedirection(redirection)) {
         await acceptMemberApplication(user.studentNumber, user.id, cycleId);
+        deleteSourceApplication = true;
       } else if (sourceType === "committee" && eaRoleId) {
         const existingEa = await prisma.executiveAssociateApplication.findFirst(
           {
@@ -151,14 +153,9 @@ export async function POST(request: NextRequest) {
           await prisma.executiveAssociateApplication.update({
             where: { id: existingEa.id },
             data: {
-              ebRole: eaRoleId,
-              firstOptionEb: eaRoleId,
-              secondOptionEb: "",
               status: "passed",
               hasAccepted: true,
               redirection: null,
-              cv: sourceApp.cv || "",
-              supabaseFilePath: sourceApp.supabaseFilePath || "",
             },
           });
         else
@@ -177,6 +174,18 @@ export async function POST(request: NextRequest) {
               redirection: null,
             },
           });
+        deleteSourceApplication = true;
+      } else if (sourceType === "committee" && committeeId) {
+        await prisma.committeeApplication.update({
+          where: { id: sourceApp.id },
+          data: {
+            firstOptionCommittee: committeeId,
+            secondOptionCommittee: "",
+            status: "passed",
+            hasAccepted: true,
+            redirection: null,
+          },
+        });
       } else if (sourceType === "executive-associate" && committeeId) {
         const existingCommittee = await prisma.committeeApplication.findFirst({
           where: {
@@ -188,17 +197,9 @@ export async function POST(request: NextRequest) {
           await prisma.committeeApplication.update({
             where: { id: existingCommittee.id },
             data: {
-              firstOptionCommittee: committeeId,
-              secondOptionCommittee: "",
               status: "passed",
               hasAccepted: true,
               redirection: null,
-              cv: sourceApp.cv || "",
-              supabaseFilePath: sourceApp.supabaseFilePath || "",
-              interviewSlotDay: sourceApp.interviewSlotDay,
-              interviewSlotTimeStart: sourceApp.interviewSlotTimeStart,
-              interviewSlotTimeEnd: sourceApp.interviewSlotTimeEnd,
-              interviewBy: sourceApp.interviewBy,
             },
           });
         else
@@ -221,28 +222,23 @@ export async function POST(request: NextRequest) {
               redirection: null,
             },
           });
+        deleteSourceApplication = true;
       }
 
       await prisma.$transaction((tx) =>
         ensureCycleMemberId(tx, user.id, cycleId),
       );
 
-      if (sourceType === "committee") {
-        await prisma.committeeApplication.update({
-          where: { id: sourceApp.id },
-          data: {
-            hasAccepted: true,
-            status: "passed",
-          },
-        });
-      } else {
-        await prisma.executiveAssociateApplication.update({
-          where: { id: sourceApp.id },
-          data: {
-            hasAccepted: true,
-            status: "passed",
-          },
-        });
+      if (deleteSourceApplication) {
+        if (sourceType === "committee") {
+          await prisma.committeeApplication.delete({
+            where: { id: sourceApp.id },
+          });
+        } else {
+          await prisma.executiveAssociateApplication.delete({
+            where: { id: sourceApp.id },
+          });
+        }
       }
 
       return NextResponse.json({
@@ -254,22 +250,12 @@ export async function POST(request: NextRequest) {
     await acceptMemberApplication(user.studentNumber, user.id, cycleId);
 
     if (sourceType === "committee") {
-      await prisma.committeeApplication.update({
+      await prisma.committeeApplication.delete({
         where: { id: sourceApp.id },
-        data: {
-          hasAccepted: true,
-          status: "passed",
-          redirection: "member",
-        },
       });
     } else {
-      await prisma.executiveAssociateApplication.update({
+      await prisma.executiveAssociateApplication.delete({
         where: { id: sourceApp.id },
-        data: {
-          hasAccepted: true,
-          status: "passed",
-          redirection: "member",
-        },
       });
 
       await prisma.committeeApplication.deleteMany({
