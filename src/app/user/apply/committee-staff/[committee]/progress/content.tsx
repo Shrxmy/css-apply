@@ -10,7 +10,6 @@ import FormProcessingOverlay from "@/components/FormProcessingOverlay";
 import Footer from "@/components/Footer";
 import NoApplicationFound from "@/components/NoApplicationFound";
 import { committeeRolesSubmitted } from "@/data/committeeRoles";
-import { roles as executiveAssociateRoles } from "@/data/ebRoles";
 import { roles } from "@/data/ebRoles";
 import { useSession } from "next-auth/react";
 import { usePaymentQr } from "@/lib/usePaymentQr";
@@ -126,30 +125,6 @@ export default function CommitteeProgressPageContent() {
     }
   };
 
-  const getRedirectionHref = (redirection?: string) => {
-    if (!redirection) return null;
-    if (redirection.toLowerCase() === "member") {
-      return "/user/apply/member/progress";
-    }
-
-    const eaRole = executiveAssociateRoles.find(
-      (role) => role.id === redirection,
-    );
-    if (eaRole) {
-      return `/user/apply/executive-associate/${encodeURIComponent(eaRole.id)}/progress`;
-    }
-
-    const committeeId = redirection.startsWith("committee-")
-      ? redirection.replace("committee-", "")
-      : committeeRolesSubmitted.find(
-            (committee) =>
-              committee.id === redirection || committee.title === redirection,
-          )?.id;
-    return committeeId
-      ? `/user/apply/committee-staff/${encodeURIComponent(committeeId)}/progress`
-      : null;
-  };
-
   const getRedirectionDisplayName = (redirection?: string) => {
     if (!redirection) return "";
     if (redirection.toLowerCase() === "member") return "Member";
@@ -182,14 +157,6 @@ export default function CommitteeProgressPageContent() {
         const data = await response.json();
         if (data.redirectTo && window.location.pathname !== data.redirectTo) {
           router.replace(data.redirectTo);
-          return;
-        }
-        const destinationHref =
-          data.application?.hasAccepted && data.application?.redirection
-            ? getRedirectionHref(data.application.redirection)
-            : null;
-        if (destinationHref && window.location.pathname !== destinationHref) {
-          router.replace(destinationHref);
           return;
         }
         setApplicationData(data);

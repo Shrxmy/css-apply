@@ -183,9 +183,6 @@ async function exportCommitteeApplications(
   const whereClause: Record<string, unknown> = {
     recruitmentCycleId: activeCycleId,
     hasAccepted: true,
-    // A redirected source is no longer the canonical application. Accepted
-    // destinations are stored as the single exportable record.
-    redirection: null,
   };
 
   if (committee && committee !== "all") {
@@ -277,13 +274,12 @@ async function exportExecutiveAssociateApplications(
   const activeCycleId = await getActiveCycleId();
   const whereClause: Record<string, unknown> = {
     hasAccepted: true, // Only export accepted EA applications
-    redirection: null, // Exclude redirected applications
     recruitmentCycleId: activeCycleId,
     ...(role && role !== "all" ? { ebRole: role } : {}),
   };
 
-  // Note: For EA applications, we only export accepted ones that were NOT redirected
-  // Redirected EA applications should not be included in EA CSV
+  // Redirected applicants remain in their original application type and are
+  // represented by the redirection column rather than a second record.
 
   const applications = await prisma.executiveAssociateApplication.findMany({
     where: whereClause,
