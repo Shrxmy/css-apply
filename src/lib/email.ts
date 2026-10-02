@@ -61,6 +61,47 @@ export const sendEmail = async (to: string, subject: string, html: string) => {
     }
 };
 
+export const sendEmailBatch = async (
+    recipients: string[],
+    subject: string,
+    html: string,
+) => {
+    if (recipients.length === 0) return { success: true, sentCount: 0 };
+    if (recipients.length > 250) {
+        return { success: false, error: new Error("Email batch exceeds the 250-recipient safety limit") };
+    }
+
+    try {
+        // One recipient per version keeps applicant addresses private; callers
+        // enforce the 250-recipient safety cap for this batch.
+        const messageVersions = recipients.map((email) => ({
+            to: [{ email }],
+        }));
+
+        const result = await brevo.transactionalEmails.sendTransacEmail({
+            subject,
+            htmlContent: html,
+            sender: {
+                name: "CSSApply",
+                email: process.env.BREVO_FROM_EMAIL || "noreply@cssapply.com",
+            },
+            messageVersions,
+        });
+
+        return {
+            success: true,
+            sentCount: recipients.length,
+            messageId: result.messageId,
+            messageIds: result.messageIds,
+        };
+    } catch (error) {
+        emailLogger.error("batch delivery failed", error, {
+            recipientCount: recipients.length,
+        });
+        return { success: false, error };
+    }
+};
+
 // Enhanced email sending with better error handling
 export const sendEmailWithValidation = async (
     to: string,
@@ -1096,7 +1137,36 @@ export const emailTemplates = {
         ),
     }),
 
-    // Payment Reminder Template
+    paymentDeadlineReminder: (deadline: string): EmailTemplate => {
+        const formattedDeadline = new Intl.DateTimeFormat("en-PH", {
+            dateStyle: "long",
+            timeStyle: "short",
+            timeZone: "Asia/Manila",
+        }).format(new Date(deadline));
+
+        return {
+            subject: "CSSApply - Payment Receipt Deadline Reminder",
+            html: wrapEmail(
+                "Payment Receipt Deadline Reminder",
+                `
+                <p>Dear CSS applicant,</p>
+                <p>Our records do not show an acknowledgement receipt submission for your accepted CSS application. If you have already submitted one, please disregard this reminder and contact us if your dashboard does not reflect it.</p>
+                <div class="accent-box">
+                  <h3>Payment deadline</h3>
+                  <p><strong>${formattedDeadline} (Philippine Time)</strong></p>
+                  <p>Please make your payment and submit the completed acknowledgement receipt through your CSSApply application progress page by this deadline.</p>
+                </div>
+                <p>Receipt submissions remain open after the deadline until CSS administrators close payments. Submissions made after the deadline will be marked late.</p>
+                <div style="text-align: center; margin: 25px 0;">
+                  <a href="${appBaseUrl}/user" class="button">Open CSSApply</a>
+                </div>
+                <p>If you have already paid but have not submitted the acknowledgement receipt link, please submit it through your application progress page.</p>
+                `,
+            ),
+        };
+    },
+
+    // Legacy generic reminder template retained for the email test tool.
     paymentReminder: (
         userName: string,
     ): EmailTemplate => ({

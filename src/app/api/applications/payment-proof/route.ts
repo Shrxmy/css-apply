@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -9,6 +10,7 @@ import {
   isGoogleDriveUrl,
   lockApplicantCycle,
 } from "@/lib/application-rules";
+import { parsePaymentPolicy, paymentPolicyKey } from "@/lib/payment-deadline";
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,6 +31,17 @@ export async function POST(request: NextRequest) {
     const proof = parsed.data.paymentProof.trim();
     await prisma.$transaction(async (tx) => {
       await lockApplicantCycle(tx, session.user.email!, cycle.id);
+      const policyKey = paymentPolicyKey(cycle.id);
+      await tx.$executeRaw(Prisma.sql`
+        SELECT pg_advisory_xact_lock(hashtext(${policyKey}))
+      `);
+      const policyConfig = await tx.systemConfig.findUnique({
+        where: { key: policyKey },
+        select: { value: true },
+      });
+      if (parsePaymentPolicy(policyConfig?.value).closed) {
+        throw new Error("PAYMENT_SUBMISSIONS_CLOSED");
+      }
 
       const user = await tx.user.findUnique({
         where: { email: session.user.email! },
@@ -142,6 +155,10 @@ export async function POST(request: NextRequest) {
     }
 
     const knownErrors: Record<string, { error: string; status: number }> = {
+      PAYMENT_SUBMISSIONS_CLOSED: {
+        error: "Payment submissions are closed. Please contact CSS if you need assistance.",
+        status: 409,
+      },
       PAYMENT_USER_NOT_FOUND: { error: "User not found", status: 404 },
       NO_ACCEPTED_APPLICATION: {
         error: "No accepted application found",

@@ -15,6 +15,7 @@ import FormProcessingOverlay from "@/components/FormProcessingOverlay";
 import MobileSidebar from "@/components/AdminMobileSB";
 import SidebarContent from "@/components/AdminSidebar";
 import DigitalIdCard from "@/components/DigitalIdCard";
+import PaymentDeadlineManager from "@/components/admin/PaymentDeadlineManager";
 import {
   EXCLUSIVE_PERK_IMAGE_TYPES,
   MAX_EXCLUSIVE_PERK_IMAGE_SIZE,
@@ -2309,6 +2310,7 @@ function SettingsTab({
       <div>
         {settingsSection === "general" && (
           <div className="space-y-5">
+            <PaymentDeadlineManager />
             <div className="rounded-2xl bg-white/90 p-5 shadow-sm sm:p-6">
               <h2 className="text-sm font-bold text-[#134687] font-poppins mb-1">
                 payment qr

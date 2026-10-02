@@ -16,6 +16,8 @@ import { usePaymentQr } from "@/lib/usePaymentQr";
 import { useCommunityLink } from "@/lib/useCommunityLink";
 import { usePaymentReceiptTemplate } from "@/lib/usePaymentReceiptTemplate";
 import DigitalIdCard from "@/components/DigitalIdCard";
+import PaymentDeadlineNotice from "@/components/PaymentDeadlineNotice";
+import { usePaymentDeadline } from "@/lib/usePaymentDeadline";
 
 import type React from "react";
 
@@ -25,6 +27,7 @@ export default function EAProgressPageContent() {
   const { receiptTemplateUrl } = usePaymentReceiptTemplate();
   const router = useRouter();
   const { data: session } = useSession();
+  const { deadline, deadlinePassed, paymentsClosed } = usePaymentDeadline();
 
   const { roles } = useEbRoles();
   const [applicationData, setApplicationData] = useState<{
@@ -741,6 +744,11 @@ export default function EAProgressPageContent() {
               <h3 className="text-base sm:text-lg lg:text-xl font-semibold mb-4 sm:mb-5 text-center">
                 Payment Instructions
               </h3>
+              <PaymentDeadlineNotice
+                deadline={deadline}
+                deadlinePassed={deadlinePassed}
+                paymentsClosed={paymentsClosed}
+              />
 
               <div className="bg-[#F3F8FF] rounded-xl p-4 sm:p-6 lg:p-8">
                 {!hasPaymentProof && (
@@ -799,7 +807,11 @@ export default function EAProgressPageContent() {
                       Revision requested: {application.paymentRejectionReason || "Please review and resubmit your receipt."}
                     </p>
                   )}
-                  {canSubmitPaymentProof ? (
+                  {paymentsClosed && paymentStatus !== "approved" ? (
+                    <p className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-center text-sm font-semibold text-amber-900 sm:mb-6">
+                      Payment submissions are closed. Please contact CSS if you need assistance.
+                    </p>
+                  ) : canSubmitPaymentProof ? (
                     <form
                       onSubmit={handlePaymentProofSubmit}
                       aria-busy={submittingPaymentProof}
