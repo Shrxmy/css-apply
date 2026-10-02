@@ -600,12 +600,18 @@ function SuperAdminApplicationsTab() {
 
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
-type Tab = "users" | "applications" | "settings" | "email";
+type Tab =
+  | "users"
+  | "applications"
+  | "payments"
+  | "settings"
+  | "email";
 type SettingsSection = "general" | "executive-board" | "recruitment";
 
 const isTab = (value: string | null): value is Tab =>
   value === "users" ||
   value === "applications" ||
+  value === "payments" ||
   value === "settings" ||
   value === "email";
 
@@ -850,6 +856,7 @@ export default function SuperAdminDashboard() {
             {[
               { key: "users" as Tab, label: "User Database" },
               { key: "applications" as Tab, label: "All Applications" },
+              { key: "payments" as Tab, label: "Payment Tracking" },
               { key: "settings" as Tab, label: "Configuration" },
               { key: "email" as Tab, label: "Email Test" },
             ].map((tab) => (
@@ -868,11 +875,17 @@ export default function SuperAdminDashboard() {
           </div>
         </div>
 
-        <div className="mb-5 rounded-xl border border-[#005FD9]/10 bg-white p-5">
+        <div
+          className={`mb-5 rounded-xl bg-white p-5 ${
+            activeTab === "payments" ? "" : "border border-[#005FD9]/10"
+          }`}
+        >
           {activeTab === "users" ? (
             <UsersTab />
           ) : activeTab === "applications" ? (
             <SuperAdminApplicationsTab />
+          ) : activeTab === "payments" ? (
+            <PaymentDeadlineManager />
           ) : activeTab === "settings" ? (
             <SettingsTab
               settingsSection={settingsSection}
@@ -2310,7 +2323,6 @@ function SettingsTab({
       <div>
         {settingsSection === "general" && (
           <div className="space-y-5">
-            <PaymentDeadlineManager />
             <div className="rounded-2xl bg-white/90 p-5 shadow-sm sm:p-6">
               <h2 className="text-sm font-bold text-[#134687] font-poppins mb-1">
                 payment qr

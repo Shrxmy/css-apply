@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import useSWR from "swr";
 import { toast } from "sonner";
+import { committeeRoles } from "@/data/committeeRoles";
+import { roles as executiveAssociateRoles } from "@/data/ebRoles";
 
 type ApplicantStatus =
   "no_receipt" | "pending" | "approved" | "needs_revision" | "rejected";
@@ -83,21 +85,22 @@ function formatDeadline(value: string | null) {
 }
 
 function statusLabel(applicant: PaymentApplicant) {
-  if (applicant.isLate && applicant.paymentStatus === "no_receipt") {
-    return "Late · No receipt";
+  if (applicant.isLate) {
+    switch (applicant.paymentStatus) {
+      case "no_receipt":
+        return "Late · No receipt";
+      case "needs_revision":
+        return "Late · Needs revision";
+      case "rejected":
+        return "Late · Receipt rejected";
+      case "pending":
+        return "Late · Awaiting review";
+    }
   }
-  if (applicant.isLate && applicant.paymentStatus === "needs_revision") {
-    return "Late · Needs revision";
-  }
-  if (applicant.isLate && applicant.paymentStatus === "rejected") {
-    return "Late · Receipt rejected";
-  }
-  if (applicant.isLate && applicant.paymentStatus === "pending") {
-    return "Late · Receipt awaiting review";
-  }
+
   switch (applicant.paymentStatus) {
     case "no_receipt":
-      return "No receipt submitted";
+      return "No receipt";
     case "pending":
       return "Awaiting review";
     case "approved":
@@ -109,25 +112,39 @@ function statusLabel(applicant: PaymentApplicant) {
   }
 }
 
-function statusStyle(applicant: PaymentApplicant) {
-  if (applicant.isLate) return "border-amber-200 bg-amber-50 text-amber-800";
-  if (applicant.paymentStatus === "approved")
-    return "border-green-200 bg-green-50 text-green-700";
-  if (applicant.paymentStatus === "pending")
-    return "border-blue-200 bg-blue-50 text-blue-700";
-  if (applicant.paymentStatus === "no_receipt")
-    return "border-slate-200 bg-slate-50 text-slate-700";
-  return "border-orange-200 bg-orange-50 text-orange-800";
+function statusTone(applicant: PaymentApplicant) {
+  if (applicant.isLate) return "bg-[#8A5B22] text-white";
+  if (applicant.paymentStatus === "approved") return "bg-[#3C684A] text-white";
+  if (applicant.paymentStatus === "pending") return "bg-[#315A7B] text-white";
+  if (applicant.paymentStatus === "no_receipt") {
+    return "bg-[#E3E7EB] text-[#394654]";
+  }
+  return "bg-[#91483F] text-white";
 }
 
 function applicationLabel(applicant: PaymentApplicant) {
-  const type =
-    applicant.applicationType === "executive-associate"
-      ? "Executive Associate"
-      : applicant.applicationType === "committee"
-        ? "Committee Staff"
-        : "Member";
-  return applicant.position ? `${type} · ${applicant.position}` : type;
+  if (applicant.applicationType === "member") return "Member";
+  if (applicant.applicationType === "committee") {
+    const committee = committeeRoles.find(
+      (role) => role.id === applicant.position,
+    );
+    return `Committee Staff · ${committee?.title ?? applicant.position}`;
+  }
+  const role = executiveAssociateRoles.find(
+    (item) => item.id === applicant.position,
+  );
+  return `Executive Associate · ${role?.title ?? applicant.position}`;
+}
+
+function redirectionLabel(redirection: string) {
+  if (redirection === "member") return "Member";
+  const committeeId = redirection.startsWith("committee-")
+    ? redirection.slice("committee-".length)
+    : redirection;
+  const committee = committeeRoles.find((role) => role.id === committeeId);
+  if (committee) return `${committee.title} Staff`;
+  const role = executiveAssociateRoles.find((item) => item.id === redirection);
+  return role?.title ?? redirection;
 }
 
 export default function PaymentDeadlineManager() {
@@ -171,8 +188,9 @@ export default function PaymentDeadlineManager() {
         }),
       });
       const result = await response.json();
-      if (!response.ok)
+      if (!response.ok) {
         throw new Error(result.error || "Could not save payment settings");
+      }
       await mutate();
       toast.success("Payment settings saved");
     } catch (saveError) {
@@ -186,9 +204,7 @@ export default function PaymentDeadlineManager() {
     }
   };
 
-  const togglePaymentClosure = async () => {
-    await savePolicy(!paymentsClosed);
-  };
+  const togglePaymentClosure = async () => savePolicy(!paymentsClosed);
 
   const sendReminders = async () => {
     setSending(true);
@@ -199,8 +215,9 @@ export default function PaymentDeadlineManager() {
         body: JSON.stringify({ confirm: true }),
       });
       const result = await response.json();
-      if (!response.ok)
+      if (!response.ok) {
         throw new Error(result.error || "Could not send payment reminders");
+      }
       setShowSendConfirmation(false);
       toast.success(
         `Payment deadline reminder sent to ${result.sentCount} applicant${result.sentCount === 1 ? "" : "s"}`,
@@ -218,49 +235,46 @@ export default function PaymentDeadlineManager() {
   };
 
   return (
-    <section
-      className="rounded-2xl border border-[#005FD9]/10 bg-white/95 p-5 shadow-sm sm:p-6"
-      aria-labelledby="payment-deadline-title"
-    >
+    <section className="space-y-5" aria-labelledby="payment-deadline-title">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2
             id="payment-deadline-title"
-            className="font-poppins text-sm font-bold text-[#134687]"
+            className="font-poppins text-base font-bold text-[#134687]"
           >
             Payment deadline & receipt tracking
           </h2>
-          <p className="mt-1 max-w-2xl text-xs text-[#134687]/65">
-            Configure the active cycle&apos;s deadline, monitor acknowledgement
-            receipt submissions, and email only accepted applicants who have not
-            submitted a receipt.
+          <p className="mt-1 max-w-2xl text-xs leading-relaxed text-[#58687A]">
+            Set the active cycle&apos;s payment deadline, monitor
+            acknowledgement receipts, and contact accepted applicants who have
+            not submitted one.
           </p>
         </div>
         {data?.cycle && (
-          <span className="w-fit rounded-full bg-[#E8F2FF] px-3 py-1 text-xs font-semibold text-[#044FAF]">
+          <span className="w-fit rounded-full bg-[#E4EAF0] px-3 py-1 text-xs font-semibold text-[#34475B]">
             {data.cycle.schoolYear}
           </span>
         )}
       </div>
 
       {isLoading ? (
-        <div className="mt-5 rounded-xl bg-[#F7F9FC] p-5 text-center text-sm text-[#134687]/60">
+        <div className="rounded-xl bg-[#F1F3F5] p-5 text-center text-sm text-[#58687A]">
           Loading payment tracking…
         </div>
       ) : error ? (
-        <div className="mt-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <div className="rounded-xl bg-[#F1E6E4] p-4 text-sm text-[#7B332C]">
           Could not load payment settings. Please refresh this section.
         </div>
       ) : !data?.cycle ? (
-        <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+        <div className="rounded-xl bg-[#F2EBDD] p-4 text-sm text-[#705522]">
           No active recruitment cycle. Activate a cycle to configure payment
           settings.
         </div>
       ) : (
         <>
-          <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto]">
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
             <form
-              className="flex flex-col gap-3 rounded-xl bg-[#F7F9FC] p-4 sm:flex-row sm:items-end"
+              className="flex flex-col gap-3 rounded-xl bg-[#F1F3F5] p-4 sm:flex-row sm:items-end"
               onSubmit={(event) => {
                 event.preventDefault();
                 void savePolicy();
@@ -269,7 +283,7 @@ export default function PaymentDeadlineManager() {
               <div className="min-w-0 flex-1">
                 <label
                   htmlFor="payment-deadline-input"
-                  className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#134687]/70"
+                  className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[#58687A]"
                 >
                   Deadline · Philippine Time
                 </label>
@@ -278,38 +292,51 @@ export default function PaymentDeadlineManager() {
                   type="datetime-local"
                   value={deadlineInput}
                   onChange={(event) => setDeadlineInput(event.target.value)}
-                  className="w-full rounded-lg border border-[#005FD9]/20 bg-white px-3 py-2 text-sm text-[#134687] outline-none focus:ring-2 focus:ring-[#044FAF]/20"
+                  className="w-full rounded-lg border-0 bg-white px-3 py-2 text-sm text-[#26394D] outline-none focus-visible:ring-2 focus-visible:ring-[#58728B]"
                 />
-                <p className="mt-1 text-[11px] text-[#134687]/55">
+                <p className="mt-1 text-[10px] text-[#667587]">
                   Current: {formatDeadline(data.deadline)}
                 </p>
               </div>
               <button
                 type="submit"
                 disabled={saving}
-                className="rounded-lg bg-[#134687] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0F376B] disabled:opacity-50"
+                className="rounded-lg bg-[#244E76] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#1C3E60] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#58728B] focus-visible:ring-offset-2 disabled:opacity-50"
               >
                 {saving ? "Saving…" : "Save deadline"}
               </button>
             </form>
-            <div className="flex flex-col justify-center gap-2 rounded-xl border border-[#005FD9]/10 p-4 lg:min-w-56">
-              <p className="text-xs font-semibold text-[#134687]">
-                Receipt submissions
-              </p>
-              <p
-                className={`text-xs ${paymentsClosed ? "text-red-700" : hasDeadlinePassed ? "text-amber-800" : "text-green-700"}`}
-              >
-                {paymentsClosed
-                  ? "Closed by Super Admin"
-                  : hasDeadlinePassed
-                    ? "Deadline passed · still open"
-                    : "Open"}
-              </p>
+
+            <div className="flex items-center justify-between gap-3 rounded-xl bg-[#F1F3F5] p-4 lg:flex-col lg:items-stretch">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-[#58687A]">
+                  Receipt submissions
+                </p>
+                <span
+                  className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold ${
+                    paymentsClosed
+                      ? "bg-[#E9D8D5] text-[#74352F]"
+                      : hasDeadlinePassed
+                        ? "bg-[#E9DFC9] text-[#6D5424]"
+                        : "bg-[#DCE7DE] text-[#365B40]"
+                  }`}
+                >
+                  {paymentsClosed
+                    ? "Closed"
+                    : hasDeadlinePassed
+                      ? "Past deadline · Open"
+                      : "Open"}
+                </span>
+              </div>
               <button
                 type="button"
                 onClick={() => void togglePaymentClosure()}
                 disabled={saving}
-                className={`rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50 ${paymentsClosed ? "border-green-200 bg-green-50 text-green-800 hover:bg-green-100" : "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"}`}
+                className={`rounded-lg px-3 py-2 text-xs font-semibold text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#58728B] focus-visible:ring-offset-2 disabled:opacity-50 ${
+                  paymentsClosed
+                    ? "bg-[#3C684A] hover:bg-[#31573D]"
+                    : "bg-[#6D4944] hover:bg-[#5B3B37]"
+                }`}
               >
                 {saving
                   ? "Saving…"
@@ -320,7 +347,7 @@ export default function PaymentDeadlineManager() {
             </div>
           </div>
 
-          <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
             {[
               ["Accepted", data.counts.accepted],
               ["No receipt", data.counts.noReceipt],
@@ -329,26 +356,25 @@ export default function PaymentDeadlineManager() {
               ["Needs action", data.counts.needsRevision],
               ["Late", data.counts.late],
             ].map(([label, count]) => (
-              <div
-                key={label}
-                className="rounded-xl border border-[#005FD9]/10 bg-white p-3"
-              >
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-[#134687]/55">
+              <div key={label} className="rounded-lg bg-[#F1F3F5] px-3 py-2.5">
+                <p className="text-[9px] font-semibold uppercase tracking-wide text-[#667587]">
                   {label}
                 </p>
-                <p className="mt-1 text-xl font-bold text-[#134687]">{count}</p>
+                <p className="mt-0.5 text-lg font-bold leading-5 text-[#26394D]">
+                  {count}
+                </p>
               </div>
             ))}
           </div>
 
-          <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h3 className="text-sm font-semibold text-[#134687]">
+              <h3 className="text-sm font-semibold text-[#26394D]">
                 Accepted applicants
               </h3>
-              <p className="text-xs text-[#134687]/55">
-                Reminder emails target only the no-receipt group. Applicants
-                awaiting review are excluded.
+              <p className="text-[11px] text-[#667587]">
+                Reminders go only to applicants without a receipt; submitted
+                receipts awaiting review are excluded.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -361,7 +387,7 @@ export default function PaymentDeadlineManager() {
                 onChange={(event) =>
                   setFilter(event.target.value as ApplicantFilter)
                 }
-                className="rounded-lg border border-[#005FD9]/15 bg-white px-3 py-2 text-xs text-[#134687]"
+                className="rounded-lg border-0 bg-[#F1F3F5] px-3 py-2 text-xs text-[#34475B] outline-none focus-visible:ring-2 focus-visible:ring-[#58728B]"
               >
                 <option value="all">All statuses</option>
                 <option value="no_receipt">No receipt</option>
@@ -380,65 +406,72 @@ export default function PaymentDeadlineManager() {
                   !data.deadline ||
                   sending
                 }
-                className="rounded-lg bg-[#134687] px-4 py-2 text-xs font-semibold text-white hover:bg-[#0F376B] disabled:cursor-not-allowed disabled:opacity-40"
+                className="rounded-lg bg-[#244E76] px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#1C3E60] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#58728B] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-[#A8B3BD]"
               >
                 Email no-receipt group ({data.counts.noReceipt})
               </button>
             </div>
           </div>
 
-          <div className="mt-3 max-h-[460px] overflow-auto rounded-xl border border-[#005FD9]/10">
-            <table className="w-full min-w-[760px] text-left text-xs">
-              <thead className="sticky top-0 bg-[#134687] text-[10px] uppercase tracking-wide text-white/85">
+          <div className="max-h-[460px] overflow-auto rounded-xl bg-white">
+            <table className="w-full min-w-[700px] table-fixed text-left text-xs">
+              <colgroup>
+                <col className="w-[34%]" />
+                <col className="w-[26%]" />
+                <col className="w-[18%]" />
+                <col className="w-[22%]" />
+              </colgroup>
+              <thead className="sticky top-0 bg-[#244E76] text-[9px] uppercase tracking-wider text-white">
                 <tr>
-                  <th className="px-3 py-3">Applicant</th>
-                  <th className="px-3 py-3">Application</th>
-                  <th className="px-3 py-3">Receipt</th>
-                  <th className="px-3 py-3">Payment status</th>
+                  <th className="px-3 py-2.5">Applicant</th>
+                  <th className="px-3 py-2.5">Type / Position</th>
+                  <th className="px-3 py-2.5 text-center">Receipt</th>
+                  <th className="px-3 py-2.5 text-center">Payment status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#005FD9]/10 bg-white">
+              <tbody className="text-[11px] text-[#34475B]">
                 {visibleApplicants.map((applicant) => (
                   <tr
                     key={`${applicant.studentNumber}:${applicant.id}`}
-                    className="align-top hover:bg-[#F9FBFF]"
+                    className="align-middle odd:bg-white even:bg-[#F4F6F8] hover:bg-[#E9EEF2]"
                   >
-                    <td className="px-3 py-3">
-                      <p className="font-semibold text-[#134687]">
+                    <td className="px-3 py-2">
+                      <p className="truncate font-semibold uppercase text-[#26394D]">
                         {applicant.name}
                       </p>
-                      <p className="mt-0.5 text-[#134687]/65">
+                      <p className="truncate text-[10px] text-[#687789]">
                         {applicant.email}
-                      </p>
-                      <p className="mt-0.5 font-mono text-[10px] text-[#134687]/50">
-                        {applicant.studentNumber}
+                        {applicant.studentNumber &&
+                          ` · ${applicant.studentNumber}`}
                       </p>
                     </td>
-                    <td className="px-3 py-3 text-[#134687]">
-                      {applicationLabel(applicant)}
+                    <td className="truncate px-3 py-2 text-[#34475B]">
+                      <span title={applicationLabel(applicant)}>
+                        {applicationLabel(applicant)}
+                      </span>
                       {applicant.redirection && (
-                        <p className="mt-1 text-[10px] text-[#044FAF]">
-                          Redirected to: {applicant.redirection}
+                        <p className="truncate text-[9px] text-[#687789]">
+                          Redirected to {redirectionLabel(applicant.redirection)}
                         </p>
                       )}
                     </td>
-                    <td className="px-3 py-3">
+                    <td className="px-3 py-2 text-center">
                       {applicant.paymentProof ? (
                         <a
                           href={applicant.paymentProof}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="font-semibold text-[#044FAF] underline"
+                          className="font-semibold text-[#244E76] underline underline-offset-2 hover:text-[#1C3E60]"
                         >
                           Open receipt
                         </a>
                       ) : (
-                        <span className="text-[#134687]/45">Not submitted</span>
+                        <span className="text-[#687789]">Not submitted</span>
                       )}
                     </td>
-                    <td className="px-3 py-3">
+                    <td className="px-3 py-2 text-center">
                       <span
-                        className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-semibold ${statusStyle(applicant)}`}
+                        className={`inline-flex max-w-full rounded-full px-2.5 py-1 text-[9px] font-semibold leading-tight ${statusTone(applicant)}`}
                       >
                         {statusLabel(applicant)}
                       </span>
@@ -449,7 +482,7 @@ export default function PaymentDeadlineManager() {
                   <tr>
                     <td
                       colSpan={4}
-                      className="px-3 py-8 text-center text-sm text-[#134687]/55"
+                      className="px-3 py-8 text-center text-[#667587]"
                     >
                       No accepted applicants match this filter.
                     </td>
@@ -474,27 +507,27 @@ export default function PaymentDeadlineManager() {
           >
             <h3
               id="payment-reminder-confirm-title"
-              className="font-poppins text-lg font-bold text-[#134687]"
+              className="font-poppins text-lg font-bold text-[#26394D]"
             >
               Send payment deadline reminders?
             </h3>
-            <p className="mt-3 text-sm leading-6 text-[#134687]/75">
+            <p className="mt-3 text-sm leading-6 text-[#58687A]">
               This will email <strong>{data.counts.noReceipt}</strong> accepted
               applicant(s) with no acknowledgement receipt on file. Applicants
               whose receipt is awaiting review or already approved will not be
               contacted. The email will state the deadline:{" "}
               <strong>{formatDeadline(data.deadline)}</strong>.
             </p>
-            <p className="mt-2 text-xs text-[#134687]/60">
-              This action sends real emails via Brevo and cannot be undone.
-              Maximum batch: {data.reminderRecipientLimit} recipients.
+            <p className="mt-2 text-xs text-[#667587]">
+              This sends real emails via Brevo and cannot be undone. Maximum
+              batch: {data.reminderRecipientLimit} recipients.
             </p>
             <div className="mt-6 flex justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setShowSendConfirmation(false)}
                 disabled={sending}
-                className="rounded-lg border border-[#005FD9]/15 px-4 py-2 text-sm font-semibold text-[#134687] disabled:opacity-50"
+                className="rounded-lg bg-[#E8ECEF] px-4 py-2 text-sm font-semibold text-[#34475B] hover:bg-[#DCE2E7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#58728B] disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -502,7 +535,7 @@ export default function PaymentDeadlineManager() {
                 type="button"
                 onClick={() => void sendReminders()}
                 disabled={sending}
-                className="rounded-lg bg-[#134687] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                className="rounded-lg bg-[#244E76] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1C3E60] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#58728B] disabled:opacity-50"
               >
                 {sending ? "Sending…" : "Send reminders"}
               </button>
