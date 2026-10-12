@@ -397,18 +397,33 @@ export default function PaymentDeadlineManager() {
                 <option value="rejected">Rejected</option>
                 <option value="late">Late</option>
               </select>
+              {filter === "needs_revision" && (
+                <span className="text-[11px] text-[#134687]/70">
+                  To resend revision emails, use Receipt Review.
+                </span>
+              )}
               <button
                 type="button"
                 onClick={() => setShowSendConfirmation(true)}
                 disabled={
+                  filter !== "no_receipt" ||
                   data.counts.noReceipt === 0 ||
                   paymentsClosed ||
                   !data.deadline ||
                   sending
                 }
+                title={
+                  filter === "no_receipt"
+                    ? "Email accepted applicants who have no receipt on file"
+                    : "Select No receipt to enable payment reminders"
+                }
                 className="rounded-lg bg-[#134687] px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#0F376B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#044FAF] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-[#9FB4C9]"
               >
-                Email no-receipt group ({data.counts.noReceipt})
+                {filter === "no_receipt"
+                  ? `Email no-receipt group (${data.counts.noReceipt})`
+                  : filter === "needs_revision"
+                    ? "Resend via Receipt Review"
+                    : "Select No receipt to email"}
               </button>
             </div>
           </div>
