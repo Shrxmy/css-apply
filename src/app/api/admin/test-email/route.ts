@@ -1,172 +1,120 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
+import { z } from "zod";
 import { authOptions } from "@/lib/auth";
-import { sendEmail, emailTemplates } from "@/lib/email";
+import { prisma } from "@/lib/prisma";
+import { sendEmail } from "@/lib/email";
+import {
+  buildEmailTemplateTest,
+  getEmailTemplateTestOptions,
+} from "@/lib/email-test-templates";
+
+export const dynamic = "force-dynamic";
+
+const testEmailSchema = z
+  .object({ templateType: z.string().min(1).max(100) })
+  .strict();
+const noStoreHeaders = { "Cache-Control": "no-store, max-age=0" };
+
+function json(data: unknown, status = 200) {
+  return NextResponse.json(data, { status, headers: noStoreHeaders });
+}
+
+function isSuperAdmin(role?: string) {
+  return role === "super_admin" || role === "super-admin";
+}
+
+async function authorize() {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.email)
+    return { response: json({ error: "Unauthorized" }, 401) };
+  if (!isSuperAdmin(session.user.role)) {
+    return { response: json({ error: "Forbidden" }, 403) };
+  }
+  return { session };
+}
+
+export async function GET() {
+  try {
+    const authorization = await authorize();
+    if ("response" in authorization) return authorization.response;
+
+    return json({ templates: getEmailTemplateTestOptions() });
+  } catch (error) {
+    console.error("Load email test catalog failed", error);
+    return json({ error: "Could not load email test templates." }, 500);
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const authorization = await authorize();
+    if ("response" in authorization) return authorization.response;
 
-    if (!session || !session?.user?.email) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return json({ error: "Invalid JSON body." }, 400);
     }
 
-    if (session.user.role !== "super_admin") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const parsed = testEmailSchema.safeParse(body);
+    if (!parsed.success)
+      return json({ error: "Invalid email template type." }, 400);
+
+    const option = getEmailTemplateTestOptions().find(
+      (template) => template.value === parsed.data.templateType,
+    );
+    if (!option) return json({ error: "Invalid email template type." }, 400);
+
+    let communityLabel = "CSS Community Group";
+    if (parsed.data.templateType === "css_group_join") {
+      try {
+        const config = await prisma.systemConfig.findUnique({
+          where: { key: "community_group_label" },
+          select: { value: true },
+        });
+        communityLabel = config?.value.trim() || communityLabel;
+      } catch (configError) {
+        console.error(
+          "Could not load community label for email test",
+          configError,
+        );
+      }
     }
 
-    const { templateType } = await request.json();
+    const recipientEmail = authorization.session.user.email;
+    const recipientName = authorization.session.user.name || "Super Admin";
+    const template = buildEmailTemplateTest(
+      parsed.data.templateType,
+      recipientName,
+      communityLabel,
+    );
+    if (!template) return json({ error: "Invalid email template type." }, 400);
 
-    const recipientEmail = session.user.email;
-    const testName = session.user.name || "Super Admin";
-
-    let subject: string;
-    let html: string;
-
-    switch (templateType) {
-      case "member_application":
-        const memberTemplate = emailTemplates.memberApplication(
-          testName,
-          "2024XXXX",
-        );
-        subject = memberTemplate.subject;
-        html = memberTemplate.html;
-        break;
-
-      case "committee_application":
-        const committeeTemplate = emailTemplates.committeeApplication(
-          testName,
-          "2024XXXX",
-          "academics",
-          "creatives",
-        );
-        subject = committeeTemplate.subject;
-        html = committeeTemplate.html;
-        break;
-
-      case "executive_associate_application":
-        const eaTemplate = emailTemplates.executiveAssistantApplication(
-          testName,
-          "2024XXXX",
-          "President",
-          "Vice President",
-          "Secretary",
-        );
-        subject = eaTemplate.subject;
-        html = eaTemplate.html;
-        break;
-
-      case "member_accepted":
-        const memberAcceptedTemplate = emailTemplates.memberAccepted(
-          testName,
-          "test123",
-        );
-        subject = memberAcceptedTemplate.subject;
-        html = memberAcceptedTemplate.html;
-        break;
-
-      case "committee_accepted":
-        const committeeAcceptedTemplate = emailTemplates.committeeAccepted(
-          testName,
-          "test123",
-          "academics",
-        );
-        subject = committeeAcceptedTemplate.subject;
-        html = committeeAcceptedTemplate.html;
-        break;
-
-      case "executive_associate_accepted":
-        const eaAcceptedTemplate = emailTemplates.executiveAssistantAccepted(
-          testName,
-          "test123",
-          "President",
-        );
-        subject = eaAcceptedTemplate.subject;
-        html = eaAcceptedTemplate.html;
-        break;
-
-      case "committee_rejected":
-        const committeeRejectedTemplate = emailTemplates.committeeRejected(
-          testName,
-          "academics",
-        );
-        subject = committeeRejectedTemplate.subject;
-        html = committeeRejectedTemplate.html;
-        break;
-
-      case "executive_associate_rejected":
-        const eaRejectedTemplate = emailTemplates.executiveAssistantRejected(
-          testName,
-          "President",
-        );
-        subject = eaRejectedTemplate.subject;
-        html = eaRejectedTemplate.html;
-        break;
-
-      case "committee_redirected":
-        const committeeRedirectedTemplate = emailTemplates.committeeRedirected(
-          testName,
-          "test123",
-          "creatives",
-          "academics",
-        );
-        subject = committeeRedirectedTemplate.subject;
-        html = committeeRedirectedTemplate.html;
-        break;
-
-      case "member_id_released":
-        const memberIdReleasedTemplate = emailTemplates.memberIdReleased(
-          testName,
-          "TEST123"
-        );
-        subject = memberIdReleasedTemplate.subject;
-        html = memberIdReleasedTemplate.html;
-        break;
-
-      case "payment_reminder":
-        const paymentReminderTemplate = emailTemplates.paymentReminder(
-          testName
-        );
-        subject = paymentReminderTemplate.subject;
-        html = paymentReminderTemplate.html;
-        break;
-
-      case "css_group_join":
-        const cssGroupJoinTemplate = emailTemplates.cssGroupJoin(
-          testName,
-          "https://fb.me/g/6UCY6FrzU/L7r94Zcj",
-          "Join UST CSS Members 25'-26' Group"
-        );
-        subject = cssGroupJoinTemplate.subject;
-        html = cssGroupJoinTemplate.html;
-        break;
-
-      default:
-        return NextResponse.json(
-          { error: "Invalid template type" },
-          { status: 400 },
-        );
-    }
-
-    const result = await sendEmail(recipientEmail, subject, html);
-
-    if (result.success) {
-      return NextResponse.json({
-        success: true,
-        message: `Test email sent to ${recipientEmail}`,
-        messageId: result.messageId,
-      });
-    } else {
-      return NextResponse.json(
-        { error: "Failed to send email", details: result.error },
-        { status: 500 },
+    const result = await sendEmail(
+      recipientEmail,
+      template.subject,
+      template.html,
+    );
+    if (!result.success) {
+      return json(
+        { error: "The email provider could not accept the test email." },
+        502,
       );
     }
+
+    return json({
+      success: true,
+      message: `Test email accepted for ${recipientEmail}`,
+      template: option.label,
+      messageId: result.messageId,
+    });
   } catch (error) {
-    console.error("Test email error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
+    console.error(
+      "Test email send failed",
+      error instanceof Error ? error.name : "UnknownError",
     );
+    return json({ error: "Could not send the test email." }, 500);
   }
 }

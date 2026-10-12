@@ -2,9 +2,28 @@ import { BrevoClient } from "@getbrevo/brevo";
 import { createLogger } from "@/lib/logger";
 
 const emailLogger = createLogger("email");
-const appBaseUrl = (
-    process.env.NEXTAUTH_URL || "https://ust-css-apply.vercel.app"
-).replace(/\/+$/, "");
+const fallbackAppBaseUrl = "https://ust-css-apply.vercel.app";
+const configuredAppBaseUrl =
+    process.env.APP_BASE_URL?.trim() ||
+    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "") ||
+    process.env.NEXTAUTH_URL?.trim() ||
+    fallbackAppBaseUrl;
+const appBaseUrl = (() => {
+    try {
+        const url = new URL(configuredAppBaseUrl);
+        if (
+            url.protocol !== "https:" ||
+            url.hostname === "localhost" ||
+            url.hostname === "127.0.0.1"
+        ) {
+            return fallbackAppBaseUrl;
+        }
+        return url.origin;
+    } catch {
+        return fallbackAppBaseUrl;
+    }
+})();
 const emailLogoUrl = `${appBaseUrl}/assets/css-apply-static-images/assets/logos/Logo_CSS_Apply_Email.png`;
 
 const brevo = new BrevoClient({
@@ -21,6 +40,18 @@ const capitalizeWords = (input: string): string => {
     if (!input) return input;
     return input.replace(/\b\w/g, (ch) => ch.toUpperCase());
 };
+
+const escapeHtml = (input: string): string =>
+    input.replace(/[&<>"']/g, (character) => {
+        const entities: Record<string, string> = {
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            '"': "&quot;",
+            "'": "&#39;",
+        };
+        return entities[character];
+    });
 
 // Map committee IDs to their proper full names
 const getCommitteeFullName = (committeeId: string): string => {
@@ -480,7 +511,7 @@ export const emailTemplates = {
             </div>
 
             <div style="text-align: center; margin: 25px 0;">
-              <a href="${process.env.NEXTAUTH_URL || 'https://cssapply.com'}" class="button">
+              <a href="${appBaseUrl}" class="button">
                 Go to Application Progress
               </a>
             </div>
@@ -526,7 +557,7 @@ export const emailTemplates = {
             </div>
 
             <div style="text-align: center; margin: 25px 0;">
-              <a href="${process.env.NEXTAUTH_URL || 'https://cssapply.com'}" class="button">
+              <a href="${appBaseUrl}" class="button">
                 Go to Application Progress
               </a>
             </div>
@@ -573,7 +604,7 @@ export const emailTemplates = {
             </div>
 
             <div style="text-align: center; margin: 25px 0;">
-              <a href="${process.env.NEXTAUTH_URL || 'https://cssapply.com'}" class="button">
+              <a href="${appBaseUrl}" class="button">
                 Go to Application Progress
               </a>
             </div>
@@ -688,7 +719,7 @@ export const emailTemplates = {
             </div>
 
             <div style="text-align: center; margin: 25px 0;">
-              <a href="${process.env.NEXTAUTH_URL || 'https://cssapply.com'}" class="button">
+              <a href="${appBaseUrl}" class="button">
                 Go to Application Progress
               </a>
             </div>
@@ -741,7 +772,7 @@ export const emailTemplates = {
             </div>
 
             <div style="text-align: center; margin: 25px 0;">
-              <a href="${process.env.NEXTAUTH_URL || 'https://cssapply.com'}" class="button">
+              <a href="${appBaseUrl}" class="button">
                 Go to Application Progress
               </a>
             </div>
@@ -795,7 +826,7 @@ export const emailTemplates = {
             </div>
 
             <div style="text-align: center; margin: 25px 0;">
-              <a href="${process.env.NEXTAUTH_URL || 'https://cssapply.com'}" class="button">
+              <a href="${appBaseUrl}" class="button">
                 Go to Application Progress
               </a>
             </div>
@@ -1020,7 +1051,7 @@ export const emailTemplates = {
             </div>
 
             <div style="text-align: center; margin: 25px 0;">
-              <a href="${process.env.NEXTAUTH_URL || 'https://cssapply.com'}" class="button">
+              <a href="${appBaseUrl}" class="button">
                 Go to Application Progress
               </a>
             </div>
@@ -1076,7 +1107,7 @@ export const emailTemplates = {
             </div>
 
             <div style="text-align: center; margin: 25px 0;">
-              <a href="${process.env.NEXTAUTH_URL || 'https://cssapply.com'}" class="button">
+              <a href="${appBaseUrl}" class="button">
                 Go to Application Progress
               </a>
             </div>
@@ -1184,7 +1215,7 @@ export const emailTemplates = {
             </div>
             
             <div style="text-align: center; margin: 25px 0;">
-              <a href="${process.env.NEXTAUTH_URL || 'https://cssapply.com'}" class="button">
+              <a href="${appBaseUrl}" class="button">
                 Log In to CSSApply
               </a>
             </div>
@@ -1196,37 +1227,37 @@ export const emailTemplates = {
         ),
     }),
 
-    // CSS Group Join Invitation Template
+    // CSS Group Join Invitation Template. The invite itself stays in the
+    // authenticated progress page so applicants must acknowledge the payment
+    // and receipt-approval requirement before opening it.
     cssGroupJoin: (
         userName: string,
-        groupUrl: string,
         groupLabel: string,
-    ): EmailTemplate => ({
-        subject: "CSS Community Group Invitation",
-        html: wrapEmail(
-            "Join the CSS Community Group",
-            `
-            <p>Dear ${userName},</p>
-            
-            <p>Congratulations. We have verified your membership payment. You are now officially a member of the Computer Science Society.</p>
-            
-            <p>As a next step, we would like to invite you to join our official community group where we post updates, events, and announcements.</p>
-            
-            <div class="info-box" style="text-align: center; background-color: #f3f3fd; border: 1px solid rgba(0, 95, 217, 0.08);">
-              <h3 style="margin-top: 0; color: #134687;">CSS Community Group</h3>
-              <p style="margin-bottom: 20px;">Click the button below to join the official CSS group:</p>
-              <div style="text-align: center;">
-                <a href="${groupUrl}" target="_blank" class="button">
-                  ${groupLabel}
-                </a>
-              </div>
-              <p style="margin-top: 15px; font-size: 13px; color: #6b7280; font-style: italic;">
-                Please make sure to answer the membership questions when requesting to join.
-              </p>
-            </div>
-            
-            <p>Welcome once again, and we look forward to seeing you in the group and at our upcoming activities.</p>
-            `
-        ),
-    }),
+    ): EmailTemplate => {
+        const safeUserName = escapeHtml(userName);
+        const safeGroupLabel = escapeHtml(groupLabel);
+        return {
+            subject: "CSS Community Group Invitation",
+            html: wrapEmail(
+                "Join the CSS Community Group",
+                `
+                <p>Dear ${safeUserName},</p>
+
+                <p>You are invited to join the official CSS community group for updates, events, and announcements. If you have already joined, please log in and confirm your status so we can update our records.</p>
+
+                <div class="accent-box">
+                  <h3>Important Member ID Reminder</h3>
+                  <p>Payment is required before your Member ID can be released. You must submit your acknowledgement receipt and wait for an authorized reviewer to approve it.</p>
+                  <p>Before opening the ${safeGroupLabel} invite, CSSApply will ask you to acknowledge this requirement. After joining, please answer the required confirmation question on your application progress page.</p>
+                </div>
+
+                <div style="text-align: center; margin: 25px 0;">
+                  <a href="${appBaseUrl}/user" class="button">Continue to CSSApply</a>
+                </div>
+
+                <p>If you have not joined yet, use the community invite on your accepted application progress page after acknowledging the reminder. If you already belong to the group, choose “Yes, I have joined” there instead of requesting access again.</p>
+                `
+            ),
+        };
+    },
 };

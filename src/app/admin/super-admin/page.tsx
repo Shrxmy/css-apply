@@ -16,6 +16,7 @@ import MobileSidebar from "@/components/AdminMobileSB";
 import SidebarContent from "@/components/AdminSidebar";
 import DigitalIdCard from "@/components/DigitalIdCard";
 import PaymentDeadlineManager from "@/components/admin/PaymentDeadlineManager";
+import CommunityJoinManager from "@/components/admin/CommunityJoinManager";
 import {
   EXCLUSIVE_PERK_IMAGE_TYPES,
   MAX_EXCLUSIVE_PERK_IMAGE_SIZE,
@@ -605,7 +606,8 @@ type Tab =
   | "applications"
   | "payments"
   | "settings"
-  | "email";
+  | "email"
+  | "community";
 type SettingsSection = "general" | "executive-board" | "recruitment";
 
 const isTab = (value: string | null): value is Tab =>
@@ -613,7 +615,8 @@ const isTab = (value: string | null): value is Tab =>
   value === "applications" ||
   value === "payments" ||
   value === "settings" ||
-  value === "email";
+  value === "email" ||
+  value === "community";
 
 const isSettingsSection = (value: string | null): value is SettingsSection =>
   value === "general" || value === "executive-board" || value === "recruitment";
@@ -680,40 +683,48 @@ export default function SuperAdminDashboard() {
 
   // ─── Email Test Tab ───────────────────────────────────────────────────────────
 
-  const EMAIL_TEMPLATES = [
-    { value: "member_application", label: "Member Application Received" },
-    {
-      value: "committee_application",
-      label: "Committee Staff Application Received",
-    },
-    {
-      value: "executive_associate_application",
-      label: "Executive Associate Application Received",
-    },
-    { value: "member_accepted", label: "Member Accepted" },
-    { value: "committee_accepted", label: "Committee Staff Accepted" },
-    {
-      value: "executive_associate_accepted",
-      label: "Executive Associate Accepted",
-    },
-    { value: "committee_rejected", label: "Committee Staff Rejected" },
-    {
-      value: "executive_associate_rejected",
-      label: "Executive Associate Rejected",
-    },
-    { value: "committee_redirected", label: "Committee Staff Redirected" },
-    { value: "member_id_released", label: "Member ID Released" },
-    { value: "payment_reminder", label: "Payment Reminder" },
-    { value: "css_group_join", label: "CSS Group Join Invitation" },
-  ];
+  type EmailTemplateTestOption = {
+    value: string;
+    label: string;
+    category: string;
+  };
 
   function EmailTestTab() {
     const [sending, setSending] = useState(false);
+    const [templates, setTemplates] = useState<EmailTemplateTestOption[]>([]);
+    const [loadingTemplates, setLoadingTemplates] = useState(true);
+    const [catalogError, setCatalogError] = useState("");
     const [result, setResult] = useState<{
       success: boolean;
       message: string;
     } | null>(null);
     const { data: session } = useSession();
+
+    useEffect(() => {
+      let active = true;
+      void fetch("/api/admin/test-email", { cache: "no-store" })
+        .then(async (response) => {
+          const data = (await response.json()) as {
+            templates?: EmailTemplateTestOption[];
+            error?: string;
+          };
+          if (!response.ok) throw new Error(data.error || "Could not load templates.");
+          if (active) setTemplates(data.templates || []);
+        })
+        .catch((error) => {
+          if (active) {
+            setCatalogError(
+              error instanceof Error ? error.message : "Could not load templates.",
+            );
+          }
+        })
+        .finally(() => {
+          if (active) setLoadingTemplates(false);
+        });
+      return () => {
+        active = false;
+      };
+    }, []);
 
     const handleSendTest = async (templateType: string) => {
       setSending(true);
@@ -780,32 +791,51 @@ export default function SuperAdminDashboard() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {EMAIL_TEMPLATES.map((template) => (
-              <button
-                key={template.value}
-                onClick={() => handleSendTest(template.value)}
-                disabled={sending}
-                className="flex items-center gap-3 p-4 border border-[#005FD9]/15 rounded-lg hover:bg-[#F3F3FD] transition-colors text-left disabled:opacity-50"
-              >
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[#134687]">
-                  <div
-                    className="w-4 h-4 text-white bg-current"
-                    style={{
-                      maskImage: "url(/icons/send.svg)",
-                      WebkitMaskImage: "url(/icons/send.svg)",
-                      maskSize: "contain",
-                      maskRepeat: "no-repeat",
-                      maskPosition: "center",
-                    }}
-                  />
-                </div>
-                <span className="text-sm text-[#134687] font-medium">
-                  {template.label}
-                </span>
-              </button>
-            ))}
-          </div>
+          {catalogError && (
+            <p role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              {catalogError}
+            </p>
+          )}
+          {loadingTemplates ? (
+            <p className="py-6 text-center text-sm text-[#134687]/60">Loading all email templates…</p>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+              {templates.map((template) => (
+                <button
+                  key={template.value}
+                  onClick={() => handleSendTest(template.value)}
+                  disabled={sending}
+                  className="flex items-center gap-3 rounded-lg border border-[#005FD9]/15 p-4 text-left transition-colors hover:bg-[#F3F3FD] disabled:opacity-50"
+                >
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[#134687]">
+                    <div
+                      className="h-4 w-4 bg-current text-white"
+                      style={{
+                        maskImage: "url(/icons/send.svg)",
+                        WebkitMaskImage: "url(/icons/send.svg)",
+                        maskSize: "contain",
+                        maskRepeat: "no-repeat",
+                        maskPosition: "center",
+                      }}
+                    />
+                  </div>
+                  <span>
+                    <span className="block text-[10px] font-mono uppercase tracking-wider text-[#044FAF]/70">
+                      {template.category}
+                    </span>
+                    <span className="text-sm font-medium text-[#134687]">
+                      {template.label}
+                    </span>
+                  </span>
+                </button>
+              ))}
+              {!templates.length && !catalogError && (
+                <p className="col-span-full py-6 text-center text-sm text-[#134687]/60">
+                  No email templates are registered for testing.
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="bg-[#E8F2FF]/50 border border-[#005FD9]/10 rounded-xl p-5">
@@ -859,6 +889,7 @@ export default function SuperAdminDashboard() {
               { key: "payments" as Tab, label: "Payment Tracking" },
               { key: "settings" as Tab, label: "Configuration" },
               { key: "email" as Tab, label: "Email Test" },
+              { key: "community" as Tab, label: "Community Join" },
             ].map((tab) => (
               <button
                 key={tab.key}
@@ -891,6 +922,8 @@ export default function SuperAdminDashboard() {
               settingsSection={settingsSection}
               onSettingsSectionChange={updateSettingsSection}
             />
+          ) : activeTab === "community" ? (
+            <CommunityJoinManager />
           ) : (
             <EmailTestTab />
           )}

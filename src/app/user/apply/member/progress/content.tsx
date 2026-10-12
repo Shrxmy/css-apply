@@ -7,6 +7,7 @@ import LoadingSpinner from "@/components/LoadingSpinner";
 import LoadingScreen from "@/components/LoadingScreen";
 import FormProcessingOverlay from "@/components/FormProcessingOverlay";
 import Footer from "@/components/Footer";
+import CommunityJoinCard from "@/components/CommunityJoinCard";
 import NoApplicationFound from "@/components/NoApplicationFound";
 import { useSession } from "next-auth/react";
 import { usePaymentQr } from "@/lib/usePaymentQr";
@@ -415,31 +416,10 @@ export default function MemberProgressPageContent() {
           {applicationData.application?.hasAccepted &&
             communityEnabled &&
             communityUrl && (
-              <div className="rounded-2xl sm:rounded-[20px] lg:rounded-3xl bg-white shadow-[0_2px_8px_0_rgba(0,0,0,0.15)] sm:shadow-[0_4px_4px_0_rgba(0,0,0,0.31)] p-4 sm:p-6 lg:p-10 w-full max-w-4xl">
-                <h3 className="text-base sm:text-lg lg:text-xl font-semibold mb-4 sm:mb-5 text-center">
-                  Join Our Community
-                </h3>
-                <div className="bg-[#F3F8FF] border border-[#005FD9]/15 rounded-xl p-4 sm:p-6 lg:p-8">
-                  <p className="text-[#134687] text-center mb-4 sm:mb-6 text-sm sm:text-base lg:text-lg">
-                    Join our exclusive private FB group for members to stay
-                    connected and receive updates:
-                  </p>
-                  <div className="text-center">
-                    <a
-                      href={communityUrl}
-                      className="inline-block bg-linear-to-r from-[#134687] to-[#0f3a6b] text-white px-4 sm:px-6 lg:px-8 py-2 sm:py-3 lg:py-4 rounded-lg font-bold text-sm sm:text-base lg:text-lg shadow-lg hover:shadow-xl transition-all duration-200"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {communityLabel}
-                    </a>
-                  </div>
-                  <p className="text-[#134687]/70 text-center text-xs sm:text-sm mt-4">
-                    Connect with fellow members and stay updated with exclusive
-                    announcements!
-                  </p>
-                </div>
-              </div>
+              <CommunityJoinCard
+                communityUrl={communityUrl}
+                communityLabel={communityLabel}
+              />
             )}
         </div>
       </section>

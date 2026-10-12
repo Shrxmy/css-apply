@@ -68,6 +68,7 @@ model User {
   committeeApplications          CommitteeApplication[]
   ebProfile                      EBProfile?
   memberships                    Membership[]
+  communityJoinConfirmations     CommunityJoinConfirmation[]
   attendanceEventsCreated        AttendanceEvent[]               @relation("AttendanceEventCreator")
   attendanceRosterEntries        AttendanceEventRoster[]
   attendanceCheckIns             EventAttendance[]               @relation("AttendanceCheckInOperator")
@@ -115,6 +116,26 @@ model Membership {
   @@index([recruitmentCycleId])
   @@index([userId])
 }
+
+model CommunityJoinConfirmation {
+  id                               String           @id @default(cuid())
+  userId                           String
+  user                             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recruitmentCycleId               String
+  recruitmentCycle                 RecruitmentCycle @relation(fields: [recruitmentCycleId], references: [id], onDelete: Cascade)
+  paymentRequirementAcknowledgedAt DateTime?
+  hasJoined                        Boolean?
+  respondedAt                      DateTime?
+  lastReminderSentAt               DateTime?
+  reminderCount                    Int              @default(0)
+  createdAt                        DateTime         @default(now())
+  updatedAt                        DateTime         @updatedAt
+
+  @@unique([userId, recruitmentCycleId])
+  @@index([recruitmentCycleId, hasJoined])
+  @@index([recruitmentCycleId, lastReminderSentAt])
+}
+
 
 model MembershipCounter {
   id                 String           @id @default(cuid())
@@ -255,6 +276,7 @@ model RecruitmentCycle {
   executiveAssociateApplications ExecutiveAssociateApplication[]
   committeeApplications          CommitteeApplication[]
   memberships                    Membership[]
+  communityJoinConfirmations     CommunityJoinConfirmation[]
   membershipCounters             MembershipCounter[]
   attendanceEvents               AttendanceEvent[]
   attendanceGuests               AttendanceGuest[]
