@@ -314,8 +314,17 @@ export default function PaymentReviewsPage() {
                             </p>
                           )}
                           {review.paymentRejectionReason && (
-                            <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
-                              Reason: {review.paymentRejectionReason}
+                            <p
+                              className={`rounded-lg p-3 text-sm ${
+                                review.paymentStatus === "needs_revision"
+                                  ? "border-l-4 border-l-amber-800 bg-amber-50 text-amber-950"
+                                  : "bg-red-50 text-red-700"
+                              }`}
+                            >
+                              {review.paymentStatus === "needs_revision"
+                                ? "Revision requested: "
+                                : "Reason: "}
+                              {review.paymentRejectionReason}
                             </p>
                           )}
                         </div>
@@ -346,7 +355,7 @@ export default function PaymentReviewsPage() {
                                   setReviewAction("needs_revision");
                                   setRejectionReason("");
                                 }}
-                                className="rounded-lg border border-amber-200 px-2 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-50"
+                                className="rounded-lg border border-amber-800 px-2 py-2 text-xs font-semibold text-amber-950 hover:bg-amber-100"
                               >
                                 Needs Revision
                               </button>
@@ -368,7 +377,7 @@ export default function PaymentReviewsPage() {
                             <div className={`space-y-2 rounded-lg p-3 ${reviewAction === "needs_revision" ? "bg-amber-50" : "bg-red-50"}`}>
                               <label
                                 htmlFor={`rejection-${review.id}`}
-                                className={`block text-xs font-semibold ${reviewAction === "needs_revision" ? "text-amber-800" : "text-red-800"}`}
+                                className={`block text-xs font-semibold ${reviewAction === "needs_revision" ? "text-amber-950" : "text-red-800"}`}
                               >
                                 {reviewAction === "needs_revision" ? "What needs to be fixed?" : "Why is this receipt invalid?"}
                               </label>
@@ -379,13 +388,13 @@ export default function PaymentReviewsPage() {
                                 maxLength={500}
                                 rows={3}
                                 required
-                                className="w-full rounded-lg border border-red-200 bg-white px-3 py-2 text-sm focus:border-red-500 focus:outline-none"
+                                className={`w-full rounded-lg border bg-white px-3 py-2 text-sm focus:outline-none ${reviewAction === "needs_revision" ? "border-amber-800 focus:border-amber-900" : "border-red-200 focus:border-red-500"}`}
                               />
                               <div className="grid grid-cols-2 gap-2">
                                 <button
                                   type="button"
                                   onClick={() => void reviewReceipt(review, reviewAction)}
-                                  className={`rounded-lg px-3 py-2 text-sm font-semibold text-white ${reviewAction === "needs_revision" ? "bg-amber-600" : "bg-red-700"}`}
+                                  className={`rounded-lg px-3 py-2 text-sm font-semibold text-white ${reviewAction === "needs_revision" ? "bg-amber-800 hover:bg-amber-900" : "bg-red-700"}`}
                                 >
                                   {reviewAction === "needs_revision" ? "Send Revision Request" : "Confirm Reject"}
                                 </button>
@@ -409,7 +418,7 @@ export default function PaymentReviewsPage() {
                               type="button"
                               onClick={() => void resendRevisionEmail(review)}
                               disabled={!review.paymentRejectionReason?.trim()}
-                              className="rounded-lg border border-amber-200 px-3 py-2 text-xs font-semibold text-amber-800 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50"
+                              className="rounded-lg border border-amber-800 px-3 py-2 text-xs font-semibold text-amber-950 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
                               title={
                                 review.paymentRejectionReason?.trim()
                                   ? "Resend the revision email with the saved comment"
