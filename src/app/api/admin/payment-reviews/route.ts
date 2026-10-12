@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { Prisma } from "@prisma/client";
+import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getActiveCycle, getApplicationRuleResponse } from "@/lib/application-rules";
@@ -16,6 +17,12 @@ const PAYMENT_REVIEW_POSITIONS = new Set([
   "treasurer",
   "auditor",
 ]);
+const resendNeedsRevisionSchema = z
+  .object({
+    applicationId: z.string().min(1),
+    applicationType: z.enum(["member", "committee", "executive-associate"]),
+  })
+  .strict();
 
 function committeeName(id: string) {
   return committeeRoles.find((committee) => committee.id === id)?.title ?? id;
@@ -206,6 +213,117 @@ export async function GET(request: NextRequest) {
   }
 }
 
+export async function POST(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const cycle = await getActiveCycle();
+    const reviewer = await authorizePaymentReviewer(session.user.email, cycle.id);
+    if (!reviewer) {
+      return NextResponse.json(
+        {
+          error:
+            "Only the active President, Treasurer, Auditor, or Super Admin can review receipts",
+        },
+        { status: 403 },
+      );
+    }
+
+    const parsed = resendNeedsRevisionSchema.safeParse(await request.json());
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message ?? "Invalid resend request" },
+        { status: 400 },
+      );
+    }
+
+    const { applicationId, applicationType } = parsed.data;
+    const where = {
+      id: applicationId,
+      recruitmentCycleId: cycle.id,
+      hasAccepted: true,
+      paymentStatus: "needs_revision",
+    };
+    let application: {
+      paymentRejectionReason: string | null;
+      user: { name: string; email: string };
+    } | null = null;
+
+    if (applicationType === "member") {
+      application = await prisma.memberApplication.findFirst({
+        where,
+        select: {
+          paymentRejectionReason: true,
+          user: { select: { name: true, email: true } },
+        },
+      });
+    } else if (applicationType === "committee") {
+      application = await prisma.committeeApplication.findFirst({
+        where,
+        select: {
+          paymentRejectionReason: true,
+          user: { select: { name: true, email: true } },
+        },
+      });
+    } else {
+      application = await prisma.executiveAssociateApplication.findFirst({
+        where,
+        select: {
+          paymentRejectionReason: true,
+          user: { select: { name: true, email: true } },
+        },
+      });
+    }
+
+    if (!application) {
+      return NextResponse.json(
+        { error: "Needs-revision application not found in the active cycle" },
+        { status: 404 },
+      );
+    }
+    const comment = application.paymentRejectionReason?.trim();
+    if (!comment) {
+      return NextResponse.json(
+        { error: "This needs-revision application has no saved reviewer comment" },
+        { status: 409 },
+      );
+    }
+
+    const template = emailTemplates.acknowledgementReceiptNeedsRevision(
+      application.user.name || "Applicant",
+      comment,
+    );
+    const emailResult = await sendEmail(
+      application.user.email,
+      template.subject,
+      template.html,
+    );
+    if (!emailResult.success) {
+      return NextResponse.json(
+        { error: "The revision email could not be sent. Please try again." },
+        { status: 502 },
+      );
+    }
+
+    return NextResponse.json({ success: true, emailSent: true });
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+    const ruleError = getApplicationRuleResponse(error);
+    if (ruleError) {
+      return NextResponse.json(ruleError.body, { status: ruleError.status });
+    }
+    console.error("Resend receipt revision email failed", {
+      name: error instanceof Error ? error.name : "UnknownError",
+    });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
 export async function PATCH(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -337,14 +455,24 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
+    let revisionEmailSent: boolean | undefined;
     if (result.action === "needs_revision") {
       try {
         const template = emailTemplates.acknowledgementReceiptNeedsRevision(
           result.user.name || "Applicant",
           rejectionReason!.trim(),
         );
-        await sendEmail(result.user.email, template.subject, template.html);
+        const emailResult = await sendEmail(
+          result.user.email,
+          template.subject,
+          template.html,
+        );
+        revisionEmailSent = emailResult.success;
+        if (!emailResult.success) {
+          console.error("Receipt revision email provider rejected the send");
+        }
       } catch (emailError) {
+        revisionEmailSent = false;
         console.error(
           "Receipt revision email failed",
           emailError instanceof Error ? emailError.name : "UnknownError",
@@ -360,6 +488,7 @@ export async function PATCH(request: NextRequest) {
           : result.action === "needs_revision"
             ? "needs_revision"
             : "rejected",
+      emailSent: revisionEmailSent,
       memberId: result.memberId,
     });
   } catch (error) {

@@ -2,7 +2,7 @@
 
 # CSSApply - Computer Science Society Recruitment Portal for R101
 
-![CSSApply Logo](https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/logos/Logo_CSS%20Apply.svg)
+![CSSApply Logo](public/assets/css-apply-static-images/assets/logos/Logo_CSS_Apply_Email.png)
 
 **The official recruitment portal for the Computer Science Society at the University of Santo Tomas**
 

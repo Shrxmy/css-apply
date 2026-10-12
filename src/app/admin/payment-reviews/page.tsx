@@ -134,13 +134,19 @@ export default function PaymentReviewsPage() {
         );
       }
 
-      toast.success(
-        action === "approve"
-          ? "Receipt approved and Member ID released"
-          : action === "needs_revision"
-            ? "Revision request sent to the applicant"
-            : "Receipt rejected; the applicant can resubmit",
-      );
+      if (action === "needs_revision" && data.emailSent === false) {
+        toast.error(
+          "Revision saved, but the email failed to send. Retry it from the Needs Revision filter.",
+        );
+      } else {
+        toast.success(
+          action === "approve"
+            ? "Receipt approved and Member ID released"
+            : action === "needs_revision"
+              ? "Revision request emailed to the applicant with your comment"
+              : "Receipt rejected; the applicant can resubmit",
+        );
+      }
       setRejectingId(null);
       setReviewAction("reject");
       setRejectionReason("");
@@ -148,6 +154,35 @@ export default function PaymentReviewsPage() {
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to review receipt",
+      );
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const resendRevisionEmail = async (review: PaymentReview) => {
+    setProcessingId(review.id);
+    try {
+      const response = await fetch("/api/admin/payment-reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          applicationId: review.id,
+          applicationType: review.applicationType,
+        }),
+      });
+      const data = await parseResponse(response);
+      if (!response.ok) {
+        throw new Error(
+          typeof data.error === "string"
+            ? data.error
+            : "Failed to resend revision email",
+        );
+      }
+      toast.success("Revision email sent with the saved reviewer comment");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to resend revision email",
       );
     } finally {
       setProcessingId(null);
@@ -237,11 +272,13 @@ export default function PaymentReviewsPage() {
                     <FormProcessingOverlay
                       active={isProcessing}
                       label={
-                        isRejecting
-                          ? reviewAction === "needs_revision"
-                            ? "Sending revision request..."
-                            : "Rejecting acknowledgement receipt..."
-                          : "Approving acknowledgement receipt..."
+                        selectedStatus === "needs_revision"
+                          ? "Sending revision email..."
+                          : isRejecting
+                            ? reviewAction === "needs_revision"
+                              ? "Sending revision request..."
+                              : "Rejecting acknowledgement receipt..."
+                            : "Approving acknowledgement receipt..."
                       }
                     />
                     <fieldset
@@ -365,6 +402,22 @@ export default function PaymentReviewsPage() {
                                 </button>
                               </div>
                             </div>
+                          )}
+
+                          {selectedStatus === "needs_revision" && (
+                            <button
+                              type="button"
+                              onClick={() => void resendRevisionEmail(review)}
+                              disabled={!review.paymentRejectionReason?.trim()}
+                              className="rounded-lg border border-amber-200 px-3 py-2 text-xs font-semibold text-amber-800 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50"
+                              title={
+                                review.paymentRejectionReason?.trim()
+                                  ? "Resend the revision email with the saved comment"
+                                  : "A reviewer comment is required before sending"
+                              }
+                            >
+                              Resend Revision Email
+                            </button>
                           )}
 
                           {selectedStatus === "approved" &&

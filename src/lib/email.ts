@@ -24,7 +24,10 @@ const appBaseUrl = (() => {
         return fallbackAppBaseUrl;
     }
 })();
-const emailLogoUrl = `${appBaseUrl}/assets/css-apply-static-images/assets/logos/Logo_CSS_Apply_Email.png`;
+// Keep email images on the public production alias so preview/custom app URLs
+// cannot point mail clients at an inaccessible logo host.
+const emailLogoUrl =
+    "https://ust-css-apply.vercel.app/assets/css-apply-static-images/assets/logos/Logo_CSS_Apply_Email.png";
 
 const brevo = new BrevoClient({
     apiKey: process.env.BREVO_API_KEY || "",
@@ -1136,13 +1139,13 @@ export const emailTemplates = {
     ): EmailTemplate => ({
         subject: "CSSApply - Acknowledgement Receipt Needs Revision",
         html: wrapEmail(
-            `Application Update - ${userName}`,
+            `Application Update - ${escapeHtml(userName)}`,
             `
-            <p>Hi ${userName}, your acknowledgement receipt was reviewed by an authorized Executive Board reviewer.</p>
+            <p>Hi ${escapeHtml(userName)}, your acknowledgement receipt was reviewed by an authorized Executive Board reviewer.</p>
             <p>Please revise your submission and upload a new Google Drive link. Your application was not rejected.</p>
             <div class="accent-box" style="background-color: #FFF8E7; border-left: 4px solid #D6A326; padding: 18px; border-radius: 8px;">
               <p style="margin: 0 0 6px; color: #8A5A00; font-weight: 700;">Requested revision</p>
-              <p style="margin: 0; color: #5B4515;">${reason}</p>
+              <p style="margin: 0; color: #5B4515;">${escapeHtml(reason)}</p>
             </div>
             <p>Please log in to CSSApply, correct the receipt as instructed, and submit the updated acknowledgement receipt for review.</p>
             `,
