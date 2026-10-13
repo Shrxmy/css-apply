@@ -13,6 +13,7 @@ import {
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 function isAdminRole(role: string | undefined) {
   return role === "admin" || role === "super_admin" || role === "super-admin";
@@ -121,43 +122,53 @@ export async function GET(request: Request) {
       ].includes("approved");
     });
 
-    const members: DigitalIdPdfMember[] = await Promise.all(
-      eligibleMemberships.map(async (membership) => {
-        let photo: Buffer | null = null;
-        if (membership.photoPath) {
-          const { data } = await supabase.storage
-            .from("member-id-photos")
-            .download(membership.photoPath);
-          if (data) {
-            try {
-              photo = await sharp(Buffer.from(await data.arrayBuffer()))
-                .resize(320, 320, { fit: "cover", position: "centre" })
-                .png()
-                .toBuffer();
-            } catch (photoError) {
-              console.warn(
-                "Skipping an invalid digital ID photo during export:",
-                photoError instanceof Error
-                  ? photoError.message
-                  : "unknown error",
-              );
-            }
+    const toMember = async (
+      membership: (typeof eligibleMemberships)[number],
+    ): Promise<DigitalIdPdfMember> => {
+      let photo: Buffer | null = null;
+      if (membership.photoPath) {
+        const { data } = await supabase.storage
+          .from("member-id-photos")
+          .download(membership.photoPath);
+        if (data) {
+          try {
+            photo = await sharp(Buffer.from(await data.arrayBuffer()))
+              .resize(320, 320, { fit: "cover", position: "centre" })
+              .png()
+              .toBuffer();
+          } catch (photoError) {
+            console.warn(
+              "Skipping an invalid digital ID photo during export:",
+              photoError instanceof Error
+                ? photoError.message
+                : "unknown error",
+            );
           }
         }
+      }
 
-        return {
-          memberId: membership.memberId,
-          schoolYear: cycle.schoolYear,
-          roleTitle: getRoleTitle(membership.user),
-          issueDate: membership.createdAt,
-          expirationDate: cycle.membershipExpiration,
-          name: membership.user.name,
-          studentNumber: membership.user.studentNumber || "N/A",
-          section: membership.user.section || "N/A",
-          photo,
-        };
-      }),
-    );
+      return {
+        memberId: membership.memberId,
+        schoolYear: cycle.schoolYear,
+        roleTitle: getRoleTitle(membership.user),
+        issueDate: membership.createdAt,
+        expirationDate: cycle.membershipExpiration,
+        name: membership.user.name,
+        studentNumber: membership.user.studentNumber || "N/A",
+        section: membership.user.section || "N/A",
+        photo,
+      };
+    };
+
+    // Download and resize photos a few at a time to bound memory and Supabase load.
+    const members: DigitalIdPdfMember[] = [];
+    for (let index = 0; index < eligibleMemberships.length; index += 8) {
+      members.push(
+        ...(await Promise.all(
+          eligibleMemberships.slice(index, index + 8).map(toMember),
+        )),
+      );
+    }
 
     if (members.length === 0) {
       return NextResponse.json(

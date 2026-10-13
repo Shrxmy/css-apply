@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
@@ -441,18 +441,22 @@ export async function PATCH(request: NextRequest) {
     }, { maxWait: 10_000, timeout: 15_000 });
 
     if (result.action === "approve" && result.memberId) {
-      try {
-        const template = emailTemplates.memberIdReleased(
-          result.user.name || "Valued Member",
-          result.memberId,
-        );
-        await sendEmail(result.user.email, template.subject, template.html);
-      } catch (emailError) {
-        console.error(
-          "Member ID approval email failed",
-          emailError instanceof Error ? emailError.name : "UnknownError",
-        );
-      }
+      const memberId = result.memberId;
+      // The approval email is informational; send it after responding.
+      after(async () => {
+        try {
+          const template = emailTemplates.memberIdReleased(
+            result.user.name || "Valued Member",
+            memberId,
+          );
+          await sendEmail(result.user.email, template.subject, template.html);
+        } catch (emailError) {
+          console.error(
+            "Member ID approval email failed",
+            emailError instanceof Error ? emailError.name : "UnknownError",
+          );
+        }
+      });
     }
 
     let revisionEmailSent: boolean | undefined;

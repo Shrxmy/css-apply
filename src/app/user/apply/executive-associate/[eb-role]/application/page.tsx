@@ -352,7 +352,7 @@ export default function ExecutiveAssistantApplication() {
     return (
       <div>
         <section className="min-h-screen bg-[rgb(243,243,253)]">
-          <div className="flex flex-col justify-center items-center px-50 py-20">
+          <div className="flex flex-col justify-center items-center px-4 sm:px-8 lg:px-50 py-20">
             <div className="text-center">
               <h1 className="text-2xl font-inter font-bold text-black mb-4">
                 EB role not found

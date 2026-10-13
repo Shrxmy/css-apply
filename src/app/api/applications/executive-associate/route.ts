@@ -3,7 +3,10 @@ import { getServerSession } from "next-auth/next";
 import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
-import { APPLICATION_STORAGE_BUCKETS } from "@/lib/application-storage";
+import {
+  APPLICATION_STORAGE_BUCKETS,
+  isOwnApplicationFile,
+} from "@/lib/application-storage";
 import { getPositionTitle } from "@/lib/eb-mapping";
 import { executiveAssociateApplicationSchema } from "@/lib/schemas";
 import { isMembershipExpired } from "@/lib/membership-expiration";
@@ -56,7 +59,7 @@ export async function POST(request: NextRequest) {
     );
 
     const cvPath = normalizeStoragePath(data.cv);
-    if (!cvPath) {
+    if (!cvPath || !isOwnApplicationFile(cvPath, data.studentNumber)) {
       return NextResponse.json(
         { error: "Invalid CV file reference" },
         { status: 400 },
@@ -347,7 +350,7 @@ export async function DELETE() {
     }
 
     const cvPath = normalizeStoragePath(application.supabaseFilePath);
-    if (cvPath) {
+    if (cvPath && isOwnApplicationFile(cvPath, application.studentNumber)) {
       const { error: storageError } = await supabase.storage
         .from(APPLICATION_STORAGE_BUCKETS.executiveAssociate)
         .remove([cvPath]);

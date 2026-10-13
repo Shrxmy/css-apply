@@ -10,6 +10,14 @@ body {
 @theme {
   --font-family-inter: var(--font-inter), system-ui, sans-serif;
   --font-family-jetbrains: var(--font-jetbrains-mono), monospace;
+
+  /* Palette from docs/UI_DESIGN_GUIDELINES.md; use these (bg-css-navy, text-css-link, ...) in new code. */
+  --color-css-bg: #f3f3fd;
+  --color-css-navy: #134687;
+  --color-css-link: #044faf;
+  --color-css-accent: #005fd9;
+  --color-css-surface: #e8f2ff;
+  --color-css-surface-soft: #f3f8ff;
 }
 
 /* Map Next.js font variables to convenient utility classes */

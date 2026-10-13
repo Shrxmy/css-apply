@@ -19,6 +19,7 @@ import { usePaymentReceiptTemplate } from "@/lib/usePaymentReceiptTemplate";
 import DigitalIdCard from "@/components/DigitalIdCard";
 import PaymentDeadlineNotice from "@/components/PaymentDeadlineNotice";
 import { usePaymentDeadline } from "@/lib/usePaymentDeadline";
+import { toast } from "sonner";
 
 export default function CommitteeProgressPageContent() {
   const { communityEnabled, communityUrl, communityLabel } = useCommunityLink();
@@ -258,11 +259,11 @@ export default function CommitteeProgressPageContent() {
         // Redirect to application page after successful deletion
         router.push("/user/apply/committee-staff");
       } else {
-        alert(result.error || "Failed to delete application");
+        toast.error(result.error || "Failed to delete application");
       }
     } catch (error) {
       console.error("Delete error:", error);
-      alert("Failed to delete application");
+      toast.error("Failed to delete application");
     } finally {
       setIsDeleting(false);
       setShowDeleteConfirm(false);

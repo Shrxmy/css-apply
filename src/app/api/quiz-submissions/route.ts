@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { supabase } from "@/lib/supabase";
 
 const RECENT_SUBMISSION_TTL_MS = 5 * 60 * 1000;
@@ -10,28 +11,41 @@ const pruneRecentSubmissionKeys = (now: number) => {
   }
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
+// Public endpoint: only the columns the personality test writes are accepted.
+const committeeName = z.string().trim().min(1).max(100);
+const submissionSchema = z
+  .object({
+    top_committee: committeeName,
+    second_committee: committeeName,
+    third_committee: committeeName,
+    idempotencyKey: z.string().max(100).optional(),
+  })
+  .catchall(z.number().finite().min(-1000).max(1000))
+  .refine(
+    (value) =>
+      Object.keys(value).every(
+        (key) =>
+          /^score_[a-z_]{1,60}$/.test(key) ||
+          [
+            "top_committee",
+            "second_committee",
+            "third_committee",
+            "idempotencyKey",
+          ].includes(key),
+      ) && Object.keys(value).length <= 30,
+  );
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
     const submission = body?.submission ?? body;
 
-    if (!isRecord(submission)) {
+    const parsed = submissionSchema.safeParse(submission);
+    if (!parsed.success) {
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
     }
 
-    // Minimal shape validation
-    const hasTop = typeof submission.top_committee === "string";
-    if (!hasTop) {
-      return NextResponse.json(
-        { error: "Missing top_committee" },
-        { status: 400 },
-      );
-    }
-
-    const { idempotencyKey, ...submissionRecord } = submission;
+    const { idempotencyKey, ...submissionRecord } = parsed.data;
 
     if (typeof idempotencyKey === "string" && idempotencyKey.length > 0) {
       const now = Date.now();
@@ -56,12 +70,19 @@ export async function POST(req: Request) {
       if (typeof idempotencyKey === "string") {
         recentSubmissionKeys.delete(idempotencyKey);
       }
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error("Quiz submission insert failed", error.code);
+      return NextResponse.json(
+        { error: "Failed to save submission" },
+        { status: 500 },
+      );
     }
 
     return NextResponse.json({ data }, { status: 201 });
   } catch (err: unknown) {
-    const message = (err as { message?: string })?.message ?? String(err);
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("Quiz submission failed", err);
+    return NextResponse.json(
+      { error: "Failed to save submission" },
+      { status: 500 },
+    );
   }
 }

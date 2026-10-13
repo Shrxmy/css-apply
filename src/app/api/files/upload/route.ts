@@ -112,6 +112,19 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
+    // Accounts without a student number yet must not write into another user's folder.
+    if (
+      !user.studentNumber &&
+      (await prisma.user.findUnique({
+        where: { studentNumber },
+        select: { id: true },
+      }))
+    ) {
+      return NextResponse.json(
+        { error: "This student number is already registered by another user" },
+        { status: 409 },
+      );
+    }
 
     // Determine the bucket and application type
     const bucketName =
@@ -120,8 +133,7 @@ export async function POST(request: NextRequest) {
         : APPLICATION_STORAGE_BUCKETS.committee;
 
     // Generate unique file name
-    const timestamp = Date.now();
-    const fileName = `${studentNumber}_${fileType}_${timestamp}.pdf`;
+    const fileName = `${studentNumber}_${fileType}_${crypto.randomUUID()}.pdf`;
     const filePath = `applications/${studentNumber}/${fileName}`;
 
     // Convert File to ArrayBuffer for Supabase upload

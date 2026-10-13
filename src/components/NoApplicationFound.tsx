@@ -41,7 +41,7 @@ export default function NoApplicationFound({
                   priority
                   className="relative h-auto w-40 drop-shadow-[0_14px_20px_rgba(3,25,58,0.28)] sm:w-48 md:w-60"
                 />
-                <span className="relative mt-3 rounded-full border border-white/20 bg-white/10 px-4 py-1.5 text-xs font-semibold tracking-[0.18em] text-white/90 backdrop-blur-sm">
+                <span className="relative mt-3 rounded-full bg-[#2f7ee3] px-4 py-1.5 text-xs font-semibold tracking-[0.18em] text-white">
                   CSSAPPLY
                 </span>
               </div>
@@ -59,7 +59,7 @@ export default function NoApplicationFound({
                 {description}
               </p>
 
-              <div className="mt-6 rounded-2xl border border-[#dbe9fb] bg-[#f6faff] p-4">
+              <div className="mt-6 rounded-2xl bg-[#eaf3ff] p-4">
                 <p className="text-sm font-semibold text-[#102a4c]">
                   Ready to join CSS?
                 </p>

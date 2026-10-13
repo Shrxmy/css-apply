@@ -113,9 +113,15 @@ export async function GET(
       select: { id: true },
     });
     const activeCycleId = activeCycle?.id ?? "__no_active_cycle__";
+    // Pre-filter in the database; the exact assignment match still runs below.
+    const openApplicationWhere = {
+      recruitmentCycleId: activeCycleId,
+      OR: [{ status: null }, { status: { notIn: ["failed", "redirected"] } }],
+      ...(isSuperAdmin ? {} : { interviewBy: { not: null } }),
+    };
 
     const allCommApplications = await prisma.committeeApplication.findMany({
-      where: { recruitmentCycleId: activeCycleId },
+      where: openApplicationWhere,
       orderBy: { createdAt: "desc" },
       include: {
         user: {
@@ -137,7 +143,7 @@ export async function GET(
         const isRedirected = app.status === "redirected";
         const isAssigned = Boolean(
           app.interviewBy &&
-            assignmentValues.includes(app.interviewBy.toLowerCase()),
+          assignmentValues.includes(app.interviewBy.toLowerCase()),
         );
 
         const hasCommitteeAccess =
@@ -156,7 +162,7 @@ export async function GET(
     // Get all EA applications and compute whether each one is assigned to the current admin position
     const allExecutiveAssociateApplications =
       await prisma.executiveAssociateApplication.findMany({
-        where: { recruitmentCycleId: activeCycleId },
+        where: openApplicationWhere,
         orderBy: { createdAt: "desc" },
         include: {
           user: {
@@ -178,7 +184,7 @@ export async function GET(
           const isRedirected = app.status === "redirected";
           const isAssigned = Boolean(
             app.interviewBy &&
-              assignmentValues.includes(app.interviewBy.toLowerCase()),
+            assignmentValues.includes(app.interviewBy.toLowerCase()),
           );
 
           return (isSuperAdmin || isAssigned) && !isRejected && !isRedirected;

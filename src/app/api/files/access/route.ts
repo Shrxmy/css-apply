@@ -3,7 +3,10 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
-import { APPLICATION_STORAGE_BUCKETS } from "@/lib/application-storage";
+import {
+  APPLICATION_STORAGE_BUCKETS,
+  isOwnApplicationFile,
+} from "@/lib/application-storage";
 
 // GET file access for authenticated users (their own files)
 export async function GET(request: NextRequest) {
@@ -87,72 +90,56 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    try {
-      // Check if supabaseFilePath is a full URL or just a path
-      if (supabaseFilePath.startsWith("http")) {
-        // It's a full URL, extract bucket and file path (handle both public and signed URLs)
-        const urlMatch = supabaseFilePath.match(
-          /\/storage\/v1\/object\/(?:public|sign)\/([^\/]+)\/(.+?)(?:\?|$)/,
-        );
+    const bucketName =
+      applicationType === "executive-associate"
+        ? APPLICATION_STORAGE_BUCKETS.executiveAssociate
+        : APPLICATION_STORAGE_BUCKETS.committee;
+    const fileName = `${user.name}_${user.studentNumber}_${fileType.toUpperCase()}.pdf`;
+    let filePath = supabaseFilePath;
 
-        if (urlMatch) {
-          const bucketName = urlMatch[1];
-          const filePath = urlMatch[2];
-
-          // Generate a signed URL for secure access (24 hours expiration)
-          const { data, error } = await supabase.storage
-            .from(bucketName)
-            .createSignedUrl(filePath, 86400);
-
-          if (error) {
-            console.error("Supabase error:", error);
-            return NextResponse.json(
-              { error: "Failed to generate access link" },
-              { status: 500 },
-            );
-          }
-
-          return NextResponse.json({
-            success: true,
-            accessUrl: data.signedUrl,
-            fileName: `${user.name}_${user.studentNumber}_${fileType.toUpperCase()}.pdf`,
-            expiresIn: 86400,
-          });
-        } else {
-          // If we can't parse the URL, return the original URL
-          return NextResponse.json({
-            success: true,
-            accessUrl: supabaseFilePath,
-            fileName: `${user.name}_${user.studentNumber}_${fileType.toUpperCase()}.pdf`,
-            expiresIn: 86400,
-          });
-        }
-      } else {
-        // It's just a file path, use the bucket name
-        const bucketName =
-          applicationType === "executive-associate"
-            ? APPLICATION_STORAGE_BUCKETS.executiveAssociate
-            : APPLICATION_STORAGE_BUCKETS.committee;
-
-        const { data, error } = await supabase.storage
-          .from(bucketName)
-          .createSignedUrl(supabaseFilePath, 86400);
-
-        if (error) {
-          console.error("Supabase error:", error);
-          return NextResponse.json(
-            { error: "Failed to generate access link" },
-            { status: 500 },
-          );
-        }
-
+    if (supabaseFilePath.startsWith("http")) {
+      // Full URL (public or signed): only the path is trusted, never the bucket it names.
+      const urlMatch = supabaseFilePath.match(
+        /\/storage\/v1\/object\/(?:public|sign)\/([^\/]+)\/(.+?)(?:\?|$)/,
+      );
+      if (!urlMatch) {
+        // Not a Supabase storage URL: echo the stored link as before.
         return NextResponse.json({
           success: true,
-          accessUrl: data.signedUrl,
-          fileName: `${user.name}_${user.studentNumber}_${fileType.toUpperCase()}.pdf`,
+          accessUrl: supabaseFilePath,
+          fileName,
           expiresIn: 86400,
         });
       }
+      if (urlMatch[1] !== bucketName) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+      filePath = urlMatch[2];
+    }
+
+    if (!isOwnApplicationFile(filePath, user.studentNumber)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    try {
+      const { data, error } = await supabase.storage
+        .from(bucketName)
+        .createSignedUrl(filePath, 86400);
+
+      if (error) {
+        console.error("Supabase error:", error);
+        return NextResponse.json(
+          { error: "Failed to generate access link" },
+          { status: 500 },
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        accessUrl: data.signedUrl,
+        fileName,
+        expiresIn: 86400,
+      });
     } catch (supabaseError) {
       console.error("Supabase storage error:", supabaseError);
       return NextResponse.json(

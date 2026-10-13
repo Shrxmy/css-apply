@@ -40,6 +40,19 @@ export async function POST(request: NextRequest) {
     if (user.studentNumber && user.studentNumber !== studentNumber) {
       return NextResponse.json({ error: "Student number does not match your account" }, { status: 400 });
     }
+    // Accounts without a student number yet must not write into another user's folder.
+    if (
+      !user.studentNumber &&
+      (await prisma.user.findUnique({
+        where: { studentNumber },
+        select: { id: true },
+      }))
+    ) {
+      return NextResponse.json(
+        { error: "This student number is already registered by another user" },
+        { status: 409 },
+      );
+    }
 
     const bucketName = applicationType === "executive-associate"
       ? APPLICATION_STORAGE_BUCKETS.executiveAssociate

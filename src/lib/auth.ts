@@ -208,15 +208,18 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
 
-    async redirect({ url }) {
-      if (url.startsWith("/api/auth")) {
-        return url;
+    async redirect({ url, baseUrl }) {
+      // Only same-origin relative paths; resolving like a browser defeats
+      // tricks such as protocol-relative, backslash or tab-separated hosts.
+      if (!url.startsWith("/")) return "/";
+      try {
+        const target = new URL(url, baseUrl);
+        if (target.origin === new URL(baseUrl).origin) {
+          return `${target.pathname}${target.search}${target.hash}`;
+        }
+      } catch {
+        // Unparseable URL: fall through to the home page.
       }
-
-      if (url.startsWith("/")) {
-        return url;
-      }
-
       return "/";
     },
   },

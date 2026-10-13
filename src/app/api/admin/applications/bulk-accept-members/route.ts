@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -10,6 +10,9 @@ type AcceptedApplication = {
 };
 
 const BATCH_SIZE = 5;
+
+// Emails are sent after the response; give them time to finish.
+export const maxDuration = 60;
 
 async function sendAcceptanceEmails(applications: AcceptedApplication[]) {
   await Promise.all(
@@ -71,9 +74,18 @@ export async function POST() {
         },
       },
       orderBy: { createdAt: "asc" },
+      // Keep each manual acceptance batch below the 300-email limit.
+      take: 299,
     });
 
-    let acceptedCount = 0;
+    const allAccepted: AcceptedApplication[] = [];
+    // Registered before the loop so batches that already committed are still
+    // emailed if a later batch fails (after() also runs on error responses).
+    after(async () => {
+      for (let index = 0; index < allAccepted.length; index += BATCH_SIZE) {
+        await sendAcceptanceEmails(allAccepted.slice(index, index + BATCH_SIZE));
+      }
+    });
     for (let index = 0; index < pendingApplications.length; index += BATCH_SIZE) {
       const batch = pendingApplications.slice(index, index + BATCH_SIZE);
       const acceptedApplications = await prisma.$transaction(async (tx) => {
@@ -103,13 +115,12 @@ export async function POST() {
         return accepted;
       }, { maxWait: 10_000, timeout: 10_000 });
 
-      await sendAcceptanceEmails(acceptedApplications);
-      acceptedCount += acceptedApplications.length;
+      allAccepted.push(...acceptedApplications);
     }
 
     return NextResponse.json({
       success: true,
-      acceptedCount,
+      acceptedCount: allAccepted.length,
     });
   } catch (error) {
     console.error("Bulk member acceptance failed", error);

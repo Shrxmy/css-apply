@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -63,7 +64,10 @@ export async function POST(request: NextRequest) {
     const session = await getServerSession(authOptions);
     const isAuthorizedByRole = isAdminRole(session?.user?.role);
     const isAuthorizedBySecret =
-      !!cleanupSecret && !!headerSecret && headerSecret === cleanupSecret;
+      !!cleanupSecret &&
+      !!headerSecret &&
+      Buffer.byteLength(headerSecret) === Buffer.byteLength(cleanupSecret) &&
+      timingSafeEqual(Buffer.from(headerSecret), Buffer.from(cleanupSecret));
 
     if (!isAuthorizedByRole && !isAuthorizedBySecret) {
       return NextResponse.json(

@@ -348,7 +348,7 @@ export const emailTemplates = {
     ): EmailTemplate => ({
         subject: "CSSApply - Member Application Received",
         html: wrapEmail(
-            `Hello, ${userName}!`,
+            `Hello, ${escapeHtml(userName)}!`,
             `
             <p>
               Thank you for submitting your member application to CSSApply! We have successfully received your application.
@@ -382,7 +382,7 @@ export const emailTemplates = {
     ): EmailTemplate => ({
         subject: "CSSApply - Committee Staff Application Received",
         html: wrapEmail(
-            `Hello, ${userName}!`,
+            `Hello, ${escapeHtml(userName)}!`,
             `
             <p>
               Thank you for submitting your committee staff application to CSSApply! We have successfully received your application.
@@ -438,7 +438,7 @@ export const emailTemplates = {
     ): EmailTemplate => ({
         subject: "CSSApply - Executive Associate Application Received",
         html: wrapEmail(
-            `Hello, ${userName}!`,
+            `Hello, ${escapeHtml(userName)}!`,
             `
             <p>
                 Thank you for submitting your executive associate application to CSSApply! We have successfully received your application.
@@ -489,7 +489,7 @@ export const emailTemplates = {
         subject:
             "CSSApply - Congratulations! Your Member Application Has Been Accepted",
         html: wrapEmail(
-            `Congratulations ${userName}!`,
+            `Congratulations ${escapeHtml(userName)}!`,
             `
             <p>
               We are thrilled to inform you that your member application has been <strong style="color: #134687;">ACCEPTED</strong>! 
@@ -498,7 +498,7 @@ export const emailTemplates = {
             
             <div class="info-box">
               <h3>Acceptance Details</h3>
-              <p><strong>Name:</strong> ${userName}</p>
+              <p><strong>Name:</strong> ${escapeHtml(userName)}</p>
               <p><strong>Application Type:</strong> Member</p>
               <p><strong>Status:</strong> <span class="badge badge-accepted">ACCEPTED</span></p>
             </div>
@@ -534,7 +534,7 @@ export const emailTemplates = {
         subject:
             "CSSApply - Congratulations! Your Committee Staff Application Has Been Accepted",
         html: wrapEmail(
-            `Congratulations ${userName}!`,
+            `Congratulations ${escapeHtml(userName)}!`,
             `
             <p>
               We are thrilled to inform you that your committee staff application has been <strong style="color: #134687;">ACCEPTED</strong>! 
@@ -543,7 +543,7 @@ export const emailTemplates = {
             
             <div class="info-box">
               <h3>Acceptance Details</h3>
-              <p><strong>Name:</strong> ${userName}</p>
+              <p><strong>Name:</strong> ${escapeHtml(userName)}</p>
               <p><strong>Application Type:</strong> Committee Staff</p>
               <p><strong>Committee:</strong> ${getCommitteeFullName(committee)}</p>
               <p><strong>Status:</strong> <span class="badge badge-accepted">ACCEPTED</span></p>
@@ -581,7 +581,7 @@ export const emailTemplates = {
         subject:
             "CSSApply - Congratulations! Your Executive Associate Application Has Been Accepted",
         html: wrapEmail(
-            `Congratulations ${userName}!`,
+            `Congratulations ${escapeHtml(userName)}!`,
             `
             <p>
               We are thrilled to inform you that your executive associate application has been <strong style="color: #134687;">ACCEPTED</strong>! 
@@ -590,7 +590,7 @@ export const emailTemplates = {
             
             <div class="info-box">
               <h3>Acceptance Details</h3>
-              <p><strong>Name:</strong> ${userName}</p>
+              <p><strong>Name:</strong> ${escapeHtml(userName)}</p>
               <p><strong>Application Type:</strong> Executive Associate</p>
               <p><strong>Executive Associate Role:</strong> ${capitalizeWords(ebRole)}</p>
               <p><strong>Status:</strong> <span class="badge badge-accepted">ACCEPTED</span></p>
@@ -624,7 +624,7 @@ export const emailTemplates = {
     committeeRejected: (userName: string, committee: string): EmailTemplate => ({
         subject: "CSSApply - Committee Staff Application Update",
         html: wrapEmail(
-            `Hello, ${userName},`,
+            `Hello, ${escapeHtml(userName)},`,
             `
             <p>
               Thank you for your interest in joining the Computer Science Society Committee Staff. 
@@ -634,7 +634,7 @@ export const emailTemplates = {
             
             <div class="info-box">
               <h3>Application Update</h3>
-              <p><strong>Name:</strong> ${userName}</p>
+              <p><strong>Name:</strong> ${escapeHtml(userName)}</p>
               <p><strong>Application Type:</strong> Committee Staff</p>
               <p><strong>Committee:</strong> ${getCommitteeFullName(committee)}</p>
               <p><strong>Status:</strong> <span class="badge badge-rejected">NOT SELECTED</span></p>
@@ -658,7 +658,7 @@ export const emailTemplates = {
     ): EmailTemplate => ({
         subject: "CSSApply - Executive Associate Application Update",
         html: wrapEmail(
-            `Hello, ${userName},`,
+            `Hello, ${escapeHtml(userName)},`,
             `
             <p>
               Thank you for your interest in joining the Computer Science Society Executive Associate. 
@@ -668,7 +668,7 @@ export const emailTemplates = {
             
             <div class="info-box">
               <h3>Application Update</h3>
-              <p><strong>Name:</strong> ${userName}</p>
+              <p><strong>Name:</strong> ${escapeHtml(userName)}</p>
               <p><strong>Application Type:</strong> Executive Associate</p>
               <p><strong>Executive Associate Role:</strong> ${capitalizeWords(ebRole)}</p>
               <p><strong>Status:</strong> <span class="badge badge-rejected">NOT SELECTED</span></p>
@@ -695,7 +695,7 @@ export const emailTemplates = {
     ): EmailTemplate => ({
         subject: "CSSApply - Committee Staff Application Redirected",
         html: wrapEmail(
-            `Hello, ${userName},`,
+            `Hello, ${escapeHtml(userName)},`,
             `
             <p>
               We have reviewed your committee staff application and would like to offer you an opportunity 
@@ -704,7 +704,7 @@ export const emailTemplates = {
             
             <div class="info-box">
               <h3>Application Redirected</h3>
-              <p><strong>Name:</strong> ${userName}</p>
+              <p><strong>Name:</strong> ${escapeHtml(userName)}</p>
               <p><strong>Application Type:</strong> Committee Staff</p>
               <p><strong>Original Committee:</strong> ${getCommitteeFullName(originalCommittee)}</p>
               <p><strong>Redirected to:</strong> ${getCommitteeFullName(redirectedCommittee)}</p>
@@ -748,7 +748,7 @@ export const emailTemplates = {
     ): EmailTemplate => ({
         subject: "CSSApply - Executive Associate Application Redirected",
         html: wrapEmail(
-            `Hello, ${userName},`,
+            `Hello, ${escapeHtml(userName)},`,
             `
             <p>
               We have reviewed your executive associate application and would like to offer you an opportunity 
@@ -757,7 +757,7 @@ export const emailTemplates = {
             
             <div class="info-box">
               <h3>Application Redirected</h3>
-              <p><strong>Name:</strong> ${userName}</p>
+              <p><strong>Name:</strong> ${escapeHtml(userName)}</p>
               <p><strong>Application Type:</strong> Executive Associate</p>
               <p><strong>Original Executive Associate Role:</strong> ${capitalizeWords(originalEbRole)}</p>
               <p><strong>Redirected to:</strong> ${capitalizeWords(redirectedEbRole)} Executive Associate</p>
@@ -802,7 +802,7 @@ export const emailTemplates = {
         subject:
             "CSSApply - Executive Associate Application Redirected to Committee Staff",
         html: wrapEmail(
-            `Hello, ${userName}!`,
+            `Hello, ${escapeHtml(userName)}!`,
             `
             <p>
               Great news! Your Executive Associate application has been redirected to a Committee Staff position 
@@ -811,7 +811,7 @@ export const emailTemplates = {
             
             <div class="info-box">
               <h3>Application Redirected</h3>
-              <p><strong>Name:</strong> ${userName}</p>
+              <p><strong>Name:</strong> ${escapeHtml(userName)}</p>
               <p><strong>Application Type:</strong> Executive Associate</p>
               <p><strong>Original Executive Associate Role:</strong> ${capitalizeWords(originalEbRole)}</p>
               <p><strong>Redirected to:</strong> ${getCommitteeFullName(committeeId)} Committee Staff</p>
@@ -860,7 +860,7 @@ export const emailTemplates = {
     ): EmailTemplate => ({
         subject: "CSSApply - Committee Staff Application Under Evaluation",
         html: wrapEmail(
-            `Hello, ${userName},`,
+            `Hello, ${escapeHtml(userName)},`,
             `
             <p>
               Thank you for your interest in joining the Computer Science Society Committee Staff. 
@@ -870,7 +870,7 @@ export const emailTemplates = {
             
             <div class="info-box">
               <h3>Evaluation Status</h3>
-              <p><strong>Name:</strong> ${userName}</p>
+              <p><strong>Name:</strong> ${escapeHtml(userName)}</p>
               <p><strong>Application Type:</strong> Committee Staff</p>
               <p><strong>Committee:</strong> ${getCommitteeFullName(committee)}</p>
               <p><strong>Status:</strong> <span class="badge badge-evaluating">UNDER EVALUATION</span></p>
@@ -895,7 +895,7 @@ export const emailTemplates = {
     ): EmailTemplate => ({
         subject: "CSSApply - Executive Associate Application Under Evaluation",
         html: wrapEmail(
-            `Hello, ${userName},`,
+            `Hello, ${escapeHtml(userName)},`,
             `
             <p>
               Thank you for your interest in joining the Computer Science Society Executive Associate. 
@@ -905,7 +905,7 @@ export const emailTemplates = {
             
             <div class="info-box">
               <h3>Evaluation Status</h3>
-              <p><strong>Name:</strong> ${userName}</p>
+              <p><strong>Name:</strong> ${escapeHtml(userName)}</p>
               <p><strong>Application Type:</strong> Executive Associate</p>
               <p><strong>Executive Associate Role:</strong> ${capitalizeWords(ebRole)}</p>
               <p><strong>Status:</strong> <span class="badge badge-evaluating">UNDER EVALUATION</span></p>
@@ -936,7 +936,7 @@ export const emailTemplates = {
     ): EmailTemplate => ({
         subject: `CSSApply - New Executive Associate Interview Scheduled - ${applicantName}`,
         html: wrapEmail(
-            `Hello, ${ebName}!`,
+            `Hello, ${escapeHtml(ebName)}!`,
             `
             <p>
               You have a new interview scheduled for an Executive Associate application. 
@@ -945,7 +945,7 @@ export const emailTemplates = {
             
             <div class="info-box">
               <h3>Interview Details</h3>
-              <p><strong>Applicant Name:</strong> ${applicantName}</p>
+              <p><strong>Applicant Name:</strong> ${escapeHtml(applicantName)}</p>
               <p><strong>Student Number:</strong> ${studentNumber}</p>
               <p><strong>Position:</strong> ${capitalizeWords(ebRole)} Executive Associate</p>
               <p><strong>Interview Date:</strong> ${interviewDate}</p>
@@ -976,7 +976,7 @@ export const emailTemplates = {
     ): EmailTemplate => ({
         subject: `CSSApply - New Committee Staff Interview Scheduled - ${applicantName}`,
         html: wrapEmail(
-            `Hello, ${ebName}!`,
+            `Hello, ${escapeHtml(ebName)}!`,
             `
             <p>
               You have a new interview scheduled for a Committee Staff application. 
@@ -985,7 +985,7 @@ export const emailTemplates = {
             
             <div class="info-box">
               <h3>Interview Details</h3>
-              <p><strong>Applicant Name:</strong> ${applicantName}</p>
+              <p><strong>Applicant Name:</strong> ${escapeHtml(applicantName)}</p>
               <p><strong>Student Number:</strong> ${studentNumber}</p>
               <p><strong>Committee:</strong> ${getCommitteeFullName(committee)}</p>
               <p><strong>Interview Date:</strong> ${interviewDate}</p>
@@ -1012,9 +1012,9 @@ export const emailTemplates = {
     ): EmailTemplate => ({
         subject: `CSSApply - Interview Schedule Reset - ${applicantName}`,
         html: wrapEmail(
-            `Hello, ${ebName}!`,
+            `Hello, ${escapeHtml(ebName)}!`,
             `
-            <p>The interview schedule for <strong>${applicantName}</strong>'s ${interviewType} application has been reset.</p>
+            <p>The interview schedule for <strong>${escapeHtml(applicantName)}</strong>'s ${interviewType} application has been reset.</p>
             <p>The previously selected interview slot is no longer booked. Please wait for the applicant to select a new available slot.</p>
             `,
         ),
@@ -1028,7 +1028,7 @@ export const emailTemplates = {
     ): EmailTemplate => ({
         subject: "CSSApply - Committee Staff Application Redirected to Member",
         html: wrapEmail(
-            `Application Update - ${userName}`,
+            `Application Update - ${escapeHtml(userName)}`,
             `
             <p>
               Great news! Your Committee Staff application has been redirected to a Member position. 
@@ -1037,7 +1037,7 @@ export const emailTemplates = {
             
             <div class="info-box">
               <h3>Application Redirected</h3>
-              <p><strong>Name:</strong> ${userName}</p>
+              <p><strong>Name:</strong> ${escapeHtml(userName)}</p>
               <p><strong>Original Application:</strong> ${getCommitteeFullName(originalCommittee)} Committee Staff</p>
               <p><strong>Redirected to:</strong> Member</p>
               <p><strong>Status:</strong> <span class="badge badge-redirected">REDIRECTED</span></p>
@@ -1084,7 +1084,7 @@ export const emailTemplates = {
     ): EmailTemplate => ({
         subject: "CSSApply - Executive Associate Application Redirected to Member",
         html: wrapEmail(
-            `Application Update - ${userName}`,
+            `Application Update - ${escapeHtml(userName)}`,
             `
             <p>
               Great news! Your Executive Associate application has been redirected to a Member position. 
@@ -1093,7 +1093,7 @@ export const emailTemplates = {
             
             <div class="info-box">
               <h3>Application Redirected</h3>
-              <p><strong>Name:</strong> ${userName}</p>
+              <p><strong>Name:</strong> ${escapeHtml(userName)}</p>
               <p><strong>Original Application:</strong> ${capitalizeWords(originalEbRole)} Executive Associate</p>
               <p><strong>Redirected to:</strong> Member</p>
               <p><strong>Status:</strong> <span class="badge badge-redirected">REDIRECTED</span></p>
@@ -1158,7 +1158,7 @@ export const emailTemplates = {
         html: wrapEmail(
             "Your Member ID is ready",
             `
-            <p>Hi ${userName}, an authorized Executive Board reviewer has reviewed and approved your acknowledgement receipt.</p>
+            <p>Hi ${escapeHtml(userName)}, an authorized Executive Board reviewer has reviewed and approved your acknowledgement receipt.</p>
             
             <div class="accent-box" style="background-color: #E8F2FF; padding: 20px; border-radius: 12px; margin: 20px 0; text-align: center;">
               <p style="margin: 0 0 8px; color: #134687; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;">Member ID</p>
@@ -1208,7 +1208,7 @@ export const emailTemplates = {
         html: wrapEmail(
             "CSS Membership Payment Reminder",
             `
-            <p>Dear ${userName},</p>
+            <p>Dear ${escapeHtml(userName)},</p>
             
             <p>We hope this message finds you well. This is a friendly reminder to complete your CSS membership payment.</p>
             

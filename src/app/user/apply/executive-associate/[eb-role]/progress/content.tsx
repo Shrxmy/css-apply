@@ -21,6 +21,7 @@ import PaymentDeadlineNotice from "@/components/PaymentDeadlineNotice";
 import { usePaymentDeadline } from "@/lib/usePaymentDeadline";
 
 import type React from "react";
+import { toast } from "sonner";
 
 export default function EAProgressPageContent() {
   const { communityEnabled, communityUrl, communityLabel } = useCommunityLink();
@@ -259,11 +260,11 @@ export default function EAProgressPageContent() {
       if (response.ok) {
         router.push("/user/apply/executive-associate");
       } else {
-        alert(result.error || "Failed to delete application");
+        toast.error(result.error || "Failed to delete application");
       }
     } catch (error) {
       console.error("Delete error:", error);
-      alert("Failed to delete application");
+      toast.error("Failed to delete application");
     } finally {
       setIsDeleting(false);
       setShowDeleteConfirm(false);

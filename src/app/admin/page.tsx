@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import MobileSidebar from "@/components/AdminMobileSB";
 import SidebarContent from "@/components/AdminSidebar";
@@ -21,9 +21,13 @@ import {
   ChevronUp,
 } from "lucide-react";
 import { toast } from "sonner";
-import FullCalendar from "@fullcalendar/react";
-import timeGridPlugin from "@fullcalendar/timegrid";
-import interactionPlugin from "@fullcalendar/interaction";
+import dynamic from "next/dynamic";
+
+// FullCalendar is heavy; load it only when the schedule renders.
+const AdminCalendar = dynamic(() => import("@/components/AdminCalendar"), {
+  ssr: false,
+  loading: () => <LoadingSpinner />,
+});
 
 const swrFetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -91,7 +95,6 @@ const Schedule = () => {
       .toISOString()
       .split("T")[0],
   });
-  const calendarRef = useRef<FullCalendar>(null);
 
   // Fetch recruitment cycle dates for calendar range
   useEffect(() => {
@@ -149,13 +152,12 @@ const Schedule = () => {
     };
   }, []);
 
-  // SWR for EB profile data - caches for 5 minutes
+  // SWR for EB profile data (global 5s dedupe; refreshes on tab focus)
   const { data: ebData, isLoading: isEbLoading } = useSWR(
     session?.user?.dbId ? `/api/admin/eb-profiles/${session.user.dbId}` : null,
     swrFetcher,
     {
       revalidateOnFocus: true,
-      dedupingInterval: 0,
     },
   );
 
@@ -183,7 +185,6 @@ const Schedule = () => {
     swrFetcher,
     {
       revalidateOnFocus: true,
-      dedupingInterval: 0,
     },
   );
 
@@ -199,7 +200,6 @@ const Schedule = () => {
     swrFetcher,
     {
       revalidateOnFocus: true,
-      dedupingInterval: 0,
     },
   );
 
@@ -727,9 +727,7 @@ const Schedule = () => {
                       margin-top: 0px !important;
                     }
                   `}</style>
-                  <FullCalendar
-                    ref={calendarRef}
-                    plugins={[timeGridPlugin, interactionPlugin]}
+                  <AdminCalendar
                     initialView="timeGridWeek"
                     headerToolbar={{
                       left: "prev,next",
@@ -841,6 +839,8 @@ const Schedule = () => {
                                     prev.filter((s) => s.id !== slot.id),
                                   )
                                 }
+                                type="button"
+                                aria-label="Remove this unavailable time slot"
                                 className="ml-1 hover:bg-[#0f3a6b] rounded-full p-0.5 md:p-1 transition-colors flex-shrink-0"
                               >
                                 <X className="w-2.5 h-2.5 md:w-3 md:h-3" />

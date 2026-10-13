@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -86,8 +86,15 @@ export async function GET(request: NextRequest) {
         }
       : null;
 
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "10");
+    const page = Math.min(
+      Math.max(parseInt(searchParams.get("page") || "1") || 1, 1),
+      100_000,
+    );
+    // Super-admin overview requests up to 1000 rows at once.
+    const limit = Math.min(
+      Math.max(parseInt(searchParams.get("limit") || "10") || 10, 1),
+      1000,
+    );
     const skip = (page - 1) * limit;
 
     const activeCycle = await prisma.recruitmentCycle.findFirst({
@@ -646,27 +653,31 @@ export async function PUT(request: NextRequest) {
           };
         });
 
-        // Send acceptance email
-        if (
-          updatedApplication?.user?.email &&
-          updatedApplication?.user?.name &&
-          updatedApplication?.user?.id
-        ) {
-          try {
-            const emailTemplate = emailTemplates.memberAccepted(
-              updatedApplication.user.name,
-              updatedApplication.user.id,
-            );
-            await sendEmail(
-              updatedApplication.user.email,
-              emailTemplate.subject,
-              emailTemplate.html,
-            );
-          } catch (emailError) {
-            applicationsLogger.error("acceptance email failed", emailError);
-            // Don't fail the request if email fails
+        // Email after the response so admin actions are not slowed by Brevo.
+        const emailApplication = updatedApplication;
+        after(async () => {
+          // Send acceptance email
+          if (
+            emailApplication?.user?.email &&
+            emailApplication?.user?.name &&
+            emailApplication?.user?.id
+          ) {
+            try {
+              const emailTemplate = emailTemplates.memberAccepted(
+                emailApplication.user.name,
+                emailApplication.user.id,
+              );
+              await sendEmail(
+                emailApplication.user.email,
+                emailTemplate.subject,
+                emailTemplate.html,
+              );
+            } catch (emailError) {
+              applicationsLogger.error("acceptance email failed", emailError);
+              // Don't fail the request if email fails
+            }
           }
-        }
+        });
       } else if (action === "reject") {
         updatedApplication = await prisma.memberApplication.update({
           where: { id: applicationId },
@@ -742,106 +753,110 @@ export async function PUT(request: NextRequest) {
         };
       });
 
-      // Send appropriate email based on action
-      if (updatedApplication?.user?.email && updatedApplication?.user?.name) {
-        try {
-          if (
-            action === "evaluate" &&
-            updatedApplication?.firstOptionCommittee
-          ) {
-            const emailTemplate = emailTemplates.committeeEvaluating(
-              updatedApplication.user.name,
-              updatedApplication.firstOptionCommittee,
-            );
-            await sendEmail(
-              updatedApplication.user.email,
-              emailTemplate.subject,
-              emailTemplate.html,
-            );
-          } else if (
-            action === "accept" &&
-            updatedApplication?.user?.id &&
-            updatedApplication?.firstOptionCommittee
-          ) {
-            const emailTemplate = emailTemplates.committeeAccepted(
-              updatedApplication.user.name,
-              updatedApplication.user.id,
-              updatedApplication.firstOptionCommittee,
-            );
-            await sendEmail(
-              updatedApplication.user.email,
-              emailTemplate.subject,
-              emailTemplate.html,
-            );
-          } else if (
-            action === "reject" &&
-            updatedApplication?.firstOptionCommittee
-          ) {
-            const emailTemplate = emailTemplates.committeeRejected(
-              updatedApplication.user.name,
-              updatedApplication.firstOptionCommittee,
-            );
-            await sendEmail(
-              updatedApplication.user.email,
-              emailTemplate.subject,
-              emailTemplate.html,
-            );
-          } else if (
-            action === "redirect" &&
-            updatedApplication?.user?.id &&
-            redirection
-          ) {
-            // Check if redirecting to member
-            if (redirection === "member") {
-              const emailTemplate = emailTemplates.committeeRedirectedToMember(
-                updatedApplication.user.name,
-                updatedApplication.user.id,
-                updatedApplication.firstOptionCommittee || "Original Committee",
+      // Email after the response so admin actions are not slowed by Brevo.
+      const emailApplication = updatedApplication;
+      after(async () => {
+        // Send appropriate email based on action
+        if (emailApplication?.user?.email && emailApplication?.user?.name) {
+          try {
+            if (
+              action === "evaluate" &&
+              emailApplication?.firstOptionCommittee
+            ) {
+              const emailTemplate = emailTemplates.committeeEvaluating(
+                emailApplication.user.name,
+                emailApplication.firstOptionCommittee,
               );
               await sendEmail(
-                updatedApplication.user.email,
+                emailApplication.user.email,
                 emailTemplate.subject,
                 emailTemplate.html,
               );
-            } else {
-              // Check if redirecting to an EA role
-              const { roles } = await import("@/data/ebRoles");
-              const eaRole = roles.find((r) => r.id === redirection);
-
-              if (eaRole) {
-                const emailTemplate = emailTemplates.committeeRedirected(
-                  updatedApplication.user.name,
-                  updatedApplication.user.id,
-                  updatedApplication.firstOptionCommittee ||
-                    "Original Committee",
-                  eaRole.title,
+            } else if (
+              action === "accept" &&
+              emailApplication?.user?.id &&
+              emailApplication?.firstOptionCommittee
+            ) {
+              const emailTemplate = emailTemplates.committeeAccepted(
+                emailApplication.user.name,
+                emailApplication.user.id,
+                emailApplication.firstOptionCommittee,
+              );
+              await sendEmail(
+                emailApplication.user.email,
+                emailTemplate.subject,
+                emailTemplate.html,
+              );
+            } else if (
+              action === "reject" &&
+              emailApplication?.firstOptionCommittee
+            ) {
+              const emailTemplate = emailTemplates.committeeRejected(
+                emailApplication.user.name,
+                emailApplication.firstOptionCommittee,
+              );
+              await sendEmail(
+                emailApplication.user.email,
+                emailTemplate.subject,
+                emailTemplate.html,
+              );
+            } else if (
+              action === "redirect" &&
+              emailApplication?.user?.id &&
+              redirection
+            ) {
+              // Check if redirecting to member
+              if (redirection === "member") {
+                const emailTemplate = emailTemplates.committeeRedirectedToMember(
+                  emailApplication.user.name,
+                  emailApplication.user.id,
+                  emailApplication.firstOptionCommittee || "Original Committee",
                 );
                 await sendEmail(
-                  updatedApplication.user.email,
+                  emailApplication.user.email,
                   emailTemplate.subject,
                   emailTemplate.html,
                 );
               } else {
-                // Regular committee redirection (to another committee)
-                const emailTemplate = emailTemplates.committeeRedirected(
-                  updatedApplication.user.name,
-                  updatedApplication.user.id,
-                  updatedApplication.firstOptionCommittee ||
-                    "Original Committee",
-                  redirection,
-                );
-                await sendEmail(
-                  updatedApplication.user.email,
-                  emailTemplate.subject,
-                  emailTemplate.html,
-                );
+                // Check if redirecting to an EA role
+                const { roles } = await import("@/data/ebRoles");
+                const eaRole = roles.find((r) => r.id === redirection);
+
+                if (eaRole) {
+                  const emailTemplate = emailTemplates.committeeRedirected(
+                    emailApplication.user.name,
+                    emailApplication.user.id,
+                    emailApplication.firstOptionCommittee ||
+                      "Original Committee",
+                    eaRole.title,
+                  );
+                  await sendEmail(
+                    emailApplication.user.email,
+                    emailTemplate.subject,
+                    emailTemplate.html,
+                  );
+                } else {
+                  // Regular committee redirection (to another committee)
+                  const emailTemplate = emailTemplates.committeeRedirected(
+                    emailApplication.user.name,
+                    emailApplication.user.id,
+                    emailApplication.firstOptionCommittee ||
+                      "Original Committee",
+                    redirection,
+                  );
+                  await sendEmail(
+                    emailApplication.user.email,
+                    emailTemplate.subject,
+                    emailTemplate.html,
+                  );
+                }
               }
             }
+          } catch (emailError) {
+            applicationsLogger.error("application email failed", emailError);
           }
-        } catch (emailError) {
-          applicationsLogger.error("application email failed", emailError);
         }
-      }
+      });
     } else if (type === "executive-associate") {
       // First get the current application data to check if it was redirected
       const currentApplication =
@@ -951,96 +966,100 @@ export async function PUT(request: NextRequest) {
         };
       });
 
-      // Send appropriate email based on action
-      if (updatedApplication?.user?.email && updatedApplication?.user?.name) {
-        try {
-          if (action === "evaluate" && updatedApplication?.ebRole) {
-            const emailTemplate = emailTemplates.executiveAssistantEvaluating(
-              updatedApplication.user.name,
-              updatedApplication.ebRole,
-            );
-            await sendEmail(
-              updatedApplication.user.email,
-              emailTemplate.subject,
-              emailTemplate.html,
-            );
-          } else if (
-            action === "accept" &&
-            updatedApplication?.user?.id &&
-            updatedApplication?.ebRole
-          ) {
-            const emailTemplate = emailTemplates.executiveAssistantAccepted(
-              updatedApplication.user.name,
-              updatedApplication.user.id,
-              updatedApplication.ebRole,
-            );
-            await sendEmail(
-              updatedApplication.user.email,
-              emailTemplate.subject,
-              emailTemplate.html,
-            );
-          } else if (action === "reject" && updatedApplication?.ebRole) {
-            const emailTemplate = emailTemplates.executiveAssistantRejected(
-              updatedApplication.user.name,
-              updatedApplication.ebRole,
-            );
-            await sendEmail(
-              updatedApplication.user.email,
-              emailTemplate.subject,
-              emailTemplate.html,
-            );
-          } else if (
-            action === "redirect" &&
-            updatedApplication?.user?.id &&
-            redirection
-          ) {
-            // Check if redirecting to member
-            if (redirection === "member") {
-              const emailTemplate =
-                emailTemplates.executiveAssistantRedirectedToMember(
-                  updatedApplication.user.name,
-                  updatedApplication.user.id,
-                  updatedApplication.firstOptionEb || "Executive Associate",
+      // Email after the response so admin actions are not slowed by Brevo.
+      const emailApplication = updatedApplication;
+      after(async () => {
+        // Send appropriate email based on action
+        if (emailApplication?.user?.email && emailApplication?.user?.name) {
+          try {
+            if (action === "evaluate" && emailApplication?.ebRole) {
+              const emailTemplate = emailTemplates.executiveAssistantEvaluating(
+                emailApplication.user.name,
+                emailApplication.ebRole,
+              );
+              await sendEmail(
+                emailApplication.user.email,
+                emailTemplate.subject,
+                emailTemplate.html,
+              );
+            } else if (
+              action === "accept" &&
+              emailApplication?.user?.id &&
+              emailApplication?.ebRole
+            ) {
+              const emailTemplate = emailTemplates.executiveAssistantAccepted(
+                emailApplication.user.name,
+                emailApplication.user.id,
+                emailApplication.ebRole,
+              );
+              await sendEmail(
+                emailApplication.user.email,
+                emailTemplate.subject,
+                emailTemplate.html,
+              );
+            } else if (action === "reject" && emailApplication?.ebRole) {
+              const emailTemplate = emailTemplates.executiveAssistantRejected(
+                emailApplication.user.name,
+                emailApplication.ebRole,
+              );
+              await sendEmail(
+                emailApplication.user.email,
+                emailTemplate.subject,
+                emailTemplate.html,
+              );
+            } else if (
+              action === "redirect" &&
+              emailApplication?.user?.id &&
+              redirection
+            ) {
+              // Check if redirecting to member
+              if (redirection === "member") {
+                const emailTemplate =
+                  emailTemplates.executiveAssistantRedirectedToMember(
+                    emailApplication.user.name,
+                    emailApplication.user.id,
+                    emailApplication.firstOptionEb || "Executive Associate",
+                  );
+                await sendEmail(
+                  emailApplication.user.email,
+                  emailTemplate.subject,
+                  emailTemplate.html,
                 );
-              await sendEmail(
-                updatedApplication.user.email,
-                emailTemplate.subject,
-                emailTemplate.html,
-              );
-            } else if (redirection.startsWith("committee-")) {
-              const committeeId = redirection.replace("committee-", "");
-              const emailTemplate =
-                emailTemplates.executiveAssistantRedirectedToCommittee(
-                  updatedApplication.user.name,
-                  updatedApplication.user.id,
-                  updatedApplication.firstOptionEb || "Executive Associate",
-                  committeeId,
+              } else if (redirection.startsWith("committee-")) {
+                const committeeId = redirection.replace("committee-", "");
+                const emailTemplate =
+                  emailTemplates.executiveAssistantRedirectedToCommittee(
+                    emailApplication.user.name,
+                    emailApplication.user.id,
+                    emailApplication.firstOptionEb || "Executive Associate",
+                    committeeId,
+                  );
+                await sendEmail(
+                  emailApplication.user.email,
+                  emailTemplate.subject,
+                  emailTemplate.html,
                 );
-              await sendEmail(
-                updatedApplication.user.email,
-                emailTemplate.subject,
-                emailTemplate.html,
-              );
-            } else {
-              // Regular EA to EA redirection
-              const emailTemplate = emailTemplates.executiveAssistantRedirected(
-                updatedApplication.user.name,
-                updatedApplication.user.id,
-                updatedApplication.firstOptionEb || "Executive Associate",
-                redirection,
-              );
-              await sendEmail(
-                updatedApplication.user.email,
-                emailTemplate.subject,
-                emailTemplate.html,
-              );
+              } else {
+                // Regular EA to EA redirection
+                const emailTemplate = emailTemplates.executiveAssistantRedirected(
+                  emailApplication.user.name,
+                  emailApplication.user.id,
+                  emailApplication.firstOptionEb || "Executive Associate",
+                  redirection,
+                );
+                await sendEmail(
+                  emailApplication.user.email,
+                  emailTemplate.subject,
+                  emailTemplate.html,
+                );
+              }
             }
+          } catch (emailError) {
+            applicationsLogger.error("application email failed", emailError);
+            // Don't fail the request if email fails
           }
-        } catch (emailError) {
-          applicationsLogger.error("application email failed", emailError);
-          // Don't fail the request if email fails
         }
-      }
+      });
     } else {
       return NextResponse.json(
         { error: "Invalid application type" },

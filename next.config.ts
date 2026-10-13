@@ -5,6 +5,27 @@ const nextConfig: NextConfig = {
   // Running `next build` must not invalidate an active `next dev` server.
   distDir: process.env.NODE_ENV === "development" ? ".next-dev" : ".next",
   poweredByHeader: false,
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=63072000; includeSubDomains",
+          },
+          // Camera stays allowed for the attendance QR scanner.
+          {
+            key: "Permissions-Policy",
+            value: "camera=(self), microphone=(), geolocation=()",
+          },
+        ],
+      },
+    ];
+  },
   // Keep recently visited routes compiled during local development so moving
   // between admin/application pages does not repeatedly trigger cold rebuilds.
   onDemandEntries: {

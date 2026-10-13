@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth/next";
 import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
+import { isOwnApplicationFile } from "@/lib/application-storage";
 import { getPositionTitle } from "@/lib/eb-mapping";
 import { committeeApplicationSchema } from "@/lib/schemas";
 import { isMembershipExpired } from "@/lib/membership-expiration";
@@ -54,7 +55,13 @@ export async function POST(request: NextRequest) {
     const portfolioPath = data.portfolio
       ? normalizeStoragePath(data.portfolio)
       : null;
-    if (!cvPath || (data.portfolio && !portfolioPath)) {
+    if (
+      !cvPath ||
+      !isOwnApplicationFile(cvPath, data.studentNumber) ||
+      (data.portfolio &&
+        (!portfolioPath ||
+          !isOwnApplicationFile(portfolioPath, data.studentNumber)))
+    ) {
       return NextResponse.json(
         { error: "Invalid uploaded file reference" },
         { status: 400 },
@@ -337,7 +344,10 @@ export async function DELETE() {
     const paths = [
       normalizeStoragePath(application.supabaseFilePath),
       normalizeStoragePath(application.portfolioLink),
-    ].filter((path): path is string => Boolean(path));
+    ].filter(
+      (path): path is string =>
+        !!path && isOwnApplicationFile(path, application.studentNumber),
+    );
     if (paths.length > 0) {
       const { error: storageError } = await supabase.storage
         .from("committee-applications")

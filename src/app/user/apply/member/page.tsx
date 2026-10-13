@@ -222,7 +222,7 @@ export default function MemberApplication() {
     <div className="min-h-screen md:bg-[rgb(243,243,253)] md:bg-[url('/assets/css-apply-static-images/assets/pictures/background.webp')] flex flex-col justify-between bg-cover bg-repeat">
       <Header />
 
-      <section className="flex flex-col justify-between items-center px-20 py-10 lg:px-50 lg:py-20">
+      <section className="flex flex-col justify-between items-center px-4 sm:px-8 md:px-20 py-10 lg:px-50 lg:py-20">
         <form
           onSubmit={handleSubmit}
           aria-busy={isProcessing}

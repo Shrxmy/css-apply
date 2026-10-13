@@ -21,7 +21,7 @@ export default function SuccessPageContent() {
   if (!selectedCommittee) {
     return (
       <section className="min-h-screen bg-[rgb(243,243,253)] bg-[url('/assets/css-apply-static-images/assets/pictures/background.webp')] bg-cover bg-no-repeat">
-        <div className="flex flex-col justify-center items-center px-50 py-20">
+        <div className="flex flex-col justify-center items-center px-4 sm:px-8 lg:px-50 py-20">
           <div className="text-center">
             <h1 className="text-2xl font-inter font-bold text-black mb-4">
               Committee not found

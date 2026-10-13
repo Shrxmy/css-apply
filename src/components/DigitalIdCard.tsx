@@ -110,8 +110,13 @@ export default function DigitalIdCard({
     showText: true,
   });
 
-  const handleCopyId = () => {
-    navigator.clipboard.writeText(memberId);
+  const handleCopyId = async () => {
+    try {
+      await navigator.clipboard.writeText(memberId);
+    } catch {
+      toast.error("Couldn't copy the Member ID. Please copy it manually.");
+      return;
+    }
     setCopied(true);
     toast.success("Member ID copied to clipboard!");
     setTimeout(() => setCopied(false), 2000);
@@ -363,6 +368,17 @@ export default function DigitalIdCard({
         <div
           id="digital-id-flip-inner"
           onClick={handleCardPress}
+          onKeyDown={(event) => {
+            if (showBackPreview || event.target !== event.currentTarget) return;
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              setIsFlipped((value) => !value);
+            }
+          }}
+          role={showBackPreview ? undefined : "button"}
+          tabIndex={showBackPreview ? undefined : 0}
+          aria-label={showBackPreview ? undefined : "Flip the digital ID"}
+          aria-pressed={showBackPreview ? undefined : isFlipped}
           title={showBackPreview ? undefined : "Tap to flip the digital ID"}
           className={
             showBackPreview

@@ -10,6 +10,7 @@ import Footer from "@/components/Footer";
 import { useEbRoles } from "@/lib/useEbRoles";
 import { useApplicationsOpen } from "@/lib/useApplicationsOpen";
 import { useInterviewAvailability } from "@/lib/useInterviewAvailability";
+import { toast } from "sonner";
 
 export default function SchedulePageContent() {
   const router = useRouter();
@@ -70,7 +71,7 @@ export default function SchedulePageContent() {
       );
 
       if (!selectedSlotData) {
-        alert("Selected slot not found");
+        toast.error("Selected slot not found");
         return;
       }
 
@@ -142,18 +143,18 @@ export default function SchedulePageContent() {
             "INTERVIEWER_UNAVAILABLE",
           ].includes(result.code);
           if (response.status === 409 && availabilityChanged) {
-            alert(
+            toast.error(
               "This time slot is no longer available. Please select another time slot.",
             );
             setSelectedSlot(null);
             await refreshAvailability();
           } else {
-            alert(`Error: ${result.error}`);
+            toast.error(`Error: ${result.error}`);
           }
         }
       } catch (error) {
         console.error("Error scheduling interview:", error);
-        alert("Failed to schedule interview. Please try again.");
+        toast.error("Failed to schedule interview. Please try again.");
       } finally {
         setIsSubmitting(false);
       }
@@ -170,7 +171,7 @@ export default function SchedulePageContent() {
   if (!selectedEB) {
     return (
       <section className="min-h-screen bg-[rgb(243,243,253)]">
-        <div className="flex flex-col justify-center items-center px-50 py-20">
+        <div className="flex flex-col justify-center items-center px-4 sm:px-8 lg:px-50 py-20">
           <div className="text-center">
             <h1 className="text-2xl font-inter font-bold text-black mb-4">
               Executive Board role not found
