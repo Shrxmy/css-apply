@@ -75,6 +75,7 @@ model User {
   attendanceScanAttempts         AttendanceScanAttempt[]
   attendanceGuestsImported       AttendanceGuest[]               @relation("AttendanceGuestImporter")
   attendanceAuditLogs            AttendanceAuditLog[]            @relation("AttendanceAuditActor")
+  techDevExamAttempts            TechDevExamAttempt[]
 
   @@index([role])
 }
@@ -136,7 +137,6 @@ model CommunityJoinConfirmation {
   @@index([recruitmentCycleId, lastReminderSentAt])
 }
 
-
 model MembershipCounter {
   id                 String           @id @default(cuid())
   recruitmentCycleId String           @unique
@@ -183,17 +183,17 @@ model ExecutiveAssociateApplication {
 }
 
 model CommitteeApplication {
-  id                     String            @id @default(cuid())
+  id                     String              @id @default(cuid())
   studentNumber          String
-  user                   User              @relation(fields: [studentNumber], references: [studentNumber], onDelete: Cascade)
+  user                   User                @relation(fields: [studentNumber], references: [studentNumber], onDelete: Cascade)
   recruitmentCycleId     String?
-  recruitmentCycle       RecruitmentCycle? @relation(fields: [recruitmentCycleId], references: [id], onDelete: SetNull)
+  recruitmentCycle       RecruitmentCycle?   @relation(fields: [recruitmentCycleId], references: [id], onDelete: SetNull)
   firstOptionCommittee   String
   secondOptionCommittee  String
   portfolioLink          String?
   cv                     String
   paymentProof           String?
-  paymentStatus          String            @default("not_submitted")
+  paymentStatus          String              @default("not_submitted")
   paymentReviewedAt      DateTime?
   paymentReviewedBy      String?
   paymentRejectionReason String?
@@ -201,13 +201,14 @@ model CommitteeApplication {
   interviewSlotDay       String?
   interviewSlotTimeStart String?
   interviewSlotTimeEnd   String?
-  hasFinishedInterview   Boolean           @default(false)
+  hasFinishedInterview   Boolean             @default(false)
   interviewBy            String?
   status                 String? // passed, failed, redirected
   redirection            String?
-  hasAccepted            Boolean           @default(false)
-  createdAt              DateTime          @default(now())
-  updatedAt              DateTime          @updatedAt
+  hasAccepted            Boolean             @default(false)
+  techDevExamAttempt     TechDevExamAttempt?
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
 
   @@unique([studentNumber, recruitmentCycleId])
   @@index([status])
@@ -280,8 +281,37 @@ model RecruitmentCycle {
   membershipCounters             MembershipCounter[]
   attendanceEvents               AttendanceEvent[]
   attendanceGuests               AttendanceGuest[]
+  techDevExamAttempts            TechDevExamAttempt[]
 
   @@index([isActive])
+}
+
+model TechDevExamAttempt {
+  id                    String               @id @default(cuid())
+  applicationId         String               @unique
+  userId                String
+  recruitmentCycleId    String
+  version               String
+  questionOrder         Json
+  answers               Json                 @default("{}")
+  status                String               @default("IN_PROGRESS")
+  startedAt             DateTime             @default(now())
+  expiresAt             DateTime
+  submittedAt           DateTime?
+  focusLossCount        Int                  @default(0)
+  totalAwayMilliseconds Int                  @default(0)
+  lastHeartbeatAt       DateTime?
+  manualScores          Json                 @default("{}") // written question id -> reviewer points
+  reviewedAt            DateTime?
+  reviewedById          String?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  application           CommitteeApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  user                  User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recruitmentCycle      RecruitmentCycle     @relation(fields: [recruitmentCycleId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([recruitmentCycleId, status])
 }
 
 model AttendanceGuest {
@@ -301,6 +331,7 @@ model AttendanceGuest {
   @@unique([recruitmentCycleId, studentNumber])
   @@index([recruitmentCycleId, isActive])
   @@index([studentNumber])
+  @@index([importedById])
 }
 
 model AttendanceEvent {
@@ -325,6 +356,7 @@ model AttendanceEvent {
 
   @@index([recruitmentCycleId])
   @@index([status, checkInOpensAt, checkInClosesAt])
+  @@index([createdById])
   @@index([startsAt])
 }
 
@@ -351,6 +383,8 @@ model AttendanceEventRoster {
   @@unique([eventId, memberId])
   @@index([eventId, isActive])
   @@index([memberId])
+  @@index([userId])
+  @@index([guestId])
 }
 
 model EventAttendance {
@@ -387,6 +421,8 @@ model AttendanceScanAttempt {
 
   @@unique([eventId, clientScanId])
   @@index([eventId, attemptedAt])
+  @@index([rosterEntryId])
+  @@index([attendanceId])
   @@index([operatorId])
   @@index([outcome])
 }

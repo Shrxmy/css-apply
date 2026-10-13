@@ -37,8 +37,8 @@ CSSApply is a comprehensive recruitment management system designed specifically 
 
 ### Prerequisites
 
-- **Node.js** 18.0 or later
-- **npm**, **yarn**, **pnpm**, or **bun**
+- **Node.js** 20.19 or later (required by Prisma 7 and sharp)
+- **pnpm** (the only supported package manager; `pnpm-lock.yaml` is the lockfile)
 - **PostgreSQL** database
 - **Supabase** account (for file storage)
 
@@ -54,10 +54,6 @@ CSSApply is a comprehensive recruitment management system designed specifically 
 2. **Install dependencies**
 
    ```bash
-   npm install
-   # or
-   yarn install
-   # or
    pnpm install
    ```
 
@@ -92,17 +88,15 @@ CSSApply is a comprehensive recruitment management system designed specifically 
 4. **Database Setup**
 
    ```bash
-   npx prisma generate
-   npx prisma db push
+   pnpm exec prisma generate
+   pnpm exec prisma validate
    ```
+
+   **Existing database warning:** migration history is incomplete. Do not run `migrate deploy`, `migrate reset`, or blanket `db push` against the deployed database. See [TechDev rollout and migration recovery](docs/TECHDEV_EXAM_ROLLOUT.md) before making schema changes.
 
 5. **Start Development Server**
 
    ```bash
-   npm run dev
-   # or
-   yarn dev
-   # or
    pnpm dev
    ```
 
@@ -136,16 +130,17 @@ css-apply/
 
 ## Available Scripts
 
-| Command         | Description                             |
-| --------------- | --------------------------------------- |
-| `npm run dev`   | Start development server with Turbopack |
-| `npm run build` | Build the application for production    |
-| `npm run start` | Start the production server             |
-| `npm run lint`  | Run ESLint for code quality             |
-| `npm run lint:fix` | Run ESLint with auto-fix             |
-| `npx prisma generate` | Regenerate Prisma client         |
-| `npx prisma db push` | Push schema changes to database   |
-| `npx prisma studio` | Open Prisma Studio GUI             |
+| Command                                     | Description                               |
+| ------------------------------------------- | ----------------------------------------- |
+| `pnpm dev`                                  | Start development server with Turbopack   |
+| `pnpm build`                                | Build the application for production      |
+| `pnpm start`                                | Start the production server               |
+| `pnpm lint`                                 | Run ESLint for code quality               |
+| `pnpm lint:fix`                             | Run ESLint with auto-fix                  |
+| `pnpm exec prisma generate`                 | Regenerate Prisma client                  |
+| `pnpm exec prisma validate`                 | Validate the schema without changing data |
+| `pnpm exec prisma studio`                   | Open Prisma Studio GUI                    |
+| `node --test tests/techdev-exam-*.test.cjs` | Run offline TechDev regression tests      |
 
 ---
 
@@ -184,6 +179,7 @@ The Super Admin dashboard provides comprehensive system management:
 ### EB Profile Management
 
 Super Admins can assign and manage Executive Board profiles including:
+
 - Position (President, Secretary, Treasurer, etc.)
 - Committees assigned
 - Meeting links for interviews
@@ -275,8 +271,8 @@ CSSApply uses several techniques to ensure fast performance:
 
 ### Manual Deployment
 
-1. Build the application: `npm run build`
-2. Start the production server: `npm run start`
+1. Build the application: `pnpm build`
+2. Start the production server: `pnpm start`
 3. Configure reverse proxy (nginx/Apache)
 4. Set up SSL certificates
 
@@ -324,6 +320,6 @@ We welcome contributions to CSSApply! Here's how you can help:
 
 **Passionately designed & developed by CSS 👩‍💻👩‍💻**
 
-[![CSS Logo](https://odjmlznlgvuslhceobtz.supabase.co/storage/v1/object/public/css-apply-static-images/assets/logos/Logo_CSS.svg)](https://css.ust.edu.ph)
+[![CSS Logo](public/assets/css-apply-static-images/assets/logos/Logo_CSS.webp)](https://css.ust.edu.ph)
 
 </div>

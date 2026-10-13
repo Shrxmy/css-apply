@@ -29,6 +29,9 @@ const SidebarContent = ({ activePage }: SidebarContentProps) => {
   );
   const currentPosition =
     currentEbData?.ebProfile?.position ?? session?.user?.ebProfile?.position;
+  const canReviewTechDevExam =
+    isSuperAdmin ||
+    (currentEbData?.ebProfile?.committees ?? []).includes("technology");
   const canReviewPayments =
     isSuperAdmin ||
     PAYMENT_REVIEW_POSITIONS.has(currentPosition?.trim().toLowerCase() ?? "");
@@ -379,6 +382,48 @@ const SidebarContent = ({ activePage }: SidebarContentProps) => {
                 />
                 <span className="text-sm text-gray-700 transition-colors duration-300">
                   Receipt Review
+                </span>
+              </Link>
+            ))}
+
+          {/* TechDev exam results - TechDev EB members and Super Admin */}
+          {canReviewTechDevExam &&
+            (activePage === "techdev-exam" ? (
+              <div
+                className="flex items-center px-4 py-3 text-gray-600 border border-gray-300 rounded-lg transition-all duration-300 transform hover:scale-[1.02] hover:shadow-md"
+                style={{ backgroundColor: "#fefefe" }}
+              >
+                <div
+                  className="w-5 h-5 mr-3 text-[#164e96] bg-current transition-colors duration-300"
+                  style={{
+                    maskImage: "url(/icons/check.svg)",
+                    WebkitMaskImage: "url(/icons/check.svg)",
+                    maskSize: "contain",
+                    maskRepeat: "no-repeat",
+                    maskPosition: "center",
+                  }}
+                />
+                <span className="text-sm text-gray-700 transition-colors duration-300">
+                  TechDev Exam
+                </span>
+              </div>
+            ) : (
+              <Link
+                href="/admin/techdev-exam"
+                className="group flex items-center px-4 py-3 text-gray-600 hover:bg-blue-50 rounded-lg transition-all duration-300 transform hover:scale-[1.02] hover:shadow-md"
+              >
+                <div
+                  className="w-5 h-5 mr-3 text-gray-500 group-hover:text-[#164e96] bg-current transition-all duration-300"
+                  style={{
+                    maskImage: "url(/icons/check.svg)",
+                    WebkitMaskImage: "url(/icons/check.svg)",
+                    maskSize: "contain",
+                    maskRepeat: "no-repeat",
+                    maskPosition: "center",
+                  }}
+                />
+                <span className="text-sm text-gray-700 transition-colors duration-300">
+                  TechDev Exam
                 </span>
               </Link>
             ))}

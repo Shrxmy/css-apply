@@ -14,9 +14,17 @@ import AdminContentLoading from "@/components/AdminContentLoading";
 import FormProcessingOverlay from "@/components/FormProcessingOverlay";
 import MobileSidebar from "@/components/AdminMobileSB";
 import SidebarContent from "@/components/AdminSidebar";
-import DigitalIdCard from "@/components/DigitalIdCard";
-import PaymentDeadlineManager from "@/components/admin/PaymentDeadlineManager";
-import CommunityJoinManager from "@/components/admin/CommunityJoinManager";
+import dynamic from "next/dynamic";
+import { TECHDEV_EXAM_QUESTIONS } from "@/data/techdev-exam";
+
+// Tab-only components load when their tab opens.
+const DigitalIdCard = dynamic(() => import("@/components/DigitalIdCard"));
+const PaymentDeadlineManager = dynamic(
+  () => import("@/components/admin/PaymentDeadlineManager"),
+);
+const CommunityJoinManager = dynamic(
+  () => import("@/components/admin/CommunityJoinManager"),
+);
 import {
   EXCLUSIVE_PERK_IMAGE_TYPES,
   MAX_EXCLUSIVE_PERK_IMAGE_SIZE,
@@ -81,6 +89,10 @@ interface PendingChange {
   oldRole: string;
   newRole: string;
 }
+
+type UserFilterKey = "role" | "memberStatus" | "position" | "committee";
+
+type UserFilters = Record<UserFilterKey, string>;
 
 interface RecruitmentCycleForm {
   id?: string;
@@ -296,6 +308,52 @@ function Tag({ children }: { children: React.ReactNode }) {
   );
 }
 
+function UserFilterHeader({
+  label,
+  filterKey,
+  activeFilter,
+  filters,
+  options,
+  onToggle,
+  onChange,
+}: {
+  label: string;
+  filterKey: UserFilterKey;
+  activeFilter: string | null;
+  filters: UserFilters;
+  options: Array<{ value: string; label: string }>;
+  onToggle: (key: UserFilterKey) => void;
+  onChange: (key: UserFilterKey, value: string) => void;
+}) {
+  return (
+    <th className="px-4 py-2 text-left text-[10px] font-semibold uppercase tracking-widest text-[#134687]/50 font-mono">
+      <button
+        type="button"
+        onClick={() => onToggle(filterKey)}
+        className={`inline-flex items-center gap-1 rounded px-1 py-1 transition-colors hover:bg-white hover:text-[#044FAF] ${filters[filterKey] ? "text-[#044FAF]" : ""}`}
+        aria-expanded={activeFilter === filterKey}
+      >
+        {label}
+        <span aria-hidden="true">⌄</span>
+      </button>
+      {activeFilter === filterKey && (
+        <select
+          value={filters[filterKey]}
+          onChange={(event) => onChange(filterKey, event.target.value)}
+          className="mt-1 block max-w-full rounded border border-[#005FD9]/20 bg-white px-1.5 py-1 text-[10px] font-sans font-medium normal-case tracking-normal text-[#134687] outline-none focus:border-[#044FAF]"
+          aria-label={`Filter ${label}`}
+        >
+          {options.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      )}
+    </th>
+  );
+}
+
 function UserAvatar({
   name,
   image,
@@ -328,7 +386,173 @@ function UserAvatar({
   );
 }
 
-// ─── Main Page ───────────────────────────────────────────────────────────────
+// ─── TechDev examination preview ────────────────────────────────────────────
+
+// Preview uses the same public question bank as the applicant exam.
+const TECHDEV_PREVIEW_QUESTIONS = TECHDEV_EXAM_QUESTIONS;
+
+function TechDevExamTab() {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const question = TECHDEV_PREVIEW_QUESTIONS[currentIndex];
+  const answer = answers[question.id] || "";
+  const answeredCount = TECHDEV_PREVIEW_QUESTIONS.filter((item) =>
+    Boolean(answers[item.id]?.trim()),
+  ).length;
+
+  const setAnswer = (value: string) => {
+    setAnswers((previous) => ({ ...previous, [question.id]: value }));
+  };
+
+  return (
+    <div className="space-y-5">
+      <div className="rounded-2xl border border-[#005FD9]/15 bg-[#F3F8FF] p-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-[#044FAF] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white">
+                Preview only
+              </span>
+              <span className="rounded-full border border-[#005FD9]/20 bg-white px-2.5 py-1 font-mono text-[10px] text-[#134687]/70">
+                Preview answers are not saved
+              </span>
+            </div>
+            <h2 className="font-poppins text-xl font-bold text-[#134687]">
+              TechDev Examination
+            </h2>
+            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-[#134687]/70">
+              This preview mirrors the applicant exam interface. Applicant
+              access, server-authoritative timing, autosave, and aggregate tab
+              activity tracking are now enabled; scoring remains for review only.
+            </p>
+          </div>
+          <div className="rounded-xl bg-white px-4 py-3 text-right shadow-sm">
+            <p className="font-mono text-[10px] uppercase tracking-wider text-[#134687]/50">
+              Suggested duration
+            </p>
+            <p className="font-poppins text-lg font-bold text-[#044FAF]">
+              45 minutes
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-[220px_minmax(0,1fr)]">
+        <aside className="rounded-2xl border border-[#005FD9]/10 bg-white p-4">
+          <div className="mb-4 flex items-center justify-between">
+            <p className="font-mono text-[10px] uppercase tracking-wider text-[#134687]/50">
+              Questions
+            </p>
+            <span className="font-mono text-xs text-[#044FAF]">
+              {answeredCount}/{TECHDEV_PREVIEW_QUESTIONS.length}
+            </span>
+          </div>
+          <div className="grid grid-cols-5 gap-2 lg:grid-cols-2">
+            {TECHDEV_PREVIEW_QUESTIONS.map((item, index) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setCurrentIndex(index)}
+                className={`rounded-lg border px-3 py-2 text-left text-xs font-semibold transition-colors ${
+                  currentIndex === index
+                    ? "border-[#044FAF] bg-[#044FAF] text-white"
+                    : answers[item.id]?.trim()
+                      ? "border-green-200 bg-green-50 text-green-700"
+                      : "border-[#005FD9]/15 text-[#134687] hover:bg-[#F3F8FF]"
+                }`}
+              >
+                {index + 1}. {item.section}
+              </button>
+            ))}
+          </div>
+        </aside>
+
+        <section className="rounded-2xl border border-[#005FD9]/10 bg-white p-5 sm:p-7">
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-2 border-b border-[#005FD9]/10 pb-4">
+            <div>
+              <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#044FAF]">
+                {question.section}
+              </span>
+              <p className="mt-1 font-poppins text-sm font-semibold text-[#134687]">
+                Question {currentIndex + 1} of{" "}
+                {TECHDEV_PREVIEW_QUESTIONS.length}
+              </p>
+            </div>
+            <span className="font-mono text-xs text-[#134687]/50">
+              Timer preview: 44:59
+            </span>
+          </div>
+
+          <h3 className="mb-5 text-base font-semibold leading-relaxed text-[#134687]">
+            {question.prompt}
+          </h3>
+
+          {question.code && (
+            <pre className="mb-5 overflow-x-auto rounded-xl bg-[#0B1E3B] p-4 font-mono text-xs leading-relaxed text-blue-100">
+              <code>{question.code}</code>
+            </pre>
+          )}
+
+          {question.kind === "choice" ? (
+            <div className="space-y-2.5">
+              {question.options?.map((option) => (
+                <label
+                  key={option}
+                  className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 text-sm transition-colors ${
+                    answer === option
+                      ? "border-[#044FAF] bg-[#F3F8FF] text-[#044FAF]"
+                      : "border-[#005FD9]/15 text-[#134687] hover:bg-[#F8FAFF]"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name={question.id}
+                    value={option}
+                    checked={answer === option}
+                    onChange={(event) => setAnswer(event.target.value)}
+                    className="mt-0.5 accent-[#044FAF]"
+                  />
+                  <span>{option}</span>
+                </label>
+              ))}
+            </div>
+          ) : (
+            <textarea
+              value={answer}
+              onChange={(event) => setAnswer(event.target.value)}
+              rows={8}
+              placeholder="Write your answer here..."
+              className="w-full rounded-xl border border-[#005FD9]/20 bg-[#FBFCFF] p-4 font-mono text-sm text-[#134687] outline-none focus:border-[#044FAF] focus:ring-2 focus:ring-[#044FAF]/10"
+            />
+          )}
+
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-[#005FD9]/10 pt-4">
+            <button
+              type="button"
+              onClick={() => setCurrentIndex((index) => Math.max(0, index - 1))}
+              disabled={currentIndex === 0}
+              className="rounded-lg border border-[#005FD9]/15 px-4 py-2 text-sm font-semibold text-[#134687] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Previous
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                setCurrentIndex((index) =>
+                  Math.min(TECHDEV_PREVIEW_QUESTIONS.length - 1, index + 1),
+                )
+              }
+              disabled={currentIndex === TECHDEV_PREVIEW_QUESTIONS.length - 1}
+              className="rounded-lg bg-[#134687] px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Next question
+            </button>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
 
 interface SuperAdminApplication {
   id: string;
@@ -550,7 +774,7 @@ function SuperAdminApplicationsTab() {
     </div>
     <div className="hidden min-w-0 overflow-hidden rounded-xl border border-[#005FD9]/10 bg-white md:block">
       <table className="w-full min-w-0 table-fixed text-left text-xs"><colgroup><col className="w-[24%]" /><col className="w-[18%]" /><col className="w-[10%]" /><col className="w-[16%]" /><col className="w-[12%]" /><col className="w-[20%]" /></colgroup><thead className="bg-[#134687] text-[10px] uppercase tracking-widest text-white/80"><tr><th className="px-4 py-3">Applicant</th><th className="px-4 py-3">Type / Position</th><th className="px-4 py-3 text-center">Status</th><th className="px-4 py-3 text-center">Interviewer</th><th className="px-4 py-3 text-center">Files</th><th className="px-4 py-3 text-center">Actions</th></tr></thead><tbody className="divide-y divide-[#005FD9]/10">
-        {loading ? <tr><td colSpan={6} className="px-4 py-10 text-center text-[#134687]/50">Loading applications...</td></tr> : pageApplications.map((application) => <tr key={`${application.type}:${application.id}`} className="align-middle hover:bg-[#F9FBFF]"><td className="min-w-0 break-all px-4 py-3"><div className="font-semibold text-[#134687]">{application.user.name}</div><div className="text-xs text-[#134687]/60">{application.user.email}</div><div className="font-mono text-xs text-[#134687]/50">{application.user.studentNumber}</div></td><td className="break-words px-4 py-3 text-[#134687]"><div>{labelFor(application)}</div>{redirectionFor(application.redirection) && <div className="mt-1 text-[11px] font-semibold text-[#044FAF]">Redirected to: {redirectionFor(application.redirection)}</div>}</td><td className="px-4 py-3 text-center"><span className="inline-flex rounded-full bg-[#E8F2FF] px-2.5 py-1 text-xs font-semibold text-[#044FAF]">{statusFor(application)}</span></td><td className="break-words px-4 py-3 text-center text-xs text-[#134687]/70"><div>{application.interviewBy || "Not assigned"}</div>{application.interviewSlotDay && application.interviewSlotTimeStart && <div className="mt-1 text-[11px] text-[#134687]/55">{application.interviewSlotDay} at {application.interviewSlotTimeStart}{application.interviewSlotTimeEnd ? ` - ${application.interviewSlotTimeEnd}` : ""}</div>}</td><td className="px-4 py-3"><div className="flex items-center justify-center gap-1.5">{application.cvDownloadUrl && <button type="button" onClick={() => void downloadFile(application.cvDownloadUrl!)} className="inline-flex min-w-10 items-center justify-center rounded-md border border-[#005FD9]/15 bg-[#F3F8FF] px-2 py-1 text-xs font-semibold text-[#044FAF] transition-colors hover:bg-[#E8F2FF]">CV</button>}{application.portfolioDownloadUrl && <button type="button" onClick={() => void downloadFile(application.portfolioDownloadUrl!)} className="inline-flex items-center justify-center rounded-md border border-[#005FD9]/15 bg-[#F3F8FF] px-2 py-1 text-xs font-semibold text-[#044FAF] transition-colors hover:bg-[#E8F2FF]">Portfolio</button>}</div></td><td className="px-4 py-3"><div className="flex flex-wrap justify-center gap-1"><button onClick={() => setPending({ application, action: "evaluate" })} disabled={application.type === "member" || Boolean(application.hasAccepted)} className="rounded border border-[#005FD9]/15 px-2 py-1 text-xs text-[#134687] disabled:opacity-30">Evaluate</button><button onClick={() => setPending({ application, action: "accept" })} disabled={Boolean(application.hasAccepted)} className="rounded border border-[#005FD9]/15 px-2 py-1 text-xs text-[#134687] disabled:opacity-30">Accept</button><button onClick={() => setPending({ application, action: "reject" })} disabled={Boolean(application.hasAccepted)} className="rounded border border-red-200 px-2 py-1 text-xs text-red-600 disabled:opacity-30">Reject</button><button onClick={() => setPending({ application, action: "redirect" })} disabled={application.type === "member" || Boolean(application.hasAccepted)} className="rounded border border-[#005FD9]/15 px-2 py-1 text-xs text-[#134687] disabled:opacity-30">Redirect</button><button onClick={() => setPending({ application, action: "reset" })} className="rounded border border-red-200 px-2 py-1 text-xs text-red-600">Reset</button>{(application.type === "committee" || application.type === "executive-associate") && application.interviewSlotDay && application.interviewSlotTimeStart && <button onClick={() => void resetSchedule(application)} className="rounded border border-[#D6A326]/30 px-2 py-1 text-xs text-[#8A5A00] hover:bg-[#FFF8E7]">Reset Schedule</button>}</div></td></tr>)}
+        {loading ? <tr><td colSpan={6} className="px-4 py-10 text-center text-[#134687]/50">Loading applications...</td></tr> : pageApplications.map((application) => <tr key={`${application.type}:${application.id}`} className="align-middle hover:bg-[#F9FBFF]"><td className="min-w-0 break-all px-4 py-3"><div className="font-semibold text-[#134687]">{application.user.name}</div><div className="text-xs text-[#134687]/60">{application.user.email}</div><div className="font-mono text-xs text-[#134687]/50">{application.user.studentNumber}</div></td><td className="break-words px-4 py-3 text-[#134687]"><div>{labelFor(application)}</div>{redirectionFor(application.redirection) && <div className="mt-1 text-[11px] font-semibold text-[#044FAF]">Redirected to: {redirectionFor(application.redirection)}</div>}</td><td className="px-4 py-3 text-center"><span className="inline-flex rounded-full bg-[#E8F2FF] px-2.5 py-1 text-xs font-semibold text-[#044FAF]">{statusFor(application)}</span></td><td className="break-words px-4 py-3 text-center text-xs text-[#134687]/70"><div>{application.interviewBy || "Not assigned"}</div>{application.interviewSlotDay && application.interviewSlotTimeStart && <div className="mt-1 text-[11px] text-[#134687]/55">{application.interviewSlotDay} at {application.interviewSlotTimeStart}{application.interviewSlotTimeEnd ? ` - ${application.interviewSlotTimeEnd}` : ""}</div>}</td><td className="px-4 py-3"><div className="flex flex-wrap items-center justify-center gap-1">{application.cvDownloadUrl && <button type="button" onClick={() => void downloadFile(application.cvDownloadUrl!)} className="inline-flex min-w-10 items-center justify-center rounded-md border border-[#005FD9]/15 bg-[#F3F8FF] px-2 py-1 text-xs font-semibold text-[#044FAF] transition-colors hover:bg-[#E8F2FF]">CV</button>}{application.portfolioDownloadUrl && <button type="button" onClick={() => void downloadFile(application.portfolioDownloadUrl!)} className="inline-flex items-center justify-center rounded-md border border-[#005FD9]/15 bg-[#F3F8FF] px-2 py-1 text-xs font-semibold text-[#044FAF] transition-colors hover:bg-[#E8F2FF]">Portfolio</button>}</div></td><td className="px-4 py-3"><div className="flex flex-wrap justify-center gap-1"><button onClick={() => setPending({ application, action: "evaluate" })} disabled={application.type === "member" || Boolean(application.hasAccepted)} className="rounded border border-[#005FD9]/15 px-1.5 py-1 text-xs text-[#134687] disabled:opacity-30">Evaluate</button><button onClick={() => setPending({ application, action: "accept" })} disabled={Boolean(application.hasAccepted)} className="rounded border border-[#005FD9]/15 px-1.5 py-1 text-xs text-[#134687] disabled:opacity-30">Accept</button><button onClick={() => setPending({ application, action: "reject" })} disabled={Boolean(application.hasAccepted)} className="rounded border border-red-200 px-1.5 py-1 text-xs text-red-600 disabled:opacity-30">Reject</button><button onClick={() => setPending({ application, action: "redirect" })} disabled={application.type === "member" || Boolean(application.hasAccepted)} className="rounded border border-[#005FD9]/15 px-1.5 py-1 text-xs text-[#134687] disabled:opacity-30">Redirect</button><button onClick={() => setPending({ application, action: "reset" })} className="rounded border border-red-200 px-1.5 py-1 text-xs text-red-600">Reset</button>{(application.type === "committee" || application.type === "executive-associate") && application.interviewSlotDay && application.interviewSlotTimeStart && <button onClick={() => void resetSchedule(application)} className="rounded border border-[#D6A326]/30 px-1.5 py-1 text-xs text-[#8A5A00] hover:bg-[#FFF8E7]">Reset Schedule</button>}</div></td></tr>)}
         {!loading && visibleApplications.length === 0 && <tr><td colSpan={6} className="px-4 py-10 text-center text-[#134687]/50">No applications found.</td></tr>}
       </tbody></table>
     </div>
@@ -607,7 +831,8 @@ type Tab =
   | "payments"
   | "settings"
   | "email"
-  | "community";
+  | "community"
+  | "techdev-exam";
 type SettingsSection = "general" | "executive-board" | "recruitment";
 
 const isTab = (value: string | null): value is Tab =>
@@ -616,7 +841,8 @@ const isTab = (value: string | null): value is Tab =>
   value === "payments" ||
   value === "settings" ||
   value === "email" ||
-  value === "community";
+  value === "community" ||
+  value === "techdev-exam";
 
 const isSettingsSection = (value: string | null): value is SettingsSection =>
   value === "general" || value === "executive-board" || value === "recruitment";
@@ -890,6 +1116,7 @@ export default function SuperAdminDashboard() {
               { key: "settings" as Tab, label: "Configuration" },
               { key: "email" as Tab, label: "Email Test" },
               { key: "community" as Tab, label: "Community Join" },
+              { key: "techdev-exam" as Tab, label: "TechDev Exam Preview" },
             ].map((tab) => (
               <button
                 key={tab.key}
@@ -922,10 +1149,12 @@ export default function SuperAdminDashboard() {
               settingsSection={settingsSection}
               onSettingsSectionChange={updateSettingsSection}
             />
+          ) : activeTab === "email" ? (
+            <EmailTestTab />
           ) : activeTab === "community" ? (
             <CommunityJoinManager />
           ) : (
-            <EmailTestTab />
+            <TechDevExamTab />
           )}
         </div>
       </main>
@@ -939,6 +1168,13 @@ function UsersTab() {
   const [users, setUsers] = useState<User[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [activeFilter, setActiveFilter] = useState<string | null>(null);
+  const [filters, setFilters] = useState({
+    role: "",
+    memberStatus: "",
+    position: "",
+    committee: "",
+  });
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({
@@ -972,10 +1208,17 @@ function UsersTab() {
   const fetchUsers = useCallback(async (page: number) => {
     setLoading(true);
     try {
-      const res = await fetch(
-        `/api/admin/users/all?page=${page}&limit=10&t=${Date.now()}`,
-        { cache: "no-store" },
-      );
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: "10",
+        t: String(Date.now()),
+      });
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value) params.set(key, value);
+      });
+      const res = await fetch(`/api/admin/users/all?${params.toString()}`, {
+        cache: "no-store",
+      });
       if (res.ok) {
         const data = await res.json();
         setUsers(data.users);
@@ -987,7 +1230,12 @@ function UsersTab() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [filters]);
+
+  const updateFilter = (key: keyof typeof filters, value: string) => {
+    setFilters((current) => ({ ...current, [key]: value }));
+    setCurrentPage(1);
+  };
 
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isGlobalSearch, setIsGlobalSearch] = useState(false);
@@ -1023,7 +1271,19 @@ function UsersTab() {
   }, [fetchUsers, currentPage]);
 
   useEffect(() => {
-    const source = isGlobalSearch ? searchResults : users;
+    // Global search hits every user, so re-apply the column filters the server would.
+    const source = isGlobalSearch
+      ? searchResults.filter(
+          (u) =>
+            (!filters.role || u.role === filters.role) &&
+            (!filters.memberStatus ||
+              (filters.memberStatus === "issued") ===
+                Boolean(u.memberships?.length)) &&
+            (!filters.position || u.ebProfile?.position === filters.position) &&
+            (!filters.committee ||
+              Boolean(u.ebProfile?.committees.includes(filters.committee))),
+        )
+      : users;
     const filtered = source.filter(
       (u) =>
         u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -1032,7 +1292,7 @@ function UsersTab() {
         u.ebProfile?.position?.toLowerCase().includes(searchTerm.toLowerCase()),
     );
     setFilteredUsers(filtered);
-  }, [searchTerm, users, searchResults, isGlobalSearch]);
+  }, [searchTerm, users, searchResults, isGlobalSearch, filters]);
 
   const closeEbForm = () => {
     if (isSavingEb) return;
@@ -1219,22 +1479,46 @@ function UsersTab() {
               <table className="w-full text-sm">
                 <thead className="bg-[#F3F3FD] border-b border-[#005FD9]/10">
                   <tr>
-                    <th className="text-left px-4 py-3 text-[10px] font-semibold text-[#134687]/50 uppercase tracking-widest font-mono">
+                    <th className="px-4 py-2 text-left text-[10px] font-semibold uppercase tracking-widest text-[#134687]/50 font-mono">
                       User
                     </th>
-                    <th className="text-left px-4 py-3 text-[10px] font-semibold text-[#134687]/50 uppercase tracking-widest font-mono">
-                      Role
-                    </th>
-                    <th className="text-left px-4 py-3 text-[10px] font-semibold text-[#134687]/50 uppercase tracking-widest font-mono">
-                      Member ID
-                    </th>
-                    <th className="text-left px-4 py-3 text-[10px] font-semibold text-[#134687]/50 uppercase tracking-widest font-mono">
-                      Position
-                    </th>
-                    <th className="text-left px-4 py-3 text-[10px] font-semibold text-[#134687]/50 uppercase tracking-widest font-mono">
-                      Committees
-                    </th>
-                    <th className="text-right px-4 py-3 text-[10px] font-semibold text-[#134687]/50 uppercase tracking-widest font-mono">
+                    <UserFilterHeader
+                      label="Role"
+                      filterKey="role"
+                      activeFilter={activeFilter}
+                      filters={filters}
+                      options={[{ value: "", label: "All roles" }, ...ROLE_OPTIONS]}
+                      onToggle={(key) => setActiveFilter(activeFilter === key ? null : key)}
+                      onChange={updateFilter}
+                    />
+                    <UserFilterHeader
+                      label="Member ID"
+                      filterKey="memberStatus"
+                      activeFilter={activeFilter}
+                      filters={filters}
+                      options={[{ value: "", label: "All members" }, { value: "issued", label: "Issued" }, { value: "not-issued", label: "Not issued" }]}
+                      onToggle={(key) => setActiveFilter(activeFilter === key ? null : key)}
+                      onChange={updateFilter}
+                    />
+                    <UserFilterHeader
+                      label="Position"
+                      filterKey="position"
+                      activeFilter={activeFilter}
+                      filters={filters}
+                      options={[{ value: "", label: "All positions" }, ...EB_POSITIONS.map((position) => ({ value: position, label: position }))]}
+                      onToggle={(key) => setActiveFilter(activeFilter === key ? null : key)}
+                      onChange={updateFilter}
+                    />
+                    <UserFilterHeader
+                      label="Committees"
+                      filterKey="committee"
+                      activeFilter={activeFilter}
+                      filters={filters}
+                      options={[{ value: "", label: "All committees" }, ...EB_COMMITTEES.map((committee) => ({ value: committee.id, label: committee.title }))]}
+                      onToggle={(key) => setActiveFilter(activeFilter === key ? null : key)}
+                      onChange={updateFilter}
+                    />
+                    <th className="px-4 py-2 text-right text-[10px] font-semibold uppercase tracking-widest text-[#134687]/50 font-mono">
                       Actions
                     </th>
                   </tr>
