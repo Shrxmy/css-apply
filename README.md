@@ -317,9 +317,9 @@ We welcome contributions to CSSApply! Here's how you can help:
 ---
 
 <div align="center">
-
-**Passionately designed & developed by CSS 👩‍💻👩‍💻**
-
-[![CSS Logo](public/assets/css-apply-static-images/assets/logos/Logo_CSS.webp)](https://css.ust.edu.ph)
-
+  <a href="https://css.ust.edu.ph">
+    <img src="public/assets/css-apply-static-images/assets/logos/Logo_CSS.webp" alt="CSS Logo" width="120" />
+  </a>
+  <br />
+  <strong>Passionately designed &amp; developed by CSS 👩‍💻👩‍💻</strong>
 </div>
