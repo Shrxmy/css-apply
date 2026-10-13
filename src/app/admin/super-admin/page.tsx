@@ -15,7 +15,7 @@ import FormProcessingOverlay from "@/components/FormProcessingOverlay";
 import MobileSidebar from "@/components/AdminMobileSB";
 import SidebarContent from "@/components/AdminSidebar";
 import dynamic from "next/dynamic";
-import { TECHDEV_EXAM_QUESTIONS } from "@/data/techdev-exam";
+import type { TechDevExamQuestion } from "@/data/techdev-exam";
 
 // Tab-only components load when their tab opens.
 const DigitalIdCard = dynamic(() => import("@/components/DigitalIdCard"));
@@ -388,15 +388,48 @@ function UserAvatar({
 
 // ─── TechDev examination preview ────────────────────────────────────────────
 
-// Preview uses the same public question bank as the applicant exam.
-const TECHDEV_PREVIEW_QUESTIONS = TECHDEV_EXAM_QUESTIONS;
+type PreviewQuestion = TechDevExamQuestion & { answer?: string };
 
 function TechDevExamTab() {
+  const [questions, setQuestions] = useState<PreviewQuestion[]>([]);
+  const [durationMinutes, setDurationMinutes] = useState(45);
+  const [schoolYear, setSchoolYear] = useState("");
+  const [loadError, setLoadError] = useState("");
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
-  const question = TECHDEV_PREVIEW_QUESTIONS[currentIndex];
+
+  useEffect(() => {
+    fetch("/api/admin/techdev-exam/questions", { cache: "no-store" })
+      .then(async (response) => {
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error);
+        setQuestions(data.set.questions);
+        setDurationMinutes(data.set.durationMinutes);
+        setSchoolYear(data.schoolYear);
+      })
+      .catch((error) =>
+        setLoadError(
+          error instanceof Error && error.message
+            ? error.message
+            : "Failed to load exam questions",
+        ),
+      );
+  }, []);
+
+  if (loadError) {
+    return <p className="py-12 text-center text-sm text-red-700">{loadError}</p>;
+  }
+  if (questions.length === 0) {
+    return (
+      <div className="flex justify-center py-12">
+        <LoadingSpinner label="Loading exam preview" size="md" />
+      </div>
+    );
+  }
+
+  const question = questions[currentIndex];
   const answer = answers[question.id] || "";
-  const answeredCount = TECHDEV_PREVIEW_QUESTIONS.filter((item) =>
+  const answeredCount = questions.filter((item) =>
     Boolean(answers[item.id]?.trim()),
   ).length;
 
@@ -421,17 +454,16 @@ function TechDevExamTab() {
               TechDev Examination
             </h2>
             <p className="mt-1 max-w-2xl text-sm leading-relaxed text-[#134687]/70">
-              This preview mirrors the applicant exam interface. Applicant
-              access, server-authoritative timing, autosave, and aggregate tab
-              activity tracking are now enabled; scoring remains for review only.
+              This is the AY {schoolYear} question set exactly as applicants
+              see it. TechDev edits the questions from the TechDev Exam page.
             </p>
           </div>
           <div className="rounded-xl bg-white px-4 py-3 text-right shadow-sm">
             <p className="font-mono text-[10px] uppercase tracking-wider text-[#134687]/50">
-              Suggested duration
+              Duration
             </p>
             <p className="font-poppins text-lg font-bold text-[#044FAF]">
-              45 minutes
+              {durationMinutes} minutes
             </p>
           </div>
         </div>
@@ -444,16 +476,19 @@ function TechDevExamTab() {
               Questions
             </p>
             <span className="font-mono text-xs text-[#044FAF]">
-              {answeredCount}/{TECHDEV_PREVIEW_QUESTIONS.length}
+              {answeredCount}/{questions.length}
             </span>
           </div>
-          <div className="grid grid-cols-5 gap-2 lg:grid-cols-2">
-            {TECHDEV_PREVIEW_QUESTIONS.map((item, index) => (
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(2.5rem,1fr))] gap-2">
+            {questions.map((item, index) => (
               <button
                 key={item.id}
                 type="button"
                 onClick={() => setCurrentIndex(index)}
-                className={`rounded-lg border px-3 py-2 text-left text-xs font-semibold transition-colors ${
+                title={item.section}
+                aria-label={`Question ${index + 1}: ${item.section}`}
+                aria-current={currentIndex === index ? "step" : undefined}
+                className={`flex h-10 items-center justify-center rounded-lg border text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#044FAF] ${
                   currentIndex === index
                     ? "border-[#044FAF] bg-[#044FAF] text-white"
                     : answers[item.id]?.trim()
@@ -461,7 +496,7 @@ function TechDevExamTab() {
                       : "border-[#005FD9]/15 text-[#134687] hover:bg-[#F3F8FF]"
                 }`}
               >
-                {index + 1}. {item.section}
+                {index + 1}
               </button>
             ))}
           </div>
@@ -475,11 +510,11 @@ function TechDevExamTab() {
               </span>
               <p className="mt-1 font-poppins text-sm font-semibold text-[#134687]">
                 Question {currentIndex + 1} of{" "}
-                {TECHDEV_PREVIEW_QUESTIONS.length}
+                {questions.length}
               </p>
             </div>
             <span className="font-mono text-xs text-[#134687]/50">
-              Timer preview: 44:59
+              {durationMinutes}:00 timer
             </span>
           </div>
 
@@ -539,10 +574,10 @@ function TechDevExamTab() {
               type="button"
               onClick={() =>
                 setCurrentIndex((index) =>
-                  Math.min(TECHDEV_PREVIEW_QUESTIONS.length - 1, index + 1),
+                  Math.min(questions.length - 1, index + 1),
                 )
               }
-              disabled={currentIndex === TECHDEV_PREVIEW_QUESTIONS.length - 1}
+              disabled={currentIndex === questions.length - 1}
               className="rounded-lg bg-[#134687] px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
             >
               Next question

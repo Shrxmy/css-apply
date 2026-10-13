@@ -3,29 +3,26 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { z } from "zod";
 import {
-  TECHDEV_EXAM_DURATION_MINUTES,
-  TECHDEV_EXAM_QUESTIONS,
   TECHDEV_EXAM_VERSION,
   type TechDevExamQuestion,
 } from "@/data/techdev-exam";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import {
+  getTechDevExamSet,
+  freezeTechDevExamSet,
+  lockTechDevExamSet,
+  toPublicQuestion,
+  type TechDevExamSet,
+} from "@/lib/techdev-exam-set";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const TECHDEV_COMMITTEE_ID = "technology";
-const QUESTION_IDS = new Set(
-  TECHDEV_EXAM_QUESTIONS.map((question) => question.id),
-);
 const actionSchema = z.object({
   action: z.enum(["start", "save", "heartbeat", "submit"]),
-  answers: z
-    .record(z.string(), z.string().max(20_000))
-    .refine((answers) =>
-      Object.keys(answers).every((id) => QUESTION_IDS.has(id)),
-    )
-    .optional(),
+  answers: z.record(z.string(), z.string().max(20_000)).optional(),
   focusLossCount: z.number().int().min(0).max(10_000).optional(),
   totalAwayMilliseconds: z.number().int().min(0).max(86_400_000).optional(),
 });
@@ -47,16 +44,20 @@ function shuffle<T>(items: T[]) {
   return result;
 }
 
-function publicQuestions(questionOrder: string[]): TechDevExamQuestion[] {
+function publicQuestions(
+  questionOrder: string[],
+  set: TechDevExamSet,
+): TechDevExamQuestion[] {
   const questionMap = new Map(
-    TECHDEV_EXAM_QUESTIONS.map((question) => [question.id, question]),
+    set.questions.map((question) => [question.id, question]),
   );
-  return questionOrder
-    .map((id) => questionMap.get(id))
-    .filter((question): question is TechDevExamQuestion => Boolean(question));
+  return questionOrder.flatMap((id) => {
+    const question = questionMap.get(id);
+    return question ? [toPublicQuestion(question)] : [];
+  });
 }
 
-function attemptResponse(attempt: {
+type AttemptRecord = {
   id: string;
   version: string;
   questionOrder: unknown;
@@ -67,12 +68,18 @@ function attemptResponse(attempt: {
   submittedAt: Date | null;
   focusLossCount: number;
   totalAwayMilliseconds: number;
-}) {
-  const questionOrder = Array.isArray(attempt.questionOrder)
+};
+
+function questionIds(attempt: AttemptRecord) {
+  return Array.isArray(attempt.questionOrder)
     ? attempt.questionOrder.filter(
         (value): value is string => typeof value === "string",
       )
     : [];
+}
+
+function attemptResponse(attempt: AttemptRecord, set: TechDevExamSet) {
+  const questionOrder = questionIds(attempt);
   const answers =
     attempt.answers && typeof attempt.answers === "object"
       ? (attempt.answers as AttemptAnswers)
@@ -90,16 +97,18 @@ function attemptResponse(attempt: {
       totalAwayMilliseconds: attempt.totalAwayMilliseconds,
       answers,
     },
-    questions: publicQuestions(questionOrder),
+    questions: publicQuestions(questionOrder, set),
   };
 }
 
 // POST and GET share the envelope expected by the applicant page.
-function examResponse(attempt: Parameters<typeof attemptResponse>[0]) {
+function examEnvelope(attempt: AttemptRecord | null, set: TechDevExamSet) {
   return {
     eligible: true,
-    durationMinutes: TECHDEV_EXAM_DURATION_MINUTES,
-    attempt: attemptResponse(attempt),
+    durationMinutes: set.durationMinutes,
+    questionCount: set.questions.length,
+    sections: [...new Set(set.questions.map((question) => question.section))],
+    attempt: attempt ? attemptResponse(attempt, set) : null,
   };
 }
 
@@ -151,14 +160,12 @@ export async function GET() {
       );
     }
 
+    // Observe the attempt first: its committed start guarantees a frozen set.
     const attempt = await prisma.techDevExamAttempt.findUnique({
       where: { applicationId: context.applicationId },
     });
-    return NextResponse.json({
-      eligible: true,
-      durationMinutes: TECHDEV_EXAM_DURATION_MINUTES,
-      attempt: attempt ? attemptResponse(attempt) : null,
-    });
+    const { set } = await getTechDevExamSet(context.recruitmentCycleId);
+    return NextResponse.json(examEnvelope(attempt, set));
   } catch (error) {
     console.error(
       "Load TechDev exam failed",
@@ -190,30 +197,36 @@ export async function POST(request: NextRequest) {
     }
 
     const { action } = parsed.data;
-    let attempt = await prisma.techDevExamAttempt.findUnique({
-      where: { applicationId: context.applicationId },
-    });
-
     if (action === "start") {
-      if (!attempt) {
-        attempt = await prisma.techDevExamAttempt.create({
+      const started = await prisma.$transaction(async (tx) => {
+        await lockTechDevExamSet(tx, context.recruitmentCycleId);
+        const current = await tx.techDevExamAttempt.findUnique({
+          where: { applicationId: context.applicationId },
+        });
+        // Read/persist the set under the lock even for repeated/concurrent starts.
+        const latest = await freezeTechDevExamSet(context.recruitmentCycleId, tx);
+        if (current) return { attempt: current, set: latest.set };
+        const created = await tx.techDevExamAttempt.create({
           data: {
             applicationId: context.applicationId,
             userId: context.userId,
             recruitmentCycleId: context.recruitmentCycleId,
-            version: TECHDEV_EXAM_VERSION,
-            questionOrder: shuffle(
-              TECHDEV_EXAM_QUESTIONS.map((question) => question.id),
-            ),
+            version: latest.updatedAt?.toISOString() ?? TECHDEV_EXAM_VERSION,
+            questionOrder: shuffle(latest.set.questions.map((question) => question.id)),
             answers: {},
-            expiresAt: new Date(
-              Date.now() + TECHDEV_EXAM_DURATION_MINUTES * 60_000,
-            ),
+            expiresAt: new Date(Date.now() + latest.set.durationMinutes * 60_000),
           },
         });
-      }
-      return NextResponse.json(examResponse(attempt));
+        return { attempt: created, set: latest.set };
+      });
+      return NextResponse.json(examEnvelope(started.attempt, started.set));
     }
+
+    let attempt = await prisma.techDevExamAttempt.findUnique({
+      where: { applicationId: context.applicationId },
+    });
+    const { set } = await getTechDevExamSet(context.recruitmentCycleId);
+    const examResponse = (current: AttemptRecord) => examEnvelope(current, set);
 
     if (!attempt) {
       return NextResponse.json(
@@ -260,6 +273,17 @@ export async function POST(request: NextRequest) {
 
     const attemptId = attempt.id;
     if (action === "save" || action === "submit") {
+      const allowedIds = new Set(questionIds(attempt));
+      if (
+        !Object.keys(parsed.data.answers || {}).every((id) =>
+          allowedIds.has(id),
+        )
+      ) {
+        return NextResponse.json(
+          { error: "Invalid examination request" },
+          { status: 400 },
+        );
+      }
       const updatedAt = new Date();
       const updateResult = await prisma.techDevExamAttempt.updateMany({
         where: {

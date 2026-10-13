@@ -7,10 +7,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import LoadingScreen from "@/components/LoadingScreen";
 import { toast } from "sonner";
-import {
-  TECHDEV_EXAM_QUESTIONS,
-  type TechDevExamQuestion,
-} from "@/data/techdev-exam";
+import type { TechDevExamQuestion } from "@/data/techdev-exam";
 
 interface ExamAttempt {
   id: string;
@@ -26,6 +23,8 @@ interface ExamAttempt {
 interface ExamPayload {
   eligible: boolean;
   durationMinutes?: number;
+  questionCount?: number;
+  sections?: string[];
   attempt?: {
     attempt: ExamAttempt;
     questions: TechDevExamQuestion[];
@@ -296,9 +295,11 @@ export default function TechDevExamPage() {
               TechDev Examination
             </h1>
             <p className="mt-3 text-sm leading-relaxed text-[#134687]/70">
-              This examination contains {TECHDEV_EXAM_QUESTIONS.length}{" "}
-              questions covering Git, JavaScript, TypeScript, Python, and web
-              fundamentals. You have {payload.durationMinutes ?? 45} minutes.
+              This examination contains {payload.questionCount} questions
+              {payload.sections?.length
+                ? ` covering ${payload.sections.join(", ")}`
+                : ""}
+              . You have {payload.durationMinutes} minutes.
               Your answers are saved automatically.
             </p>
             <p className="mt-3 text-sm leading-relaxed text-[#134687]/70">
@@ -391,18 +392,18 @@ export default function TechDevExamPage() {
                 {answeredCount}/{questions.length}
               </span>
             </div>
-            <div className="grid grid-cols-5 gap-2 lg:grid-cols-2">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(2.5rem,1fr))] gap-2">
               {questions.map((item, index) => (
                 <button
                   key={item.id}
                   type="button"
                   onClick={() => setCurrentIndex(index)}
+                  title={item.section}
                   aria-label={`Question ${index + 1}: ${item.section}`}
                   aria-current={currentIndex === index ? "step" : undefined}
-                  className={`rounded-lg border px-2 py-2 text-center text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#044FAF] lg:px-3 lg:text-left ${currentIndex === index ? "border-[#044FAF] bg-[#044FAF] text-white" : answers[item.id]?.trim() ? "border-green-200 bg-green-50 text-green-700" : "border-[#005FD9]/15 text-[#134687]"}`}
+                  className={`flex h-10 items-center justify-center rounded-lg border text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#044FAF] ${currentIndex === index ? "border-[#044FAF] bg-[#044FAF] text-white" : answers[item.id]?.trim() ? "border-green-200 bg-green-50 text-green-700" : "border-[#005FD9]/15 text-[#134687]"}`}
                 >
                   {index + 1}
-                  <span className="hidden lg:inline">. {item.section}</span>
                 </button>
               ))}
             </div>

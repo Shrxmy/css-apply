@@ -1,13 +1,13 @@
 export type TechDevExamQuestion = {
   id: string;
-  section: "Git" | "JavaScript" | "TypeScript" | "Python" | "Web fundamentals";
+  section: string;
   prompt: string;
   kind: "choice" | "code";
   code?: string;
   options?: string[];
 };
 
-/** Public exam content. Answer keys stay on the server. */
+/** Default question bank for an A.Y. with no saved set. Answer keys stay on the server. */
 export const TECHDEV_EXAM_VERSION = "techdev-v1";
 export const TECHDEV_EXAM_DURATION_MINUTES = 45;
 

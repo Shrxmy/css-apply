@@ -9,16 +9,16 @@ import {
 } from "@/lib/application-rules";
 import {
   TECHDEV_WRITTEN_MAX_POINTS,
-  TECHDEV_WRITTEN_QUESTION_IDS,
+  authorizeTechDevReviewer,
   reviewQuestions,
   summarizeTechDevScore,
   toScoreRecord,
   toStringRecord,
+  writtenQuestionIds,
 } from "@/lib/techdev-exam-review";
+import { getTechDevExamSet, type TechDevExamSet } from "@/lib/techdev-exam-set";
 
 export const dynamic = "force-dynamic";
-
-const TECHDEV_COMMITTEE_ID = "technology";
 
 const gradeSchema = z
   .object({
@@ -29,34 +29,9 @@ const gradeSchema = z
       .record(
         z.string(),
         z.number().int().min(0).max(TECHDEV_WRITTEN_MAX_POINTS).nullable(),
-      )
-      .refine((scores) =>
-        Object.keys(scores).every((id) => TECHDEV_WRITTEN_QUESTION_IDS.has(id)),
       ),
   })
   .strict();
-
-// Super admins, or active TechDev EB members of the current cycle.
-async function authorizeTechDevReviewer(email: string, cycleId: string) {
-  const reviewer = await prisma.user.findUnique({
-    where: { email },
-    select: {
-      id: true,
-      role: true,
-      ebProfile: {
-        select: { committees: true, isActive: true, recruitmentCycleId: true },
-      },
-    },
-  });
-  const isSuperAdmin =
-    reviewer?.role === "super_admin" || reviewer?.role === "super-admin";
-  const isTechDevEb =
-    reviewer?.role === "admin" &&
-    reviewer.ebProfile?.isActive === true &&
-    reviewer.ebProfile.recruitmentCycleId === cycleId &&
-    reviewer.ebProfile.committees.includes(TECHDEV_COMMITTEE_ID);
-  return reviewer && (isSuperAdmin || isTechDevEb) ? reviewer : null;
-}
 
 type AttemptRow = Awaited<ReturnType<typeof findAttempts>>[number];
 
@@ -72,9 +47,9 @@ function findAttempts(where: { recruitmentCycleId: string; id?: string }) {
   });
 }
 
-function toReview(attempt: AttemptRow, now: Date) {
+function toReview(attempt: AttemptRow, set: TechDevExamSet, now: Date) {
   const answers = toStringRecord(attempt.answers);
-  const manualScores = toScoreRecord(attempt.manualScores);
+  const manualScores = toScoreRecord(set, attempt.manualScores);
   // An IN_PROGRESS attempt past its deadline is final even before the server marks it EXPIRED.
   const status =
     attempt.status === "IN_PROGRESS" && attempt.expiresAt <= now
@@ -91,8 +66,8 @@ function toReview(attempt: AttemptRow, now: Date) {
     reviewedAt: attempt.reviewedAt,
     updatedAt: attempt.updatedAt,
     user: attempt.user,
-    score: summarizeTechDevScore(answers, manualScores),
-    questions: reviewQuestions(answers, manualScores),
+    score: summarizeTechDevScore(set, answers, manualScores),
+    questions: reviewQuestions(set, answers, manualScores),
   };
 }
 
@@ -112,10 +87,11 @@ export async function GET() {
 
     const now = new Date();
     const attempts = await findAttempts({ recruitmentCycleId: cycle.id });
+    const { set } = await getTechDevExamSet(cycle.id);
     return NextResponse.json({
       schoolYear: cycle.schoolYear,
       writtenMaxPoints: TECHDEV_WRITTEN_MAX_POINTS,
-      attempts: attempts.map((attempt) => toReview(attempt, now)),
+      attempts: attempts.map((attempt) => toReview(attempt, set, now)),
     });
   } catch (error) {
     const ruleError = getApplicationRuleResponse(error);
@@ -174,7 +150,13 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const manualScores = toScoreRecord(attempt.manualScores);
+    // Once the attempt is observed, its set is durably frozen by start.
+    const { set } = await getTechDevExamSet(cycle.id);
+    const writtenIds = writtenQuestionIds(set);
+    if (!Object.keys(parsed.data.scores).every((id) => writtenIds.has(id))) {
+      return NextResponse.json({ error: "Invalid scores" }, { status: 400 });
+    }
+    const manualScores = toScoreRecord(set, attempt.manualScores);
     for (const [questionId, points] of Object.entries(parsed.data.scores)) {
       if (points === null) delete manualScores[questionId];
       else manualScores[questionId] = points;
@@ -219,7 +201,7 @@ export async function PATCH(request: NextRequest) {
         { status: 404 },
       );
     }
-    return NextResponse.json({ attempt: toReview(updated, now) });
+    return NextResponse.json({ attempt: toReview(updated, set, now) });
   } catch (error) {
     if (error instanceof SyntaxError) {
       return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });

@@ -7,6 +7,7 @@ import MobileSidebar from "@/components/AdminMobileSB";
 import SidebarContent from "@/components/AdminSidebar";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import AdminEmptyState from "@/components/AdminEmptyState";
+import TechDevExamEditor from "@/components/TechDevExamEditor";
 
 interface ReviewQuestion {
   id: string;
@@ -67,6 +68,7 @@ export default function TechDevExamReviewPage() {
   const [openId, setOpenId] = useState<string | null>(null);
   const [draftScores, setDraftScores] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [view, setView] = useState<"results" | "questions">("results");
 
   const fetchAttempts = useCallback(async () => {
     setLoading(true);
@@ -171,18 +173,50 @@ export default function TechDevExamReviewPage() {
       <main className="h-screen flex-1 overflow-y-auto p-6 pt-16 md:p-8 md:pt-12">
         <header className="mb-8 mt-12 text-center md:mt-8 md:text-left">
           <div className="mb-4 w-fit max-w-full rounded-[45px] px-6 py-2 text-center text-lg font-poppins font-medium text-white [background:linear-gradient(90deg,_#2F7EE3_0%,_#0349A2_100%)] lg:py-4 lg:text-4xl">
-            TechDev Exam Results
+            TechDev Exam
           </div>
           <p className="mb-4 text-xs font-light leading-5 text-black md:mb-6 lg:text-lg">
-            Review TechDev examinations for AY {schoolYear || "—"}. Multiple
-            choice is scored automatically; give each written answer 0–
-            {maxPoints} points.
+            {view === "results"
+              ? `Review TechDev examinations for AY ${schoolYear || "—"}. Multiple choice is scored automatically; give each written answer 0–${maxPoints} points.`
+              : "Each A.Y. has its own question set. Questions lock once the first applicant starts the exam."}
           </p>
           <hr className="border-[#005FD9]" />
         </header>
 
+        <div
+          role="tablist"
+          aria-label="TechDev exam views"
+          className="mb-4 flex gap-2"
+        >
+          {(
+            [
+              ["results", "Results"],
+              ["questions", "Questions"],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={view === key}
+              onClick={() => setView(key)}
+              className={`rounded-lg px-4 py-2 text-sm font-semibold ${focusRing} ${
+                view === key
+                  ? "bg-[#134687] text-white"
+                  : "border border-[#005FD9]/15 bg-white text-[#134687] hover:bg-[#F3F8FF]"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
         <section className="mb-5 min-h-[calc(100vh-180px)] rounded-xl border border-[#005FD9]/10 bg-white p-5 md:min-h-[calc(100vh-280px)]">
-          {loading ? (
+          {/* Stays mounted so switching tabs keeps unsaved edits. */}
+          <div hidden={view !== "questions"}>
+            <TechDevExamEditor />
+          </div>
+          {view !== "results" ? null : loading ? (
             <div className="flex flex-col items-center justify-center py-12">
               <LoadingSpinner label="Loading exam results" size="md" />
               <p className="mt-3 text-sm text-[#134687]/60">
