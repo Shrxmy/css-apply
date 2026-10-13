@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import sharp from "sharp";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { committeeRoles } from "@/data/committeeRoles";
-import { getPositionTitle } from "@/lib/eb-mapping";
+import { getApprovedDigitalIdRole } from "@/lib/digital-id-role";
 import { prisma } from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
 import {
@@ -17,34 +16,6 @@ export const maxDuration = 60;
 
 function isAdminRole(role: string | undefined) {
   return role === "admin" || role === "super_admin" || role === "super-admin";
-}
-
-function getRoleTitle(user: {
-  memberApplications: Array<{ paymentStatus: string }>;
-  committeeApplications: Array<{
-    firstOptionCommittee: string;
-    paymentStatus: string;
-  }>;
-  executiveAssociateApplications: Array<{
-    ebRole: string;
-    firstOptionEb: string;
-    paymentStatus: string;
-  }>;
-}) {
-  const ea = user.executiveAssociateApplications[0];
-  if (ea?.paymentStatus === "approved") {
-    return `Executive Associate (${getPositionTitle(ea.ebRole || ea.firstOptionEb)})`;
-  }
-
-  const committee = user.committeeApplications[0];
-  if (committee?.paymentStatus === "approved") {
-    const role = committeeRoles.find(
-      (item) => item.id === committee.firstOptionCommittee,
-    );
-    return `Staff - ${role?.title || committee.firstOptionCommittee}`;
-  }
-
-  return "Official Member";
 }
 
 export async function GET(request: Request) {
@@ -92,6 +63,8 @@ export async function GET(request: Request) {
               where: { recruitmentCycleId: cycle.id },
               select: {
                 firstOptionCommittee: true,
+                hasAccepted: true,
+                redirection: true,
                 paymentStatus: true,
               },
               orderBy: { createdAt: "desc" },
@@ -102,6 +75,8 @@ export async function GET(request: Request) {
               select: {
                 ebRole: true,
                 firstOptionEb: true,
+                hasAccepted: true,
+                redirection: true,
                 paymentStatus: true,
               },
               orderBy: { createdAt: "desc" },
@@ -150,7 +125,9 @@ export async function GET(request: Request) {
       return {
         memberId: membership.memberId,
         schoolYear: cycle.schoolYear,
-        roleTitle: getRoleTitle(membership.user),
+        roleTitle:
+          getApprovedDigitalIdRole(membership.user)?.roleTitle ??
+          "Official Member",
         issueDate: membership.createdAt,
         expirationDate: cycle.membershipExpiration,
         name: membership.user.name,

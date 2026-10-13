@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth/next";
 import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
 import { ensureCycleMemberId } from "@/lib/member-id";
-import { committeeRoles } from "@/data/committeeRoles";
+import { getApprovedDigitalIdRole } from "@/lib/digital-id-role";
 import { getPositionTitle } from "@/lib/eb-mapping";
 import { isMembershipExpired } from "@/lib/membership-expiration";
 
@@ -58,6 +58,8 @@ export async function GET() {
             select: {
               id: true,
               firstOptionCommittee: true,
+              hasAccepted: true,
+              redirection: true,
               paymentStatus: true,
               createdAt: true,
             },
@@ -69,6 +71,8 @@ export async function GET() {
               id: true,
               ebRole: true,
               firstOptionEb: true,
+              hasAccepted: true,
+              redirection: true,
               paymentStatus: true,
               createdAt: true,
             },
@@ -106,24 +110,9 @@ export async function GET() {
     const ebProfile = user.ebProfile?.isActive ? user.ebProfile : null;
     const eaApp = user.executiveAssociateApplications?.[0];
 
-    // Determine if any application has paymentStatus === "approved"
-    let approvedAppType: "member" | "committee" | "ea" | null = null;
-    let roleTitle = "Official Member";
-
-    if (eaApp && eaApp.paymentStatus === "approved") {
-      approvedAppType = "ea";
-      const targetRole = eaApp.ebRole || eaApp.firstOptionEb;
-      roleTitle = `Executive Associate (${getPositionTitle(targetRole)})`;
-    } else if (committeeApp && committeeApp.paymentStatus === "approved") {
-      approvedAppType = "committee";
-      const targetComm = committeeRoles.find(
-        (c) => c.id === committeeApp.firstOptionCommittee,
-      );
-      roleTitle = `Staff - ${targetComm?.title || committeeApp.firstOptionCommittee}`;
-    } else if (memberApp && memberApp.paymentStatus === "approved") {
-      approvedAppType = "member";
-      roleTitle = "Official Member";
-    }
+    const approvedRole = getApprovedDigitalIdRole(user);
+    let approvedAppType = approvedRole?.applicationType ?? null;
+    let roleTitle = approvedRole?.roleTitle ?? "Official Member";
 
     const isExecutiveBoardMember = Boolean(
       ebProfile && (user.role === "admin" || user.role === "super_admin"),
