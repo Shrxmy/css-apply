@@ -7,7 +7,7 @@ type CommunityApplicant = {
   name: string;
   email: string;
   applicationTypes: string[];
-  paymentRequirementAcknowledgedAt: string | null;
+  paymentApproved: boolean;
   hasJoined: boolean | null;
   respondedAt: string | null;
   lastReminderSentAt: string | null;
@@ -18,6 +18,7 @@ type CommunityDashboard = {
   cycle: { id: string; schoolYear: string } | null;
   community: { enabled: boolean; configured: boolean; label: string };
   totalAccepted: number;
+  paymentApprovedCount: number;
   joinedCount: number;
   notYetJoinedCount: number;
   notAnsweredCount: number;
@@ -123,8 +124,9 @@ export default function CommunityJoinManager() {
               Community Join Reminders
             </h2>
             <p className="mt-1 max-w-3xl text-sm leading-relaxed text-[#134687]/65">
-              Review accepted applicants who have not confirmed joining, then
-              manually send them a reminder. Nothing is sent automatically.
+              Review accepted applicants whose payment receipt is approved but
+              who have not confirmed joining, then manually send a reminder.
+              Nothing is sent automatically.
             </p>
           </div>
           <button
@@ -137,13 +139,12 @@ export default function CommunityJoinManager() {
           </button>
         </div>
 
-        <div className="mt-5 rounded-xl border border-[#D6A326]/25 bg-[#FFF8E7] p-4 text-sm leading-relaxed text-[#6F4B00]">
-          Community membership cannot be verified automatically. Until an
-          applicant answers the portal question, they are treated as unconfirmed
-          (including applicants who may already have joined). The reminder asks
-          those members to confirm in CSSApply. Payment and approval of the
-          acknowledgement receipt are required before their Member ID is
-          released.
+        <div className="mt-5 rounded-xl border border-[#005FD9]/15 bg-[#F3F8FF] p-4 text-sm leading-relaxed text-[#134687]">
+          Only accepted applicants with an approved acknowledgement receipt are
+          eligible for a reminder. The group invitation becomes available on
+          their CSSApply progress page after receipt approval. Anyone who has
+          not answered the portal question is treated as unconfirmed, including
+          applicants who may already have joined.
         </div>
 
         {error && (
@@ -173,12 +174,12 @@ export default function CommunityJoinManager() {
           <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {[
               { label: "Accepted applicants", value: dashboard.totalAccepted },
-              { label: "Confirmed joined", value: dashboard.joinedCount },
               {
-                label: "Answered ‘not yet’",
-                value: dashboard.notYetJoinedCount,
+                label: "Payment approved",
+                value: dashboard.paymentApprovedCount,
               },
-              { label: "Not answered", value: dashboard.notAnsweredCount },
+              { label: "Confirmed joined", value: dashboard.joinedCount },
+              { label: "Need confirmation", value: dashboard.unconfirmedCount },
             ].map((item) => (
               <div
                 key={item.label}
@@ -199,11 +200,11 @@ export default function CommunityJoinManager() {
               <div>
                 <h3 className="font-poppins text-lg font-bold text-[#134687]">
                   {dashboard.cycle
-                    ? `${dashboard.cycle.schoolYear} unconfirmed applicants`
+                    ? `${dashboard.cycle.schoolYear} payment-approved applicants`
                     : "No active recruitment cycle"}
                 </h3>
                 <p className="mt-1 text-xs text-[#134687]/60">
-                  {dashboard.unconfirmedCount} not confirmed ·{" "}
+                  {dashboard.unconfirmedCount} need confirmation ·{" "}
                   {dashboard.sendableCount} valid email address
                   {dashboard.sendableCount === 1 ? "" : "es"}
                   {dashboard.invalidEmailCount > 0
@@ -239,11 +240,12 @@ export default function CommunityJoinManager() {
             )}
 
             <div className="max-h-[560px] overflow-auto">
-              <table className="w-full min-w-[760px] text-left text-sm">
+              <table className="w-full min-w-[860px] text-left text-sm">
                 <thead className="sticky top-0 bg-[#F3F8FF] text-[10px] uppercase tracking-wider text-[#134687]/60">
                   <tr>
                     <th className="px-4 py-3">Applicant</th>
                     <th className="px-4 py-3">Application</th>
+                    <th className="px-4 py-3">Payment</th>
                     <th className="px-4 py-3">Confirmation</th>
                     <th className="px-4 py-3">Last reminder</th>
                   </tr>
@@ -261,6 +263,11 @@ export default function CommunityJoinManager() {
                       </td>
                       <td className="px-4 py-3 text-xs text-[#134687]/70">
                         {applicant.applicationTypes.join(", ")}
+                      </td>
+                      <td className="px-4 py-3 text-xs">
+                        <span className="rounded-full bg-[#E8F2FF] px-2.5 py-1 font-semibold text-[#134687]">
+                          Approved
+                        </span>
                       </td>
                       <td className="px-4 py-3 text-xs">
                         {applicant.hasJoined === false ? (
@@ -283,11 +290,13 @@ export default function CommunityJoinManager() {
                   {!dashboard.applicants.length && (
                     <tr>
                       <td
-                        colSpan={4}
+                        colSpan={5}
                         className="px-4 py-10 text-center text-sm text-[#134687]/55"
                       >
                         {dashboard.cycle
-                          ? "Everyone has confirmed joining for this cycle."
+                          ? dashboard.paymentApprovedCount === 0
+                            ? "No accepted applicants have an approved payment receipt yet."
+                            : "Everyone with an approved receipt has confirmed joining."
                           : "There is no active recruitment cycle."}
                       </td>
                     </tr>
@@ -323,15 +332,16 @@ export default function CommunityJoinManager() {
             </h2>
             <p className="mt-3 text-sm leading-relaxed text-[#134687]/75">
               Send the CSS community reminder to {dashboard.sendableCount}{" "}
-              accepted applicant{dashboard.sendableCount === 1 ? "" : "s"} who
-              have not confirmed joining? Each receives an individual email. The
-              batch is capped at {dashboard.recipientLimit} recipients.
+              accepted applicant{dashboard.sendableCount === 1 ? "" : "s"} whose
+              payment receipt is approved and who have not confirmed joining?
+              Each receives an individual email. The batch is capped at{" "}
+              {dashboard.recipientLimit} recipients.
             </p>
             <p className="mt-3 rounded-lg bg-[#F3F8FF] p-3 text-xs leading-relaxed text-[#134687]/75">
-              The email directs applicants to CSSApply; the group invite remains
-              behind the required payment acknowledgement. The system records
-              only that the email provider accepted the batch, not that each
-              message reached an inbox.
+              The email directs applicants to CSSApply, where the group invite
+              is available after payment approval. The system records only that
+              the email provider accepted the batch, not that each message
+              reached an inbox.
             </p>
             <div className="mt-6 flex justify-end gap-3">
               <button

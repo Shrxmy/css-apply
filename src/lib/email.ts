@@ -1230,9 +1230,9 @@ export const emailTemplates = {
         ),
     }),
 
-    // CSS Group Join Invitation Template. The invite itself stays in the
-    // authenticated progress page so applicants must acknowledge the payment
-    // and receipt-approval requirement before opening it.
+    // The reminder is sent only to accepted applicants whose receipt is
+    // approved and who have not yet confirmed joining. The invite itself is
+    // served only to eligible applicants from their authenticated progress page.
     cssGroupJoin: (
         userName: string,
         groupLabel: string,
@@ -1246,19 +1246,17 @@ export const emailTemplates = {
                 `
                 <p>Dear ${safeUserName},</p>
 
-                <p>You are invited to join the official CSS community group for updates, events, and announcements. If you have already joined, please log in and confirm your status so we can update our records.</p>
+                <p>Your acknowledgement receipt has been approved. You can now join the official CSS community group for updates, events, and announcements.</p>
 
                 <div class="accent-box">
-                  <h3>Important Member ID Reminder</h3>
-                  <p>Payment is required before your Member ID can be released. You must submit your acknowledgement receipt and wait for an authorized reviewer to approve it.</p>
-                  <p>Before opening the ${safeGroupLabel} invite, CSSApply will ask you to acknowledge this requirement. After joining, please answer the required confirmation question on your application progress page.</p>
+                  <h3>Join the CSS Community</h3>
+                  <p>Log in to CSSApply and open your accepted application progress page. The ${safeGroupLabel} invitation is available there after payment approval.</p>
+                  <p>After joining, return to the progress page and answer the community confirmation question. If you have already joined, you can simply confirm your status.</p>
                 </div>
 
                 <div style="text-align: center; margin: 25px 0;">
                   <a href="${appBaseUrl}/user" class="button">Continue to CSSApply</a>
                 </div>
-
-                <p>If you have not joined yet, use the community invite on your accepted application progress page after acknowledging the reminder. If you already belong to the group, choose “Yes, I have joined” there instead of requesting access again.</p>
                 `
             ),
         };

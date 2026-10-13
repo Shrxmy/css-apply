@@ -11,6 +11,7 @@ export function useCommunityLink() {
   const { data, error, isLoading, mutate } = useSWR<CommunityLinkResponse>(
     "/api/community-link",
     (url: string) => swrFetcher(url) as Promise<CommunityLinkResponse>,
+    { refreshInterval: 15_000, revalidateOnFocus: true },
   );
 
   return {

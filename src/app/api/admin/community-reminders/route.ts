@@ -17,6 +17,7 @@ type AcceptedApplicant = {
   userId: string;
   name: string;
   email: string;
+  paymentApproved: boolean;
   applicationTypes: Set<ApplicationType>;
 };
 
@@ -71,7 +72,10 @@ async function getAcceptedApplicants(cycleId: string) {
   const [members, committeeStaff, executiveAssociates] = await Promise.all([
     prisma.memberApplication.findMany({
       where: { recruitmentCycleId: cycleId, hasAccepted: true },
-      select: { user: { select: { id: true, name: true, email: true } } },
+      select: {
+        paymentStatus: true,
+        user: { select: { id: true, name: true, email: true } },
+      },
     }),
     prisma.committeeApplication.findMany({
       where: {
@@ -79,7 +83,10 @@ async function getAcceptedApplicants(cycleId: string) {
         hasAccepted: true,
         redirection: null,
       },
-      select: { user: { select: { id: true, name: true, email: true } } },
+      select: {
+        paymentStatus: true,
+        user: { select: { id: true, name: true, email: true } },
+      },
     }),
     prisma.executiveAssociateApplication.findMany({
       where: {
@@ -87,7 +94,10 @@ async function getAcceptedApplicants(cycleId: string) {
         hasAccepted: true,
         redirection: null,
       },
-      select: { user: { select: { id: true, name: true, email: true } } },
+      select: {
+        paymentStatus: true,
+        user: { select: { id: true, name: true, email: true } },
+      },
     }),
   ]);
 
@@ -96,15 +106,18 @@ async function getAcceptedApplicants(cycleId: string) {
     records: typeof members,
     applicationType: ApplicationType,
   ) => {
-    for (const { user } of records) {
+    for (const { user, paymentStatus } of records) {
       const existing = applicants.get(user.id);
       if (existing) {
+        existing.paymentApproved =
+          existing.paymentApproved && paymentStatus === "approved";
         existing.applicationTypes.add(applicationType);
       } else {
         applicants.set(user.id, {
           userId: user.id,
           name: user.name || "CSS applicant",
           email: user.email,
+          paymentApproved: paymentStatus === "approved",
           applicationTypes: new Set([applicationType]),
         });
       }
@@ -124,7 +137,6 @@ async function getAcceptedApplicants(cycleId: string) {
         },
         select: {
           userId: true,
-          paymentRequirementAcknowledgedAt: true,
           hasJoined: true,
           respondedAt: true,
           lastReminderSentAt: true,
@@ -144,8 +156,7 @@ async function getAcceptedApplicants(cycleId: string) {
         name: applicant.name,
         email: applicant.email,
         applicationTypes: [...applicant.applicationTypes].sort(),
-        paymentRequirementAcknowledgedAt:
-          status?.paymentRequirementAcknowledgedAt ?? null,
+        paymentApproved: applicant.paymentApproved,
         hasJoined: status?.hasJoined ?? null,
         respondedAt: status?.respondedAt ?? null,
         lastReminderSentAt: status?.lastReminderSentAt ?? null,
@@ -183,10 +194,13 @@ export async function GET() {
       return json({ error: "Forbidden" }, 403);
 
     const data = await getDashboardData();
-    const joinedCount = data.applicants.filter(
+    const paymentApprovedApplicants = data.applicants.filter(
+      (applicant) => applicant.paymentApproved,
+    );
+    const joinedCount = paymentApprovedApplicants.filter(
       (applicant) => applicant.hasJoined === true,
     ).length;
-    const unconfirmedApplicants = data.applicants.filter(
+    const unconfirmedApplicants = paymentApprovedApplicants.filter(
       (applicant) => applicant.hasJoined !== true,
     );
     const sendableApplicants = unconfirmedApplicants.filter(
@@ -197,11 +211,12 @@ export async function GET() {
       cycle: data.cycle,
       community: data.community,
       totalAccepted: data.applicants.length,
+      paymentApprovedCount: paymentApprovedApplicants.length,
       joinedCount,
-      notYetJoinedCount: data.applicants.filter(
+      notYetJoinedCount: unconfirmedApplicants.filter(
         (applicant) => applicant.hasJoined === false,
       ).length,
-      notAnsweredCount: data.applicants.filter(
+      notAnsweredCount: unconfirmedApplicants.filter(
         (applicant) => applicant.hasJoined === null,
       ).length,
       unconfirmedCount: unconfirmedApplicants.length,
@@ -256,7 +271,8 @@ export async function POST(request: NextRequest) {
 
     const applicants = await getAcceptedApplicants(cycle.id);
     const unconfirmed = applicants.filter(
-      (applicant) => applicant.hasJoined !== true,
+      (applicant) =>
+        applicant.paymentApproved && applicant.hasJoined !== true,
     );
     const byEmail = new Map<string, (typeof unconfirmed)[number]>();
     for (const applicant of unconfirmed) {
@@ -270,7 +286,7 @@ export async function POST(request: NextRequest) {
     if (recipients.length > COMMUNITY_REMINDER_LIMIT) {
       return json(
         {
-          error: `There are ${recipients.length} unconfirmed applicants, exceeding the ${COMMUNITY_REMINDER_LIMIT}-recipient safety limit. No reminders were sent.`,
+          error: `There are ${recipients.length} payment-approved applicants needing confirmation, exceeding the ${COMMUNITY_REMINDER_LIMIT}-recipient safety limit. No reminders were sent.`,
         },
         409,
       );
@@ -279,7 +295,7 @@ export async function POST(request: NextRequest) {
       return json({
         success: true,
         sentCount: 0,
-        message: "No unconfirmed applicants need a reminder.",
+        message: "No payment-approved applicants need a community reminder.",
       });
     }
 
@@ -347,7 +363,7 @@ export async function POST(request: NextRequest) {
       success: true,
       sentCount: recipients.length,
       skippedInvalidEmailCount: unconfirmed.length - recipients.length,
-      message: `The email provider accepted ${recipients.length} community reminder${recipients.length === 1 ? "" : "s"}.`,
+      message: `The email provider accepted ${recipients.length} community reminder${recipients.length === 1 ? "" : "s"} for payment-approved applicants.`,
     });
   } catch (error) {
     console.error(
