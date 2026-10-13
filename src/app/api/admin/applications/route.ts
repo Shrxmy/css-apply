@@ -699,18 +699,22 @@ export async function PUT(request: NextRequest) {
       const updateData: {
         hasAccepted?: boolean;
         status?: string;
-        redirection?: string;
+        redirection?: string | null;
       } = {};
 
       if (action === "evaluate") {
         updateData.hasAccepted = false;
         updateData.status = "evaluating";
+        updateData.redirection = null;
       } else if (action === "accept") {
         updateData.hasAccepted = true;
         updateData.status = "passed";
+        // A direct admin decision replaces any earlier redirect offer.
+        updateData.redirection = null;
       } else if (action === "reject") {
         updateData.hasAccepted = false;
         updateData.status = "failed";
+        updateData.redirection = null;
       } else if (action === "redirect" && redirection) {
         updateData.hasAccepted = false;
         updateData.status = "redirected";
@@ -868,15 +872,17 @@ export async function PUT(request: NextRequest) {
       const updateData: {
         hasAccepted?: boolean;
         status?: string;
-        redirection?: string;
+        redirection?: string | null;
       } = {};
 
       if (action === "evaluate") {
         updateData.hasAccepted = false;
         updateData.status = "evaluating";
+        updateData.redirection = null;
       } else if (action === "accept") {
         updateData.hasAccepted = true;
         updateData.status = "passed";
+        updateData.redirection = null;
 
         // If this EA application was redirected to a committee, clean up the committee application record
         if (
@@ -902,6 +908,7 @@ export async function PUT(request: NextRequest) {
       } else if (action === "reject") {
         updateData.hasAccepted = false;
         updateData.status = "failed";
+        updateData.redirection = null;
 
         // If this EA application was redirected to a committee, clean up the committee application record
         if (
