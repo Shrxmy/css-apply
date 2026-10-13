@@ -317,7 +317,7 @@ export default function PaymentReviewsPage() {
                             <p
                               className={`rounded-lg p-3 text-sm ${
                                 review.paymentStatus === "needs_revision"
-                                  ? "border-l-4 border-l-amber-800 bg-amber-50 text-amber-950"
+                                  ? "border border-[#005FD9]/10 bg-[#F3F8FF] text-[#134687]"
                                   : "bg-red-50 text-red-700"
                               }`}
                             >
@@ -355,7 +355,7 @@ export default function PaymentReviewsPage() {
                                   setReviewAction("needs_revision");
                                   setRejectionReason("");
                                 }}
-                                className="rounded-lg border border-amber-800 px-2 py-2 text-xs font-semibold text-amber-950 hover:bg-amber-100"
+                                className="rounded-lg border border-[#005FD9]/15 bg-[#F3F8FF] px-2 py-2 text-xs font-semibold text-[#044FAF] hover:bg-[#E8F2FF]"
                               >
                                 Needs Revision
                               </button>
@@ -374,10 +374,10 @@ export default function PaymentReviewsPage() {
                           )}
 
                           {selectedStatus === "pending" && isRejecting && (
-                            <div className={`space-y-2 rounded-lg p-3 ${reviewAction === "needs_revision" ? "bg-amber-50" : "bg-red-50"}`}>
+                            <div className={`space-y-2 rounded-lg p-3 ${reviewAction === "needs_revision" ? "border border-[#005FD9]/10 bg-[#F3F8FF]" : "bg-red-50"}`}>
                               <label
                                 htmlFor={`rejection-${review.id}`}
-                                className={`block text-xs font-semibold ${reviewAction === "needs_revision" ? "text-amber-950" : "text-red-800"}`}
+                                className={`block text-xs font-semibold ${reviewAction === "needs_revision" ? "text-[#134687]" : "text-red-800"}`}
                               >
                                 {reviewAction === "needs_revision" ? "What needs to be fixed?" : "Why is this receipt invalid?"}
                               </label>
@@ -388,13 +388,13 @@ export default function PaymentReviewsPage() {
                                 maxLength={500}
                                 rows={3}
                                 required
-                                className={`w-full rounded-lg border bg-white px-3 py-2 text-sm focus:outline-none ${reviewAction === "needs_revision" ? "border-amber-800 focus:border-amber-900" : "border-red-200 focus:border-red-500"}`}
+                                className={`w-full rounded-lg border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 ${reviewAction === "needs_revision" ? "border-[#005FD9]/20 focus:border-[#044FAF] focus:ring-[#044FAF]/10" : "border-red-200 focus:border-red-500 focus:ring-red-100"}`}
                               />
                               <div className="grid grid-cols-2 gap-2">
                                 <button
                                   type="button"
                                   onClick={() => void reviewReceipt(review, reviewAction)}
-                                  className={`rounded-lg px-3 py-2 text-sm font-semibold text-white ${reviewAction === "needs_revision" ? "bg-amber-800 hover:bg-amber-900" : "bg-red-700"}`}
+                                  className={`rounded-lg px-3 py-2 text-sm font-semibold text-white ${reviewAction === "needs_revision" ? "bg-[#044FAF] hover:bg-[#033B85]" : "bg-red-700"}`}
                                 >
                                   {reviewAction === "needs_revision" ? "Send Revision Request" : "Confirm Reject"}
                                 </button>
@@ -418,7 +418,7 @@ export default function PaymentReviewsPage() {
                               type="button"
                               onClick={() => void resendRevisionEmail(review)}
                               disabled={!review.paymentRejectionReason?.trim()}
-                              className="rounded-lg border border-amber-800 px-3 py-2 text-xs font-semibold text-amber-950 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+                              className="rounded-lg border border-[#005FD9]/15 bg-[#F3F8FF] px-3 py-2 text-xs font-semibold text-[#044FAF] hover:bg-[#E8F2FF] disabled:cursor-not-allowed disabled:opacity-50"
                               title={
                                 review.paymentRejectionReason?.trim()
                                   ? "Resend the revision email with the saved comment"
