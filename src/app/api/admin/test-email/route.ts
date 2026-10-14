@@ -68,17 +68,30 @@ export async function POST(request: NextRequest) {
     if (!option) return json({ error: "Invalid email template type." }, 400);
 
     let communityLabel = "CSS Community Group";
+    let communityUrl = "";
     if (parsed.data.templateType === "css_group_join") {
       try {
-        const config = await prisma.systemConfig.findUnique({
-          where: { key: "community_group_label" },
-          select: { value: true },
+        const configs = await prisma.systemConfig.findMany({
+          where: {
+            key: { in: ["community_group_label", "community_group_url"] },
+          },
+          select: { key: true, value: true },
         });
-        communityLabel = config?.value.trim() || communityLabel;
+        const values = new Map(configs.map(({ key, value }) => [key, value]));
+        communityLabel =
+          values.get("community_group_label")?.trim() || communityLabel;
+        const url = new URL(values.get("community_group_url")?.trim() || "");
+        if (url.protocol === "https:") communityUrl = url.toString();
       } catch (configError) {
         console.error(
-          "Could not load community label for email test",
-          configError,
+          "Could not load community link for email test",
+          configError instanceof Error ? configError.name : "UnknownError",
+        );
+      }
+      if (!communityUrl) {
+        return json(
+          { error: "Save an HTTPS community link before sending this test." },
+          409,
         );
       }
     }
@@ -89,6 +102,7 @@ export async function POST(request: NextRequest) {
       parsed.data.templateType,
       recipientName,
       communityLabel,
+      communityUrl,
     );
     if (!template) return json({ error: "Invalid email template type." }, 400);
 

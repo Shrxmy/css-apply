@@ -147,7 +147,11 @@ export const EMAIL_TEMPLATE_TEST_OPTIONS = [
 }>;
 
 type TemplateName = keyof typeof emailTemplates;
-type TestTemplateFactory = (name: string, groupLabel: string) => EmailTemplate;
+type TestTemplateFactory = (
+  name: string,
+  groupLabel: string,
+  groupUrl: string,
+) => EmailTemplate;
 
 const testTemplateFactories = {
   memberApplication: (name) =>
@@ -260,12 +264,8 @@ const testTemplateFactories = {
   paymentDeadlineReminder: () =>
     emailTemplates.paymentDeadlineReminder("2026-10-31T23:59:00+08:00"),
   paymentReminder: (name) => emailTemplates.paymentReminder(name),
-  cssGroupJoin: (name, groupLabel) =>
-    emailTemplates.cssGroupJoin(
-      name,
-      groupLabel,
-      "https://www.facebook.com/groups/example",
-    ),
+  cssGroupJoin: (name, groupLabel, groupUrl) =>
+    emailTemplates.cssGroupJoin(name, groupLabel, groupUrl),
 } satisfies Record<TemplateName, TestTemplateFactory>;
 
 type TestedTemplateName =
@@ -290,11 +290,16 @@ export function buildEmailTemplateTest(
   templateType: string,
   recipientName: string,
   groupLabel = "CSS Community Group",
+  groupUrl = "",
 ): EmailTemplate | null {
   const option = EMAIL_TEMPLATE_TEST_OPTIONS.find(
     (candidate) => candidate.value === templateType,
   );
   if (!option) return null;
 
-  return testTemplateFactories[option.template](recipientName, groupLabel);
+  return testTemplateFactories[option.template](
+    recipientName,
+    groupLabel,
+    groupUrl,
+  );
 }
