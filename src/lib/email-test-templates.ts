@@ -261,7 +261,11 @@ const testTemplateFactories = {
     emailTemplates.paymentDeadlineReminder("2026-10-31T23:59:00+08:00"),
   paymentReminder: (name) => emailTemplates.paymentReminder(name),
   cssGroupJoin: (name, groupLabel) =>
-    emailTemplates.cssGroupJoin(name, groupLabel),
+    emailTemplates.cssGroupJoin(
+      name,
+      groupLabel,
+      "https://www.facebook.com/groups/example",
+    ),
 } satisfies Record<TemplateName, TestTemplateFactory>;
 
 type TestedTemplateName =

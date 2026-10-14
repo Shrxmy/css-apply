@@ -1231,14 +1231,15 @@ export const emailTemplates = {
     }),
 
     // The reminder is sent only to accepted applicants whose receipt is
-    // approved and who have not yet confirmed joining. The invite itself is
-    // served only to eligible applicants from their authenticated progress page.
+    // approved and who have not yet confirmed joining, so it carries the invite.
     cssGroupJoin: (
         userName: string,
         groupLabel: string,
+        groupUrl: string,
     ): EmailTemplate => {
         const safeUserName = escapeHtml(userName);
         const safeGroupLabel = escapeHtml(groupLabel);
+        const safeGroupUrl = escapeHtml(groupUrl);
         return {
             subject: "CSS Community Group Invitation",
             html: wrapEmail(
@@ -1250,12 +1251,12 @@ export const emailTemplates = {
 
                 <div class="accent-box">
                   <h3>Join the CSS Community</h3>
-                  <p>Log in to CSSApply and open your accepted application progress page. The ${safeGroupLabel} invitation is available there after payment approval.</p>
-                  <p>After joining, return to the progress page and answer the community confirmation question. If you have already joined, you can simply confirm your status.</p>
+                  <p>Use the button below to join the community group.</p>
+                  <p>After joining, log in to <a href="${appBaseUrl}/user">CSSApply</a>, open your accepted application progress page, and answer the community confirmation question. If you have already joined, you can simply confirm your status.</p>
                 </div>
 
                 <div style="text-align: center; margin: 25px 0;">
-                  <a href="${appBaseUrl}/user" class="button">Continue to CSSApply</a>
+                  <a href="${safeGroupUrl}" class="button">${safeGroupLabel}</a>
                 </div>
                 `
             ),

@@ -64,6 +64,7 @@ async function getCommunityConfig() {
   return {
     enabled: values.get("community_group_enabled") !== "false",
     configured: validHttpsUrl,
+    url,
     label,
   };
 }
@@ -299,7 +300,11 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const template = emailTemplates.cssGroupJoin("CSS member", community.label);
+    const template = emailTemplates.cssGroupJoin(
+      "CSS member",
+      community.label,
+      community.url,
+    );
     const result = await sendEmailBatch(
       recipients.map(({ email }) => email),
       template.subject,
