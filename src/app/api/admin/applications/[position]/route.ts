@@ -3,21 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { prisma } from "@/lib/prisma";
 import { getPositionTitle, getRoleId } from "@/lib/eb-mapping";
-import { committeeRoles } from "@/data/committeeRoles";
 import { createLogger } from "@/lib/logger";
 
 const applicationsLogger = createLogger("api/admin/applications");
-
-const normalizeCommitteeId = (value: string) => {
-  const normalizedValue = value.toLowerCase().replace(/&/g, "and");
-  const committee = committeeRoles.find(
-    ({ id, title }) =>
-      id.toLowerCase() === normalizedValue ||
-      title.toLowerCase().replace(/&/g, "and") === normalizedValue,
-  );
-
-  return committee?.id ?? value;
-};
 
 // GET all applications with filtering
 export async function GET(
@@ -92,7 +80,7 @@ export async function GET(
     const ebProfile = session.user.dbId
       ? await prisma.eBProfile.findFirst({
           where: { userId: session.user.dbId },
-          select: { position: true, committees: true },
+          select: { position: true },
         })
       : null;
     const assignmentValues = ebProfile
@@ -104,9 +92,6 @@ export async function GET(
           .filter(Boolean)
           .map((value) => value.toLowerCase())
       : [];
-    const accessibleCommittees = new Set(
-      ebProfile?.committees.map(normalizeCommitteeId) ?? [],
-    );
 
     const activeCycle = await prisma.recruitmentCycle.findFirst({
       where: { isActive: true },
@@ -145,15 +130,6 @@ export async function GET(
           app.interviewBy &&
           assignmentValues.includes(app.interviewBy.toLowerCase()),
         );
-
-        const hasCommitteeAccess =
-          isSuperAdmin ||
-          accessibleCommittees.has(
-            normalizeCommitteeId(app.firstOptionCommittee),
-          ) ||
-          accessibleCommittees.has(
-            normalizeCommitteeId(app.secondOptionCommittee),
-          );
 
         return (isSuperAdmin || isAssigned) && !isRejected && !isRedirected;
       },

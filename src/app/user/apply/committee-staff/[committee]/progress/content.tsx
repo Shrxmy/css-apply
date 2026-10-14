@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Image from "next/image";
 import Header from "@/components/Header";
@@ -153,7 +153,7 @@ export default function CommitteeProgressPageContent() {
     return redirection;
   };
 
-  const fetchApplicationData = async () => {
+  const fetchApplicationData = useCallback(async () => {
     try {
       const response = await fetch(
         `/api/applications/committee-staff?t=${Date.now()}`,
@@ -197,7 +197,7 @@ export default function CommitteeProgressPageContent() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
 
   useEffect(() => {
     fetchApplicationData();
@@ -215,7 +215,7 @@ export default function CommitteeProgressPageContent() {
       window.removeEventListener("focus", refresh);
       document.removeEventListener("visibilitychange", refresh);
     };
-  }, []);
+  }, [fetchApplicationData]);
 
   const handleRedirectionResponse = async (decision: "accept" | "reject") => {
     try {

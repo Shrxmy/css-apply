@@ -251,7 +251,7 @@ const EAs = () => {
       setPendingAction({ applicationId, action });
       if (action === "redirect") setShowRedirectModal(false);
     },
-    [executeEAAction],
+    [],
   );
 
   if (status === "loading") {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Header from "@/components/Header";
@@ -155,7 +155,7 @@ export default function EAProgressPageContent() {
     return redirection;
   };
 
-  const fetchApplicationData = async () => {
+  const fetchApplicationData = useCallback(async () => {
     try {
       const response = await fetch(
         `/api/applications/executive-associate?t=${Date.now()}`,
@@ -199,7 +199,7 @@ export default function EAProgressPageContent() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
 
   useEffect(() => {
     fetchApplicationData();
@@ -217,7 +217,7 @@ export default function EAProgressPageContent() {
       window.removeEventListener("focus", refresh);
       document.removeEventListener("visibilitychange", refresh);
     };
-  }, []);
+  }, [fetchApplicationData]);
 
   const handleRedirectionResponse = async (decision: "accept" | "reject") => {
     try {

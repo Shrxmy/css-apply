@@ -403,7 +403,7 @@ const Applications = () => {
       }
       setPendingAction({ applicationId, type, action });
     },
-    [executeApplicationAction],
+    [],
   );
 
   // Memoized status badge component

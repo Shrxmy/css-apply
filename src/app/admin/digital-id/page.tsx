@@ -62,7 +62,7 @@ export default function AdminDigitalIdPage() {
     } else if (status === "authenticated") {
       void loadDigitalId();
     }
-  }, [status]);
+  }, [router, status]);
 
   if (status === "loading" || loading) {
     return <LoadingScreen message="Loading Digital ID" />;
