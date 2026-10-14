@@ -319,29 +319,25 @@ export async function POST(request: NextRequest) {
 
     const sentAt = new Date();
     try {
-      await prisma.$transaction(
-        recipients.map((applicant) =>
-          prisma.communityJoinConfirmation.upsert({
-            where: {
-              userId_recruitmentCycleId: {
-                userId: applicant.userId,
-                recruitmentCycleId: cycle.id,
-              },
-            },
-            update: {
-              lastReminderSentAt: sentAt,
-              reminderCount: { increment: 1 },
-            },
-            create: {
-              userId: applicant.userId,
-              recruitmentCycleId: cycle.id,
-              lastReminderSentAt: sentAt,
-              reminderCount: 1,
-            },
-          }),
-        ),
-        { maxWait: 10_000, timeout: 20_000 },
-      );
+      // Two bulk queries instead of one upsert per recipient: the database is
+      // far from the server, and ~130 sequential round trips hit the timeout.
+      const userIds = recipients.map(({ userId }) => userId);
+      await prisma.$transaction([
+        prisma.communityJoinConfirmation.createMany({
+          data: userIds.map((userId) => ({
+            userId,
+            recruitmentCycleId: cycle.id,
+          })),
+          skipDuplicates: true,
+        }),
+        prisma.communityJoinConfirmation.updateMany({
+          where: { recruitmentCycleId: cycle.id, userId: { in: userIds } },
+          data: {
+            lastReminderSentAt: sentAt,
+            reminderCount: { increment: 1 },
+          },
+        }),
+      ]);
     } catch (trackingError) {
       console.error(
         "Community reminder email accepted but tracking update failed",
