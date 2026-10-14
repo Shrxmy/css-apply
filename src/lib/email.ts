@@ -6,7 +6,7 @@ const fallbackAppBaseUrl = "https://ust-css-apply.vercel.app";
 const configuredAppBaseUrl =
     process.env.APP_BASE_URL?.trim() ||
     process.env.NEXT_PUBLIC_APP_URL?.trim() ||
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "") ||
+    // Not VERCEL_URL: it is the per-deployment *.vercel.app host, not the public domain.
     process.env.NEXTAUTH_URL?.trim() ||
     fallbackAppBaseUrl;
 const appBaseUrl = (() => {
@@ -1252,7 +1252,7 @@ export const emailTemplates = {
                 <div class="accent-box">
                   <h3>Join the CSS Community</h3>
                   <p>Use the button below to join the community group.</p>
-                  <p>After joining, log in to <a href="${appBaseUrl}/user">CSSApply</a>, open your accepted application progress page, and answer the community confirmation question. If you have already joined, you can simply confirm your status.</p>
+                  <p>After joining, log in to CSSApply, open your accepted application progress page, and answer the community confirmation question. If you have already joined, you can simply confirm your status.</p>
                 </div>
 
                 <div style="text-align: center; margin: 25px 0;">
