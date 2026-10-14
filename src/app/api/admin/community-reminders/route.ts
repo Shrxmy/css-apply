@@ -352,6 +352,13 @@ export async function POST(request: NextRequest) {
             trackingError instanceof Error
               ? trackingError.name
               : "UnknownError",
+          // Prisma code (e.g. P2022 missing column, P2028 transaction timeout).
+          errorCode:
+            trackingError &&
+            typeof trackingError === "object" &&
+            "code" in trackingError
+              ? String(trackingError.code)
+              : undefined,
         },
       );
       return json(
