@@ -21,11 +21,34 @@ const GROUPS: { value: EmailCampaignGroup; label: string }[] = [
 ];
 const focus =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#044FAF] focus-visible:ring-offset-2";
-const button = `rounded-lg px-3 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${focus}`;
-const secondary = `${button} bg-[#E8F2FF] text-[#134687] hover:bg-[#D9E9F8]`;
-const primary = `${button} bg-[#134687] text-white hover:bg-[#0F376B]`;
-const input = `w-full min-w-0 rounded-lg border-0 bg-[#F3F8FF] px-3 py-2 text-sm text-[#134687] disabled:opacity-60 ${focus}`;
+const button = `rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${focus}`;
+const secondary = `${button} border border-[#005FD9]/20 bg-white text-[#134687] hover:bg-[#F3F8FF]`;
+const primary = `${button} bg-[#134687] px-4 py-2 text-white hover:bg-[#0F376B]`;
+const input = `w-full min-w-0 rounded-lg border border-[#005FD9]/15 bg-white px-3 py-2 text-sm text-[#134687] placeholder:text-[#134687]/40 disabled:bg-[#F8FAFF] disabled:opacity-70 ${focus}`;
 const checkbox = `h-4 w-4 shrink-0 accent-[#134687] ${focus}`;
+const card =
+  "min-w-0 overflow-hidden rounded-2xl border border-[#005FD9]/10 bg-white";
+const cardHeader =
+  "flex flex-wrap items-center justify-between gap-2 border-b border-[#005FD9]/10 px-4 py-3 sm:px-5";
+const fieldLabel = "mb-1 block text-xs font-semibold text-[#134687]/80";
+const hint = "text-xs leading-relaxed text-[#134687]/60";
+const optional = (
+  <span className="font-normal text-[#134687]/45"> · optional</span>
+);
+
+function statusTone(status: EmailCampaignStatus | "PENDING") {
+  switch (status) {
+    case "ACCEPTED":
+      return "bg-green-50 text-green-800";
+    case "FAILED":
+      return "bg-red-50 text-red-700";
+    case "SENDING":
+    case "UNKNOWN":
+      return "bg-[#FFF8E7] text-[#8A5A00]";
+    default:
+      return "bg-[#F3F3FD] text-[#134687]/75";
+  }
+}
 
 // This is only a client-side guard; every API must also enforce super_admin.
 export default function EmailCampaignManager() {
@@ -550,15 +573,16 @@ function CampaignComposer() {
     void loadAudience();
   };
 
+  const groupLabel = (group: EmailCampaignGroup) =>
+    GROUPS.find((item) => item.value === group)?.label ?? group;
+
   return (
-    <div className="min-w-0 space-y-3 font-inter text-sm text-[#134687]">
-      <header className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h2 className="font-poppins text-base font-semibold">
-            Email campaigns
-          </h2>
-          <p className="mt-1 text-[#134687]/75">
-            Super Admin only · Accepted current-cycle EAs, Staff, and Members,
+    <div className="min-w-0 space-y-4 font-inter text-sm text-[#134687]">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h2 className="font-poppins text-xl font-bold">Email Composer</h2>
+          <p className="mt-1 max-w-3xl text-sm leading-relaxed text-[#134687]/65">
+            Send to accepted EAs, Staff, and Members in the current cycle,
             regardless of payment. Nothing is sent until you confirm.
           </p>
         </div>
@@ -575,7 +599,7 @@ function CampaignComposer() {
       {operation && (
         <p
           role="status"
-          className="flex items-center gap-2 rounded-lg bg-[#E8F2FF] p-3"
+          className="flex items-center gap-2 rounded-lg border border-[#005FD9]/15 bg-[#F3F8FF] px-3 py-2"
         >
           <LoadingSpinner size="sm" label={operation} />
           {operation}
@@ -584,13 +608,16 @@ function CampaignComposer() {
       {error && (
         <p
           role="alert"
-          className="break-words rounded-lg bg-red-50 p-3 text-red-800"
+          className="break-words rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-700"
         >
           {error}
         </p>
       )}
       {notice && (
-        <p role="status" className="rounded-lg bg-[#F3F8FF] p-3">
+        <p
+          role="status"
+          className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-green-800"
+        >
           {notice}
         </p>
       )}
@@ -598,30 +625,35 @@ function CampaignComposer() {
       {attempt && (
         <section
           aria-label="Captured campaign"
-          className="space-y-2 rounded-xl bg-[#E8F2FF] p-3"
+          className="space-y-2 rounded-2xl border border-[#D6A326]/30 bg-[#FFF8E7] p-4 text-[#6F4B00]"
         >
-          <h3
-            ref={capturedHeading}
-            tabIndex={-1}
-            className={`font-semibold ${focus}`}
-          >
-            {!attempt.campaign
-              ? "Save status uncertain · draft frozen"
-              : attempt.uncertain && attempt.campaign.status === "DRAFT"
-                ? "Send status uncertain · do not resend"
-                : statusLabel(attempt.campaign.status)}
-          </h3>
-          <p className="break-words text-xs">
-            Request ID: {attempt.request.clientRequestId}
-          </p>
-          {attempt.campaign && (
-            <p className="break-words text-xs">
-              Campaign ID: {attempt.campaign.id} ·{" "}
-              {attempt.campaign.counts.accepted}/{attempt.campaign.counts.total}{" "}
-              provider accepted
-            </p>
-          )}
-          <p>
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <h3
+              ref={capturedHeading}
+              tabIndex={-1}
+              className={`font-semibold ${focus}`}
+            >
+              {!attempt.campaign
+                ? "Save status uncertain · draft frozen"
+                : attempt.uncertain && attempt.campaign.status === "DRAFT"
+                  ? "Send status uncertain · do not resend"
+                  : statusLabel(attempt.campaign.status)}
+            </h3>
+            <button
+              type="button"
+              className={secondary}
+              disabled={busy || Boolean(review)}
+              onClick={() => {
+                if (attempt.campaign) void refreshCampaign(attempt.campaign.id);
+                else void recoverDraft();
+              }}
+            >
+              {attempt.campaign
+                ? "Refresh status"
+                : "Recover saved draft (does not send)"}
+            </button>
+          </div>
+          <p className="leading-relaxed">
             {attempt.uncertain
               ? "Do not resend. Check provider logs and refresh status. Keep this composer open to retain the captured request."
               : attempt.campaign?.status === "FAILED"
@@ -632,33 +664,27 @@ function CampaignComposer() {
                     ? "A send was already attempted. This composer will not resend. Check provider logs before starting another campaign."
                     : "The saved campaign is frozen. Review and confirm to send, or explicitly start a new campaign to make changes."}
           </p>
-          <button
-            type="button"
-            className={secondary}
-            disabled={busy || Boolean(review)}
-            onClick={() => {
-              if (attempt.campaign) void refreshCampaign(attempt.campaign.id);
-              else void recoverDraft();
-            }}
-          >
-            {attempt.campaign
-              ? "Refresh status"
-              : "Recover saved draft (does not send)"}
-          </button>
+          <p className="break-all font-mono text-[11px] opacity-75">
+            Request {attempt.request.clientRequestId}
+            {attempt.campaign &&
+              ` · Campaign ${attempt.campaign.id} · ${attempt.campaign.counts.accepted}/${attempt.campaign.counts.total} provider accepted`}
+          </p>
         </section>
       )}
 
-      <div className="grid min-w-0 gap-3 xl:grid-cols-2">
-        <section
-          aria-labelledby="campaign-recipients-heading"
-          className="min-w-0 rounded-xl bg-white p-3 sm:p-4"
-        >
-          <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="grid min-w-0 items-start gap-4 xl:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
+        <section aria-labelledby="campaign-recipients-heading" className={card}>
+          <div className={cardHeader}>
             <h3
               id="campaign-recipients-heading"
               className="font-poppins font-semibold"
             >
-              Recipients {audience?.cycle && `· ${audience.cycle.schoolYear}`}
+              Recipients
+              {audience?.cycle && (
+                <span className="ml-2 font-inter text-xs font-normal text-[#134687]/55">
+                  AY {audience.cycle.schoolYear}
+                </span>
+              )}
             </h3>
             <button
               type="button"
@@ -666,254 +692,264 @@ function CampaignComposer() {
               onClick={() => void loadAudience()}
               disabled={frozen}
             >
-              Refresh recipients
+              Refresh
             </button>
           </div>
-          {audienceLoading && (
-            <p role="status" className="py-3 text-center">
-              Loading eligible recipients…
-            </p>
-          )}
-          {audienceError && (
-            <div
-              role="alert"
-              className="my-2 rounded-lg bg-red-50 p-3 text-red-800"
-            >
-              <p>{audienceError}</p>
-              <button
-                type="button"
-                className={`${secondary} mt-2`}
-                disabled={frozen}
-                onClick={() => void loadAudience()}
+          <div className="space-y-3 p-4 sm:p-5">
+            {audienceLoading && (
+              <p role="status" className="py-2 text-center text-[#134687]/60">
+                Loading eligible recipients…
+              </p>
+            )}
+            {audienceError && (
+              <div
+                role="alert"
+                className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-700"
               >
-                Retry recipients
-              </button>
-            </div>
-          )}
-          {!audienceLoading && !audienceError && !audience?.cycle && (
-            <p className="py-3 text-center">
-              No active recruitment cycle. Activate a cycle before composing a
-              campaign.
-            </p>
-          )}
-          <fieldset
-            disabled={frozen || !audience?.cycle || Boolean(audienceError)}
-            className="mt-3 min-w-0 space-y-3"
-          >
-            <legend className="sr-only">
-              Choose groups and individual recipients
-            </legend>
-            <div className="flex flex-wrap gap-2">
-              {GROUPS.map((group) => (
-                <label
-                  key={group.value}
-                  className="flex cursor-pointer items-center gap-2 rounded-lg bg-[#E8F2FF] px-3 py-2"
+                <p>{audienceError}</p>
+                <button
+                  type="button"
+                  className={`${secondary} mt-2`}
+                  disabled={frozen}
+                  onClick={() => void loadAudience()}
                 >
-                  <input
-                    type="checkbox"
-                    className={checkbox}
-                    checked={groups[group.value]}
-                    onChange={(event) =>
-                      changeGroup(group.value, event.target.checked)
-                    }
-                  />
-                  {group.label} ({audience?.counts[group.value] ?? 0})
-                </label>
-              ))}
-            </div>
-            <p className="text-xs text-[#134687]/75">
-              Groups may overlap; each person is selected once. Disabling a
-              group removes its selections unless they also belong to another
-              enabled group. Payment is not a filter.
-            </p>
-            <label className="block space-y-1">
-              <span className="font-medium">Search recipients</span>
+                  Retry recipients
+                </button>
+              </div>
+            )}
+            {!audienceLoading && !audienceError && !audience?.cycle && (
+              <p className="py-2 text-center text-[#134687]/60">
+                No active recruitment cycle. Activate a cycle before composing a
+                campaign.
+              </p>
+            )}
+            <fieldset
+              disabled={frozen || !audience?.cycle || Boolean(audienceError)}
+              className="min-w-0 space-y-3"
+            >
+              <legend className="sr-only">
+                Choose groups and individual recipients
+              </legend>
+              <div className="flex flex-wrap gap-2">
+                {GROUPS.map((group) => (
+                  <label
+                    key={group.value}
+                    className={`flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${groups[group.value] ? "border-[#134687]/30 bg-[#E8F2FF]" : "border-[#005FD9]/15 bg-white text-[#134687]/60"}`}
+                  >
+                    <input
+                      type="checkbox"
+                      className={checkbox}
+                      checked={groups[group.value]}
+                      onChange={(event) =>
+                        changeGroup(group.value, event.target.checked)
+                      }
+                    />
+                    {group.label}
+                    <span className="font-normal opacity-70">
+                      {audience?.counts[group.value] ?? 0}
+                    </span>
+                  </label>
+                ))}
+              </div>
+              <p className={hint}>
+                Groups may overlap; each person is listed once. Turning a group
+                off removes its selections unless they belong to another enabled
+                group.
+              </p>
               <input
                 type="search"
+                aria-label="Search recipients"
                 className={input}
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Name, email, group, or position"
+                placeholder="Search name, email, group, or position"
               />
-            </label>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                className={secondary}
-                disabled={!filtered.length}
-                onClick={() =>
-                  setSelected(
-                    (previous) =>
-                      new Set([
-                        ...previous,
-                        ...filtered.map((person) => person.userId),
-                      ]),
-                  )
-                }
-              >
-                Select filtered ({filtered.length})
-              </button>
-              <button
-                type="button"
-                className={secondary}
-                disabled={!selectedInSearch}
-                onClick={() =>
-                  setSelected(
-                    (previous) =>
-                      new Set(
-                        [...previous].filter(
-                          (id) =>
-                            !filtered.some((person) => person.userId === id),
-                        ),
-                      ),
-                  )
-                }
-              >
-                Deselect filtered ({selectedInSearch})
-              </button>
-              <button
-                type="button"
-                className={secondary}
-                disabled={!selected.size}
-                onClick={() => setSelected(new Set())}
-              >
-                Clear selection
-              </button>
-            </div>
-            <p role="status">
-              {selectedRecipients.length}/{EMAIL_CAMPAIGN_RECIPIENT_LIMIT}{" "}
-              selected · {filtered.length} match
-              {filtered.length === 1 ? "" : "es"}
-              {selectedRecipients.length > selectedInSearch &&
-                ` · ${selectedRecipients.length - selectedInSearch} selected outside search`}
-            </p>
-            {tooMany && (
-              <p role="alert" className="rounded-lg bg-red-50 p-2 text-red-800">
-                Over the {EMAIL_CAMPAIGN_RECIPIENT_LIMIT}-recipient limit.
-                Deselect recipients before reviewing.
-              </p>
-            )}
-            <div className="max-h-80 space-y-1 overflow-y-auto rounded-lg bg-[#F3F8FF] p-2">
-              {filtered.map((person) => (
-                <label
-                  key={person.userId}
-                  className={`flex min-w-0 cursor-pointer items-start gap-2 rounded-lg p-2 ${selected.has(person.userId) ? "bg-[#E8F2FF]" : "bg-white"}`}
-                >
-                  <input
-                    type="checkbox"
-                    className={`${checkbox} mt-0.5`}
-                    checked={selected.has(person.userId)}
-                    onChange={(event) =>
-                      setSelected((previous) => {
-                        const next = new Set(previous);
-                        if (event.target.checked) next.add(person.userId);
-                        else next.delete(person.userId);
-                        return next;
-                      })
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p role="status" className="text-xs text-[#134687]/70">
+                  <span className="font-semibold text-[#134687]">
+                    {selectedRecipients.length}/{EMAIL_CAMPAIGN_RECIPIENT_LIMIT}
+                  </span>{" "}
+                  selected · {filtered.length} match
+                  {filtered.length === 1 ? "" : "es"}
+                  {selectedRecipients.length > selectedInSearch &&
+                    ` · ${selectedRecipients.length - selectedInSearch} outside search`}
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    className={`${secondary} px-2.5 py-1 text-xs`}
+                    disabled={!filtered.length}
+                    onClick={() =>
+                      setSelected(
+                        (previous) =>
+                          new Set([
+                            ...previous,
+                            ...filtered.map((person) => person.userId),
+                          ]),
+                      )
                     }
-                  />
-                  <span className="min-w-0 break-words">
-                    <span className="block font-semibold">{person.name}</span>
-                    <span className="block text-xs">{person.email}</span>
-                    <span className="block text-xs text-[#134687]/75">
-                      {person.groups
-                        .map(
-                          (group) =>
-                            GROUPS.find((item) => item.value === group)
-                              ?.label ?? group,
-                        )
-                        .join(", ")}
-                      {person.positions.length > 0 &&
-                        ` · ${person.positions.join(", ")}`}
-                    </span>
-                  </span>
-                </label>
-              ))}
-              {!filtered.length && (
-                <p className="p-3 text-center">
-                  {audienceLoading
-                    ? "Loading…"
-                    : !eligible.length
-                      ? "No eligible recipients in the enabled groups."
-                      : "No recipients match your search."}
+                  >
+                    Select shown ({filtered.length})
+                  </button>
+                  <button
+                    type="button"
+                    className={`${secondary} px-2.5 py-1 text-xs`}
+                    disabled={!selectedInSearch}
+                    onClick={() =>
+                      setSelected(
+                        (previous) =>
+                          new Set(
+                            [...previous].filter(
+                              (id) =>
+                                !filtered.some(
+                                  (person) => person.userId === id,
+                                ),
+                            ),
+                          ),
+                      )
+                    }
+                  >
+                    Deselect shown ({selectedInSearch})
+                  </button>
+                  <button
+                    type="button"
+                    className={`${secondary} px-2.5 py-1 text-xs`}
+                    disabled={!selected.size}
+                    onClick={() => setSelected(new Set())}
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+              {tooMany && (
+                <p
+                  role="alert"
+                  className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-700"
+                >
+                  Over the {EMAIL_CAMPAIGN_RECIPIENT_LIMIT}-recipient limit.
+                  Deselect recipients before reviewing.
                 </p>
               )}
-            </div>
-          </fieldset>
+              <div className="max-h-[26rem] divide-y divide-[#005FD9]/10 overflow-y-auto rounded-xl border border-[#005FD9]/10">
+                {filtered.map((person) => (
+                  <label
+                    key={person.userId}
+                    className={`flex min-w-0 cursor-pointer items-start gap-3 px-3 py-2 transition-colors ${selected.has(person.userId) ? "bg-[#F3F8FF]" : "bg-white hover:bg-[#F9FBFF]"}`}
+                  >
+                    <input
+                      type="checkbox"
+                      className={`${checkbox} mt-0.5`}
+                      checked={selected.has(person.userId)}
+                      onChange={(event) =>
+                        setSelected((previous) => {
+                          const next = new Set(previous);
+                          if (event.target.checked) next.add(person.userId);
+                          else next.delete(person.userId);
+                          return next;
+                        })
+                      }
+                    />
+                    <span className="min-w-0 flex-1 break-words">
+                      <span className="flex flex-wrap items-baseline justify-between gap-x-2">
+                        <span className="font-semibold">{person.name}</span>
+                        <span className="text-[11px] text-[#134687]/55">
+                          {person.groups.map(groupLabel).join(", ")}
+                        </span>
+                      </span>
+                      <span className="block text-xs text-[#134687]/70">
+                        {person.email}
+                      </span>
+                      {person.positions.length > 0 && (
+                        <span className="block text-[11px] text-[#134687]/50">
+                          {person.positions.join(", ")}
+                        </span>
+                      )}
+                    </span>
+                  </label>
+                ))}
+                {!filtered.length && (
+                  <p className="p-6 text-center text-[#134687]/55">
+                    {audienceLoading
+                      ? "Loading…"
+                      : !eligible.length
+                        ? "No eligible recipients in the enabled groups."
+                        : "No recipients match your search."}
+                  </p>
+                )}
+              </div>
+            </fieldset>
+          </div>
         </section>
 
-        <section
-          aria-labelledby="campaign-content-heading"
-          className="min-w-0 rounded-xl bg-white p-3 sm:p-4"
-        >
-          <h3
-            id="campaign-content-heading"
-            className="font-poppins font-semibold"
-          >
-            Compose email
-          </h3>
+        <section aria-labelledby="campaign-content-heading" className={card}>
+          <div className={cardHeader}>
+            <h3
+              id="campaign-content-heading"
+              className="font-poppins font-semibold"
+            >
+              Compose email
+            </h3>
+          </div>
           <form
-            className="mt-3"
+            className="p-4 sm:p-5"
             onSubmit={(event) => {
               event.preventDefault();
               void prepareReview();
             }}
           >
-            <fieldset disabled={frozen} className="min-w-0 space-y-3">
+            <fieldset disabled={frozen} className="min-w-0 space-y-4">
               <legend className="sr-only">Email content</legend>
-              <label className="block space-y-1">
-                <span className="font-medium">Template</span>
-                <select
-                  className={input}
-                  value={content.templateType}
-                  onChange={(event) =>
-                    setContent((previous) => {
-                      const next: EmailCampaignContent = {
+              <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+                <label className="block min-w-0">
+                  <span className={fieldLabel}>Template</span>
+                  <select
+                    className={input}
+                    value={content.templateType}
+                    onChange={(event) =>
+                      setContent((previous) => {
+                        const next: EmailCampaignContent = {
+                          ...previous,
+                          templateType: event.target
+                            .value as EmailCampaignContent["templateType"],
+                        };
+                        if (next.templateType === "reminder") {
+                          delete next.eventDate;
+                          delete next.eventTime;
+                          delete next.eventVenue;
+                        }
+                        return next;
+                      })
+                    }
+                  >
+                    <option value="event">Event announcement</option>
+                    <option value="reminder">Reminder</option>
+                  </select>
+                </label>
+                <label className="block min-w-0">
+                  <span className={fieldLabel}>Header logo</span>
+                  <select
+                    className={input}
+                    value={content.logo ?? "cssapply"}
+                    onChange={(event) =>
+                      setContent((previous) => ({
                         ...previous,
-                        templateType: event.target
-                          .value as EmailCampaignContent["templateType"],
-                      };
-                      if (next.templateType === "reminder") {
-                        delete next.eventDate;
-                        delete next.eventTime;
-                        delete next.eventVenue;
-                      }
-                      return next;
-                    })
-                  }
-                >
-                  <option value="event">Event announcement</option>
-                  <option value="reminder">Reminder</option>
-                </select>
-              </label>
-              <label className="block space-y-1">
-                <span className="font-medium">Header logo</span>
-                <select
-                  className={input}
-                  value={content.logo ?? "cssapply"}
-                  onChange={(event) =>
-                    setContent((previous) => ({
-                      ...previous,
-                      logo: event.target.value as "css" | "cssapply",
-                    }))
-                  }
-                >
-                  <option value="cssapply">CSSApply</option>
-                  <option value="css">CSS</option>
-                </select>
-                <span className="block text-xs text-[#134687]/75">
-                  Centered above the email title. Your selection is used in the
-                  preview and sent email.
-                </span>
-              </label>
+                        logo: event.target.value as "css" | "cssapply",
+                      }))
+                    }
+                  >
+                    <option value="cssapply">CSSApply</option>
+                    <option value="css">CSS</option>
+                  </select>
+                </label>
+              </div>
               {(
                 [
                   ["subject", "Subject"],
                   ["title", "Email title"],
                 ] as const
               ).map(([field, label]) => (
-                <label key={field} className="block space-y-1">
-                  <span className="font-medium">{label} (required)</span>
+                <label key={field} className="block">
+                  <span className={fieldLabel}>{label}</span>
                   <input
                     type="text"
                     required
@@ -928,12 +964,12 @@ function CampaignComposer() {
                   />
                 </label>
               ))}
-              <label className="block space-y-1">
-                <span className="font-medium">Plain-text body (required)</span>
+              <label className="block">
+                <span className={fieldLabel}>Message</span>
                 <textarea
                   required
                   rows={7}
-                  className={`${input} resize-y`}
+                  className={`${input} resize-y leading-relaxed`}
                   value={content.body}
                   onChange={(event) =>
                     setContent((previous) => ({
@@ -942,43 +978,49 @@ function CampaignComposer() {
                     }))
                   }
                 />
-                <span className="block text-xs text-[#134687]/75">
-                  Text only. CSSApply branding and email formatting are applied
-                  by the server.
+                <span className={`${hint} mt-1 block`}>
+                  Plain text only. A blank line starts a new paragraph; branding
+                  and formatting are added by the server.
                 </span>
               </label>
               {content.templateType === "event" && (
-                <div className="grid min-w-0 gap-3 sm:grid-cols-2">
-                  {(
-                    [
-                      ["eventDate", "Event date", "date"],
-                      ["eventTime", "Event time", "time"],
-                      ["eventVenue", "Event venue", "text"],
-                    ] as const
-                  ).map(([field, label, type]) => (
-                    <label
-                      key={field}
-                      className={`block min-w-0 space-y-1 ${field === "eventVenue" ? "sm:col-span-2" : ""}`}
-                    >
-                      <span className="font-medium">{label} (optional)</span>
-                      <input
-                        type={type}
-                        className={input}
-                        value={content[field] ?? ""}
-                        onChange={(event) =>
-                          setContent((previous) => ({
-                            ...previous,
-                            [field]: event.target.value,
-                          }))
-                        }
-                      />
-                    </label>
-                  ))}
+                <div className="rounded-xl bg-[#F3F8FF] p-3">
+                  <p className="mb-2 text-xs font-semibold">Event details</p>
+                  <div className="grid min-w-0 gap-3 sm:grid-cols-[1fr_1fr_2fr]">
+                    {(
+                      [
+                        ["eventDate", "Date", "date"],
+                        ["eventTime", "Time", "time"],
+                        ["eventVenue", "Venue", "text"],
+                      ] as const
+                    ).map(([field, label, type]) => (
+                      <label key={field} className="block min-w-0">
+                        <span className={fieldLabel}>
+                          {label}
+                          {optional}
+                        </span>
+                        <input
+                          type={type}
+                          className={input}
+                          value={content[field] ?? ""}
+                          onChange={(event) =>
+                            setContent((previous) => ({
+                              ...previous,
+                              [field]: event.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                    ))}
+                  </div>
                 </div>
               )}
-              <div className="grid min-w-0 gap-3 sm:grid-cols-2">
-                <label className="block min-w-0 space-y-1">
-                  <span className="font-medium">Button label (optional)</span>
+              <div className="grid min-w-0 gap-3 sm:grid-cols-[2fr_3fr]">
+                <label className="block min-w-0">
+                  <span className={fieldLabel}>
+                    Button label
+                    {optional}
+                  </span>
                   <input
                     type="text"
                     className={input}
@@ -991,8 +1033,11 @@ function CampaignComposer() {
                     }
                   />
                 </label>
-                <label className="block min-w-0 space-y-1">
-                  <span className="font-medium">Button HTTPS URL</span>
+                <label className="block min-w-0">
+                  <span className={fieldLabel}>
+                    Button HTTPS URL
+                    {optional}
+                  </span>
                   <input
                     type="url"
                     className={input}
@@ -1007,127 +1052,132 @@ function CampaignComposer() {
                   />
                 </label>
               </div>
-              <p className="text-xs text-[#134687]/75">
-                Provide both button fields or leave both blank. Event details
-                appear only in event announcements.
-              </p>
             </fieldset>
-            <button
-              ref={reviewButton}
-              type="submit"
-              className={`${primary} mt-3`}
-              disabled={busy || Boolean(review) || !canReview}
-            >
-              Preview & review (
-              {attempt?.request.recipientIds.length ??
-                selectedRecipients.length}
-              )
-            </button>
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-[#005FD9]/10 pt-4">
+              <p className={hint}>
+                Fill both button fields or leave both blank.
+              </p>
+              <button
+                ref={reviewButton}
+                type="submit"
+                className={primary}
+                disabled={busy || Boolean(review) || !canReview}
+              >
+                Preview & review (
+                {attempt?.request.recipientIds.length ??
+                  selectedRecipients.length}
+                )
+              </button>
+            </div>
           </form>
         </section>
       </div>
 
       {review && (
-        <section
-          aria-labelledby="campaign-review-heading"
-          className="space-y-3 rounded-xl bg-white p-3 sm:p-4"
-        >
-          <h3
-            ref={reviewHeading}
-            tabIndex={-1}
-            id="campaign-review-heading"
-            className={`text-center font-poppins font-semibold ${focus}`}
-          >
-            Final confirmation · {review.captured.recipientIds.length}{" "}
-            recipients
-          </h3>
-          <p className="text-center">
-            Review this fresh server-generated preview. Confirming below saves
-            the campaign and requests real emails immediately. It cannot be
-            undone.
-          </p>
-          <p className="break-words rounded-lg bg-[#E8F2FF] p-3">
-            <strong>Subject:</strong> {review.subject}
-          </p>
-          <iframe
-            title="Email campaign final preview"
-            sandbox=""
-            referrerPolicy="no-referrer"
-            srcDoc={review.html}
-            className="h-[28rem] w-full min-w-0 rounded-lg bg-[#F3F8FF]"
-          />
-          <label className="flex items-start justify-center gap-2">
-            <input
-              type="checkbox"
-              className={`${checkbox} mt-0.5`}
-              checked={acknowledged}
-              disabled={busy}
-              onChange={(event) => setAcknowledged(event.target.checked)}
+        <section aria-labelledby="campaign-review-heading" className={card}>
+          <div className={`${cardHeader} bg-[#F3F8FF]`}>
+            <h3
+              ref={reviewHeading}
+              tabIndex={-1}
+              id="campaign-review-heading"
+              className={`font-poppins font-semibold ${focus}`}
+            >
+              Final confirmation · {review.captured.recipientIds.length}{" "}
+              recipients
+            </h3>
+          </div>
+          <div className="space-y-3 p-4 sm:p-5">
+            <p className="leading-relaxed text-[#134687]/75">
+              Review this fresh server-generated preview. Confirming below saves
+              the campaign and requests real emails immediately. It cannot be
+              undone.
+            </p>
+            <p className="break-words rounded-lg border border-[#005FD9]/10 px-3 py-2">
+              <span className="text-xs font-semibold text-[#134687]/60">
+                Subject
+              </span>{" "}
+              {review.subject}
+            </p>
+            <iframe
+              title="Email campaign final preview"
+              sandbox=""
+              referrerPolicy="no-referrer"
+              srcDoc={review.html}
+              className="h-[32rem] w-full min-w-0 rounded-xl border border-[#005FD9]/10 bg-[#F3F8FF]"
             />
-            <span>
-              I reviewed the preview and the{" "}
-              {review.captured.recipientIds.length} selected recipients. Send
-              this campaign now.
-            </span>
-          </label>
-          <div className="flex flex-wrap justify-center gap-2">
-            <button
-              type="button"
-              className={secondary}
-              disabled={busy}
-              onClick={() => {
-                setReview(null);
-                setAcknowledged(false);
-              }}
-            >
-              Back to draft
-            </button>
-            <button
-              type="button"
-              className={primary}
-              disabled={busy || !acknowledged}
-              onClick={() => void confirmSend()}
-            >
-              Confirm & send to {review.captured.recipientIds.length}
-            </button>
+            <div className="flex flex-col gap-3 border-t border-[#005FD9]/10 pt-4 sm:flex-row sm:items-center sm:justify-between">
+              <label className="flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  className={`${checkbox} mt-0.5`}
+                  checked={acknowledged}
+                  disabled={busy}
+                  onChange={(event) => setAcknowledged(event.target.checked)}
+                />
+                <span>
+                  I reviewed the preview and the{" "}
+                  {review.captured.recipientIds.length} selected recipients.
+                  Send this campaign now.
+                </span>
+              </label>
+              <div className="flex shrink-0 flex-wrap gap-2">
+                <button
+                  type="button"
+                  className={secondary}
+                  disabled={busy}
+                  onClick={() => {
+                    setReview(null);
+                    setAcknowledged(false);
+                  }}
+                >
+                  Back to draft
+                </button>
+                <button
+                  type="button"
+                  className={primary}
+                  disabled={busy || !acknowledged}
+                  onClick={() => void confirmSend()}
+                >
+                  Confirm & send to {review.captured.recipientIds.length}
+                </button>
+              </div>
+            </div>
           </div>
         </section>
       )}
 
-      <section
-        aria-labelledby="campaign-history-heading"
-        className="min-w-0 rounded-xl bg-white p-3 sm:p-4"
-      >
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3
-            id="campaign-history-heading"
-            className="font-poppins font-semibold"
-          >
-            Recent campaigns (up to 50)
-          </h3>
+      <section aria-labelledby="campaign-history-heading" className={card}>
+        <div className={cardHeader}>
+          <div className="min-w-0">
+            <h3
+              id="campaign-history-heading"
+              className="font-poppins font-semibold"
+            >
+              Recent campaigns
+            </h3>
+            <p className={`${hint} mt-0.5`}>
+              Last 50. &ldquo;Provider accepted&rdquo; is not inbox delivery.
+              For Sending or Unknown, do not resend; check provider logs.
+            </p>
+          </div>
           <button
             type="button"
             className={secondary}
             disabled={busy || Boolean(review)}
             onClick={() => void loadHistory()}
           >
-            Refresh history
+            Refresh
           </button>
         </div>
-        <p className="mt-2 text-xs text-[#134687]/75">
-          Provider accepted means the email provider accepted the request, not
-          that it reached an inbox. For Sending or Unknown, do not resend;
-          refresh status and check provider logs. No automatic retries.
-        </p>
         {historyLoading && (
-          <p role="status" className="py-3 text-center">
+          <p role="status" className="py-6 text-center text-[#134687]/60">
             Loading campaign history…
           </p>
         )}
         {historyError && (
           <div
             role="alert"
-            className="mt-2 rounded-lg bg-red-50 p-3 text-red-800"
+            className="m-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-700"
           >
             <p>{historyError}</p>
             <button
@@ -1141,91 +1191,121 @@ function CampaignComposer() {
           </div>
         )}
         {!historyLoading && !historyError && !history.length && (
-          <p className="py-4 text-center">No campaigns yet.</p>
+          <p className="py-8 text-center text-[#134687]/55">
+            No campaigns yet.
+          </p>
         )}
-        <ul className="mt-3 space-y-2">
-          {history.map((campaign) => (
-            <li
-              key={campaign.id}
-              className="flex min-w-0 flex-col gap-2 rounded-lg bg-[#F3F8FF] p-3 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <div className="min-w-0">
-                <p className="break-words font-semibold">{campaign.subject}</p>
-                <p className="mt-1 text-xs">
-                  {new Date(campaign.createdAt).toLocaleString("en-PH")} ·{" "}
-                  {campaign.templateType === "event" ? "Event" : "Reminder"} ·{" "}
-                  {campaign.counts.total} recipients
-                </p>
-                <p className="mt-1 text-xs">
-                  Provider accepted: {campaign.counts.accepted} · Failed:{" "}
-                  {campaign.counts.failed} · Unknown: {campaign.counts.unknown}
-                </p>
-              </div>
-              <div className="flex min-w-0 flex-wrap items-center gap-2 sm:justify-end">
-                <span className="rounded-full bg-[#E8F2FF] px-3 py-1 text-xs font-semibold">
-                  {statusLabel(campaign.status)}
-                </span>
-                <button
-                  type="button"
-                  className={secondary}
-                  disabled={busy || Boolean(review)}
-                  onClick={() => void refreshCampaign(campaign.id, true)}
-                  aria-label={`View details and refresh status: ${campaign.subject}`}
-                >
-                  Details / refresh status
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
+        {history.length > 0 && (
+          <ul className="divide-y divide-[#005FD9]/10">
+            {history.map((campaign) => (
+              <li
+                key={campaign.id}
+                className="flex min-w-0 flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5"
+              >
+                <div className="min-w-0">
+                  <p className="break-words font-semibold">
+                    {campaign.subject}
+                  </p>
+                  <p className="mt-0.5 text-xs text-[#134687]/60">
+                    {new Date(campaign.createdAt).toLocaleString("en-PH")} ·{" "}
+                    {campaign.templateType === "event" ? "Event" : "Reminder"} ·{" "}
+                    {campaign.counts.accepted}/{campaign.counts.total} accepted
+                    {campaign.counts.failed > 0 &&
+                      ` · ${campaign.counts.failed} failed`}
+                    {campaign.counts.unknown > 0 &&
+                      ` · ${campaign.counts.unknown} unknown`}
+                  </p>
+                </div>
+                <div className="flex shrink-0 flex-wrap items-center gap-2">
+                  <span
+                    className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusTone(campaign.status)}`}
+                  >
+                    {statusLabel(campaign.status)}
+                  </span>
+                  <button
+                    type="button"
+                    className={`${secondary} px-2.5 py-1 text-xs`}
+                    disabled={busy || Boolean(review)}
+                    onClick={() => void refreshCampaign(campaign.id, true)}
+                    aria-label={`View details and refresh status: ${campaign.subject}`}
+                  >
+                    Details
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
         {detail && (
           <section
             aria-label="Campaign details"
-            className="mt-3 space-y-2 rounded-lg bg-[#E8F2FF] p-3"
+            className="space-y-3 border-t border-[#005FD9]/10 bg-[#F9FBFF] p-4 sm:p-5"
           >
             <div className="flex items-start justify-between gap-2">
-              <h4 className="min-w-0 break-words font-semibold">
-                {detail.subject} · {statusLabel(detail.status)}
-              </h4>
+              <div className="min-w-0">
+                <h4 className="break-words font-semibold">{detail.subject}</h4>
+                <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[#134687]/60">
+                  <span
+                    className={`rounded-full px-2.5 py-0.5 font-semibold ${statusTone(detail.status)}`}
+                  >
+                    {statusLabel(detail.status)}
+                  </span>
+                  <span className="break-all font-mono">{detail.id}</span>
+                </p>
+              </div>
               <button
                 type="button"
-                className={secondary}
+                className={`${secondary} px-2.5 py-1 text-xs`}
                 disabled={busy}
                 onClick={() => setDetail(null)}
               >
-                Close details
+                Close
               </button>
             </div>
-            <p className="break-words text-xs">Campaign ID: {detail.id}</p>
             {detail.errorMessage && (
-              <p role="alert" className="break-words">
+              <p
+                role="alert"
+                className="break-words rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-700"
+              >
                 {detail.errorMessage}
               </p>
             )}
             {(detail.status === "SENDING" || detail.status === "UNKNOWN") && (
-              <p>Do not resend. Check provider logs and refresh status.</p>
+              <p className="text-[#8A5A00]">
+                Do not resend. Check provider logs and refresh status.
+              </p>
             )}
-            <p className="font-semibold">{detail.content.title}</p>
-            <p className="whitespace-pre-wrap break-words">
-              {detail.content.body}
-            </p>
-            <p className="font-semibold">
-              Saved recipients ({detail.recipients.length})
-            </p>
-            <ul className="max-h-64 space-y-1 overflow-y-auto">
-              {detail.recipients.map((person) => (
-                <li
-                  key={person.userId}
-                  className="break-words rounded-lg bg-white p-2"
-                >
-                  <span className="font-medium">{person.name}</span> ·{" "}
-                  {person.email}
-                  <span className="block text-xs">
-                    {statusLabel(person.status)}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <div className="rounded-xl border border-[#005FD9]/10 bg-white p-3">
+              <p className="font-semibold">{detail.content.title}</p>
+              <p className="mt-1 whitespace-pre-wrap break-words leading-relaxed text-[#134687]/80">
+                {detail.content.body}
+              </p>
+            </div>
+            <div>
+              <p className="mb-1 text-xs font-semibold text-[#134687]/70">
+                Saved recipients ({detail.recipients.length})
+              </p>
+              <ul className="max-h-64 divide-y divide-[#005FD9]/10 overflow-y-auto rounded-xl border border-[#005FD9]/10 bg-white">
+                {detail.recipients.map((person) => (
+                  <li
+                    key={person.userId}
+                    className="flex min-w-0 flex-wrap items-center justify-between gap-2 px-3 py-2"
+                  >
+                    <span className="min-w-0 break-words">
+                      <span className="font-medium">{person.name}</span>{" "}
+                      <span className="text-xs text-[#134687]/60">
+                        {person.email}
+                      </span>
+                    </span>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusTone(person.status)}`}
+                    >
+                      {statusLabel(person.status)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </section>
         )}
       </section>
