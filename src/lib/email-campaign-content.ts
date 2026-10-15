@@ -1,7 +1,7 @@
 import "server-only";
 
 import { z } from "zod";
-import { wrapEmail } from "@/lib/email";
+import { wrapCampaignEmail } from "@/lib/email-campaign-layout";
 import type { EmailCampaignContent } from "@/lib/email-campaign-contract";
 
 const hasHeaderControl = (value: string): boolean =>
@@ -50,6 +50,8 @@ function isSafeHttpsUrl(value: string): boolean {
 export const campaignContentSchema = z
   .object({
     templateType: z.enum(["event", "reminder"]),
+    // Optional keeps existing immutable drafts compatible without rewriting them.
+    logo: z.enum(["css", "cssapply"]).optional(),
     // Check BEFORE trimming so even a leading/trailing newline is rejected.
     subject: z
       .string()
@@ -100,20 +102,19 @@ function paragraphs(value: string): string {
     .replace(/\r\n?/g, "\n")
     .split(/\n[\t ]*\n/)
     .map(
-      (paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, "<br>")}</p>`,
+      (paragraph) =>
+        `<p style="margin: 0 0 16px; color: #134687; font-size: 15px; line-height: 1.75;">${escapeHtml(paragraph).replace(/\n/g, "<br>")}</p>`,
     )
     .join("\n");
 }
 
-/** Reuses the CSS layout, without sending mail or adding catalog templates. */
+/** Campaign-only styling; automated application emails retain their existing layout. */
 export function buildCampaignEmail(content: EmailCampaignContent): {
   subject: string;
   html: string;
 } {
   const parsed = campaignContentSchema.parse(content);
-  const templateLabel =
-    parsed.templateType === "event" ? "CSS event" : "Reminder";
-  let innerHtml = `<p style="color: #134687; font-weight: 600;">${templateLabel}</p>\n${paragraphs(parsed.body)}`;
+  let innerHtml = paragraphs(parsed.body);
 
   if (parsed.templateType === "event") {
     const details = [
@@ -122,21 +123,25 @@ export function buildCampaignEmail(content: EmailCampaignContent): {
       ["Venue", parsed.eventVenue],
     ].filter(([, value]) => Boolean(value));
     if (details.length) {
-      innerHtml += `<div class="accent-box"><h3>Event details</h3>${details
+      innerHtml += `<div class="accent-box" style="margin: 18px 0; padding: 18px 20px; border-radius: 12px; background-color: #E8F2FF;"><h3 style="margin: 0 0 10px; color: #134687; font-size: 15px; line-height: 1.5;">Event details</h3><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="table-layout: fixed; font-size: 14px; line-height: 1.6; color: #134687;">${details
         .map(
           ([label, value]) =>
-            `<p><strong>${label}:</strong> ${escapeHtml(value!)}</p>`,
+            `<tr><td width="58" valign="top" style="width: 58px; padding: 3px 10px 3px 0; font-weight: 600;">${label}:</td><td valign="top" style="padding: 3px 0; overflow-wrap: anywhere; word-wrap: break-word;">${escapeHtml(value!)}</td></tr>`,
         )
-        .join("")}</div>`;
+        .join("")}</table></div>`;
     }
   }
 
   if (parsed.ctaLabel && parsed.ctaUrl) {
-    innerHtml += `<p style="text-align: center;"><a class="button" href="${escapeHtml(parsed.ctaUrl)}">${escapeHtml(parsed.ctaLabel)}</a></p>`;
+    innerHtml += `<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 24px auto 8px; max-width: 100%;"><tr><td align="center" bgcolor="#044FAF" style="border-radius: 9px; background-color: #044FAF;"><a class="button" href="${escapeHtml(parsed.ctaUrl)}" style="display: inline-block; padding: 13px 24px; color: #FFFFFF; background-color: #044FAF; border-radius: 9px; font-size: 14px; line-height: 1.5; font-weight: 600; text-align: center; text-decoration: none; overflow-wrap: anywhere; word-break: break-word;">${escapeHtml(parsed.ctaLabel)}</a></td></tr></table>`;
   }
 
   return {
     subject: parsed.subject,
-    html: wrapEmail(escapeHtml(parsed.title), innerHtml),
+    html: wrapCampaignEmail(
+      escapeHtml(parsed.title),
+      innerHtml,
+      parsed.logo ?? "cssapply",
+    ),
   };
 }

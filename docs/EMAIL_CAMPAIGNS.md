@@ -4,13 +4,17 @@
 
 Open **Super Admin → Email Composer**.
 
-1. Choose **Event announcement** or **General reminder**.
+1. Choose **Event announcement** or **General reminder**, then select the **CSSApply** or **CSS** header logo. The logo stays centered above the email title; existing drafts and automated application emails retain CSSApply by default.
 2. Enter a subject, heading, and plain-text message. Event date, time, and venue are optional. A button requires both a label and an HTTPS URL.
 3. Filter the audience by Executive Associates, Committee Staff, or Members. Search and select the individual recipients to include (maximum **250**).
 4. Preview the formatted email, review the recipients, and explicitly confirm the send.
 5. Check the campaign status in history. **Provider accepted** means Brevo accepted the request—not that every inbox received it.
 
 Only current database Super Admins can access these endpoints. Audience eligibility is **accepted in the active recruitment cycle, regardless of payment status**, as explicitly requested. Accepted redirections use their destination group. Addresses are normalized and deduplicated; a person matching multiple groups receives only one copy. Existing payment-gated community invitations are unchanged.
+
+Campaign emails use CSSApply's dark-blue headings, blue buttons, and pale-blue detail/footer surfaces, with the selected logo above the title and a small decorative CSar in the footer. The footer contact is **css.cics@ust.edu.ph**, accompanied by compact Facebook and Instagram icons linking to the same `ustcss` accounts as the website. A quiet **RSO Control No.: RSO-D-26-27-CICS02** line sits below the contact row. This does not change the configured, verified Brevo From address. Template names are not repeated as message badges. Existing automated application, payment, and community emails retain their previous layout and branding.
+
+The outer background reuses CSSApply's code-and-icons artwork, converted to an opaque PNG over the existing `#F3F3FD` background. Text stays on solid surfaces; clients that block background images fall back to the solid color. CSar uses a transparent RGBA PNG rather than WebP to avoid the black rectangle observed in Gmail's image proxy. The background, mascot, and 2×-resolution social-icon PNGs are generated from the existing artwork by `node scripts/generate-email-campaign-assets.cjs`; the original website assets are unchanged. Social icons have descriptive image text and accessible link labels; no icon font, inline SVG, or third-party image host is required. The mascot is decorative, so blocked images do not hide event details or the button. Publish the new PNG assets and verify their public URLs before sending any real email that references them.
 
 Each recipient is a separate Brevo message version, so other recipients' email addresses are not disclosed. Provider daily limits still apply. There are no scheduled sends, automatic sends, or automatic retries.
 

@@ -61,7 +61,13 @@ type Attempt = {
 };
 
 function emptyContent(): EmailCampaignContent {
-  return { templateType: "event", subject: "", title: "", body: "" };
+  return {
+    templateType: "event",
+    logo: "cssapply",
+    subject: "",
+    title: "",
+    body: "",
+  };
 }
 
 function enabledGroups(): Record<EmailCampaignGroup, boolean> {
@@ -127,6 +133,7 @@ function errorMessage(error: unknown) {
 function validatedContent(content: EmailCampaignContent): EmailCampaignContent {
   const result: EmailCampaignContent = {
     templateType: content.templateType,
+    logo: content.logo ?? "cssapply",
     subject: content.subject.trim(),
     title: content.title.trim(),
     body: content.body.trim(),
@@ -878,6 +885,26 @@ function CampaignComposer() {
                   <option value="event">Event announcement</option>
                   <option value="reminder">Reminder</option>
                 </select>
+              </label>
+              <label className="block space-y-1">
+                <span className="font-medium">Header logo</span>
+                <select
+                  className={input}
+                  value={content.logo ?? "cssapply"}
+                  onChange={(event) =>
+                    setContent((previous) => ({
+                      ...previous,
+                      logo: event.target.value as "css" | "cssapply",
+                    }))
+                  }
+                >
+                  <option value="cssapply">CSSApply</option>
+                  <option value="css">CSS</option>
+                </select>
+                <span className="block text-xs text-[#134687]/75">
+                  Centered above the email title. Your selection is used in the
+                  preview and sent email.
+                </span>
               </label>
               {(
                 [

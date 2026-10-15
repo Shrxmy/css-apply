@@ -6,3 +6,5 @@ public/assets/css-apply-static-images/assets/logos/Logo_CSS_Apply_Email.png -fil
 public/assets/css-apply-static-images/assets/logos/Logo_CSS_Watermark.png -filter -diff -merge -text
 public/assets/css-apply-static-images/assets/pictures/CSAR_Excited_Email.png -filter -diff -merge -text
 public/assets/css-apply-static-images/assets/pictures/background_email.png -filter -diff -merge -text
+public/assets/css-apply-static-images/assets/pictures/facebook_email.png -filter -diff -merge -text
+public/assets/css-apply-static-images/assets/pictures/instagram_email.png -filter -diff -merge -text

@@ -125,6 +125,19 @@ test("community invitation links only to its supplied saved group, never a Verce
   );
 });
 
+test("automated emails retain their existing CSSApply header and do not inherit campaign styling", () => {
+  const { email, state } = fixture();
+  const legacy = email.wrapEmail("Title", "<p>Body</p>");
+  assert.match(
+    legacy,
+    /<img src="[^"]*Logo_CSS_Apply_Email\.png" alt="CSSApply Logo" width="126" height="35"/,
+  );
+  assert.match(legacy, /#134687/);
+  assert.doesNotMatch(legacy, /CSAR_Excited|#57507D|Logo_CSS_Watermark/);
+  assert.match(legacy, /<h2[^>]*>Title<\/h2>/);
+  assert.equal(state.calls.length, 0);
+});
+
 test("community names, labels and URLs are escaped safely", () => {
   const { email } = fixture();
   const template = email.emailTemplates.cssGroupJoin(

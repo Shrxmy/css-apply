@@ -9,6 +9,8 @@ export type EmailCampaignRecipientStatus =
 
 export interface EmailCampaignContent {
   templateType: EmailCampaignTemplate;
+  /** Optional for older drafts; omission preserves the CSSApply header. */
+  logo?: "css" | "cssapply";
   subject: string;
   title: string;
   body: string;

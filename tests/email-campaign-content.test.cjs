@@ -26,10 +26,10 @@ vm.runInNewContext(
   (name) => {
     if (name === "server-only") return {};
     if (name === "zod") return require("zod");
-    if (name === "@/lib/email") {
+    if (name === "@/lib/email-campaign-layout") {
       return {
-        wrapEmail(title, html) {
-          wrapped.push({ title, html });
+        wrapCampaignEmail(title, html, logo) {
+          wrapped.push({ title, html, logo });
           return `<html><h2>${title}</h2>${html}</html>`;
         },
       };
@@ -198,8 +198,9 @@ test("event details are optional and reminder renders neither details nor a fall
     eventVenue: "SECRET_VENUE",
   });
   assert.doesNotMatch(reminder.html, /SECRET_|Event details|href=/);
-  assert.match(reminder.html, /Reminder/);
-  assert.notEqual(reminder.html, buildCampaignEmail(valid).html);
+  // Template names are composer controls, not extra labels in the message.
+  assert.doesNotMatch(reminder.html, />Reminder<|>CSS event</);
+  assert.equal(reminder.html, buildCampaignEmail(valid).html);
 });
 
 test("partial event details and an explicitly supplied reminder CTA render", () => {
@@ -214,6 +215,62 @@ test("partial event details and an explicitly supplied reminder CTA render", () 
   });
   assert.match(reminder.html, /href="https:\/\/example.org"/);
   assert.match(reminder.html, /View details/);
+});
+
+test("campaign body uses CSSApply blue with no redundant badges, side accents, or navigation", () => {
+  for (const templateType of ["event", "reminder"]) {
+    const email = buildCampaignEmail({
+      ...valid,
+      templateType,
+      eventDate: "October 15, 2026",
+      ctaLabel: "Join the Orientation",
+      ctaUrl: "https://meet.google.com/rbr-qbhw-xip",
+    });
+    assert.doesNotMatch(
+      email.html,
+      />\s*(?:CSS event|Reminder)\s*<|#353052|#4D4B65|#57507D|#F2F0FA|border-(?:left|right|inline)|\.webp|ustcomputersciencesociety@gmail\.com/i,
+    );
+    assert.match(email.html, /<p\b[^>]*style="[^"]*color:\s*#134687/i);
+    assert.match(email.html, /<td\b[^>]*bgcolor="#044FAF"/i);
+    assert.match(
+      email.html,
+      /<a\b[^>]*class="button"[^>]*style="[^"]*background-color:\s*#044FAF/i,
+    );
+    assert.match(email.html, /role="presentation"/);
+    const links = [...email.html.matchAll(/<a\b[^>]*href="([^"]+)"/g)].map(
+      (match) => match[1],
+    );
+    assert.deepEqual(links, ["https://meet.google.com/rbr-qbhw-xip"]);
+    if (templateType === "event") {
+      assert.match(
+        email.html,
+        /class="accent-box"[^>]*style="[^"]*background-color:\s*#E8F2FF/i,
+      );
+      assert.match(email.html, /<h3\b[^>]*style="[^"]*color:\s*#134687/i);
+      assert.match(email.html, /<table\b[^>]*style="[^"]*color:\s*#134687/i);
+    } else {
+      assert.doesNotMatch(email.html, /Event details|class="accent-box"/);
+    }
+  }
+});
+
+test("logo choice is optional for old drafts and limited to CSS or CSSApply", () => {
+  const legacy = campaignContentSchema.parse(valid);
+  assert.equal(Object.hasOwn(legacy, "logo"), false);
+  for (const logo of ["css", "cssapply"]) assert.equal(parses({ logo }), true);
+  for (const logo of ["other", "https://example.org/logo.png", null, 1]) {
+    assert.equal(parses({ logo }), false);
+  }
+  assert.equal(parses({ logoUrl: "https://example.org/logo.png" }), false);
+});
+
+test("preview and send rendering forwards the chosen logo and keeps the legacy default", () => {
+  buildCampaignEmail(valid);
+  assert.equal(wrapped.at(-1).logo, "cssapply");
+  for (const logo of ["css", "cssapply"]) {
+    buildCampaignEmail({ ...valid, logo });
+    assert.equal(wrapped.at(-1).logo, logo);
+  }
 });
 
 test("builder validates at runtime rather than trusting TypeScript types", () => {
