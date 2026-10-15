@@ -17,6 +17,7 @@ import { usePaymentQr } from "@/lib/usePaymentQr";
 import { useCommunityLink } from "@/lib/useCommunityLink";
 import { usePaymentReceiptTemplate } from "@/lib/usePaymentReceiptTemplate";
 import DigitalIdCard from "@/components/DigitalIdCard";
+import { getApprovedDigitalIdRole } from "@/lib/digital-id-role";
 import PaymentDeadlineNotice from "@/components/PaymentDeadlineNotice";
 import { usePaymentDeadline } from "@/lib/usePaymentDeadline";
 import { toast } from "sonner";
@@ -380,6 +381,20 @@ export default function CommitteeProgressPageContent() {
   }
 
   const application = applicationData.application;
+  // The canonical application retains its original choices after a redirection.
+  // Resolve the ID role exactly as the standalone ID and admin exports do.
+  const digitalIdRole = getApprovedDigitalIdRole({
+    memberApplications: [],
+    committeeApplications: [
+      {
+        firstOptionCommittee: application.firstOptionCommittee,
+        hasAccepted: application.hasAccepted,
+        redirection: application.redirection ?? null,
+        paymentStatus,
+      },
+    ],
+    executiveAssociateApplications: [],
+  });
   const firstCommittee = committeeRolesSubmitted.find(
     (role) => role.id === application.firstOptionCommittee,
   );
@@ -618,11 +633,7 @@ export default function CommitteeProgressPageContent() {
                     applicationData.user.memberships[0].recruitmentCycle
                       .membershipExpiration || undefined
                   }
-                  roleTitle={
-                    firstCommittee?.title
-                      ? `Staff - ${firstCommittee.title}`
-                      : "Committee Staff"
-                  }
+                  roleTitle={digitalIdRole?.roleTitle ?? "Committee Staff"}
                   user={{
                     name: applicationData.user.name,
                     studentNumber: applicationData.user.studentNumber,

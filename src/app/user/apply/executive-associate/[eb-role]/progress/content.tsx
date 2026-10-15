@@ -17,6 +17,7 @@ import { usePaymentQr } from "@/lib/usePaymentQr";
 import { useCommunityLink } from "@/lib/useCommunityLink";
 import { usePaymentReceiptTemplate } from "@/lib/usePaymentReceiptTemplate";
 import DigitalIdCard from "@/components/DigitalIdCard";
+import { getApprovedDigitalIdRole } from "@/lib/digital-id-role";
 import PaymentDeadlineNotice from "@/components/PaymentDeadlineNotice";
 import { usePaymentDeadline } from "@/lib/usePaymentDeadline";
 
@@ -383,6 +384,20 @@ export default function EAProgressPageContent() {
   }
 
   const application = applicationData.application;
+  // Use the accepted destination, not the canonical record's original EA choice.
+  const digitalIdRole = getApprovedDigitalIdRole({
+    memberApplications: [],
+    committeeApplications: [],
+    executiveAssociateApplications: [
+      {
+        ebRole: application.ebRole,
+        firstOptionEb: application.firstOptionEb,
+        hasAccepted: application.hasAccepted,
+        redirection: application.redirection ?? null,
+        paymentStatus,
+      },
+    ],
+  });
   const firstEB = roles.find((role) => role.id === application.firstOptionEb);
   const secondEB = roles.find((role) => role.id === application.secondOptionEb);
   const hasPendingRedirectionDecision =
@@ -617,11 +632,7 @@ export default function EAProgressPageContent() {
                     applicationData.user.memberships[0].recruitmentCycle
                       .membershipExpiration || undefined
                   }
-                  roleTitle={
-                    firstEB?.title
-                      ? `Executive Associate (${firstEB.title})`
-                      : "Executive Associate"
-                  }
+                  roleTitle={digitalIdRole?.roleTitle ?? "Executive Associate"}
                   user={{
                     name: applicationData.user.name,
                     studentNumber: applicationData.user.studentNumber,
