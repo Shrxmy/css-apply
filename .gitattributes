@@ -4,3 +4,5 @@
 *.jpeg filter=lfs diff=lfs merge=lfs -text
 public/assets/css-apply-static-images/assets/logos/Logo_CSS_Apply_Email.png -filter -diff -merge -text
 public/assets/css-apply-static-images/assets/logos/Logo_CSS_Watermark.png -filter -diff -merge -text
+public/assets/css-apply-static-images/assets/pictures/CSAR_Excited_Email.png -filter -diff -merge -text
+public/assets/css-apply-static-images/assets/pictures/background_email.png -filter -diff -merge -text
