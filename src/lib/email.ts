@@ -99,6 +99,7 @@ export const sendEmailBatch = async (
     recipients: string[],
     subject: string,
     html: string,
+    options?: { maxRetries?: number; timeoutInSeconds?: number },
 ) => {
     if (recipients.length === 0) return { success: true, sentCount: 0 };
     if (recipients.length > 250) {
@@ -120,7 +121,7 @@ export const sendEmailBatch = async (
                 email: process.env.BREVO_FROM_EMAIL || "noreply@cssapply.com",
             },
             messageVersions,
-        });
+        }, options);
 
         return {
             success: true,
@@ -168,7 +169,7 @@ export const sendEmailWithValidation = async (
 };
 
 // Reusable standard email layout wrapper with premium CSS theme
-const wrapEmail = (title: string, innerHtml: string): string => `
+export const wrapEmail = (title: string, innerHtml: string): string => `
 <!DOCTYPE html>
 <html>
 <head>

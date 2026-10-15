@@ -25,6 +25,9 @@ const PaymentDeadlineManager = dynamic(
 const CommunityJoinManager = dynamic(
   () => import("@/components/admin/CommunityJoinManager"),
 );
+const EmailCampaignManager = dynamic(
+  () => import("@/components/admin/EmailCampaignManager"),
+);
 import {
   EXCLUSIVE_PERK_IMAGE_TYPES,
   MAX_EXCLUSIVE_PERK_IMAGE_SIZE,
@@ -866,6 +869,7 @@ type Tab =
   | "payments"
   | "settings"
   | "email"
+  | "campaigns"
   | "community"
   | "techdev-exam";
 type SettingsSection = "general" | "executive-board" | "recruitment";
@@ -876,6 +880,7 @@ const isTab = (value: string | null): value is Tab =>
   value === "payments" ||
   value === "settings" ||
   value === "email" ||
+  value === "campaigns" ||
   value === "community" ||
   value === "techdev-exam";
 
@@ -1149,6 +1154,7 @@ export default function SuperAdminDashboard() {
               { key: "applications" as Tab, label: "All Applications" },
               { key: "payments" as Tab, label: "Payment Tracking" },
               { key: "settings" as Tab, label: "Configuration" },
+              { key: "campaigns" as Tab, label: "Email Composer" },
               { key: "email" as Tab, label: "Email Test" },
               { key: "community" as Tab, label: "Community Join" },
               { key: "techdev-exam" as Tab, label: "TechDev Exam Preview" },
@@ -1184,6 +1190,8 @@ export default function SuperAdminDashboard() {
               settingsSection={settingsSection}
               onSettingsSectionChange={updateSettingsSection}
             />
+          ) : activeTab === "campaigns" ? (
+            <EmailCampaignManager />
           ) : activeTab === "email" ? (
             <EmailTestTab />
           ) : activeTab === "community" ? (

@@ -441,3 +441,44 @@ model AttendanceAuditLog {
   @@index([action])
   @@index([occurredAt])
 }
+
+// Immutable sending/audience snapshots intentionally do not depend on deleting
+// or changing application/account records. Only recipients reference campaigns.
+model EmailCampaign {
+  id                 String                   @id @default(cuid())
+  recruitmentCycleId String
+  createdById        String
+  createdByName      String?
+  subject            String
+  templateType       String
+  content            Json
+  status             String                   @default("DRAFT")
+  startedAt          DateTime?
+  acceptedAt         DateTime?
+  messageIds         Json?
+  errorMessage       String?
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+  recipients         EmailCampaignRecipient[]
+
+  @@index([recruitmentCycleId, createdAt])
+  @@index([status])
+}
+
+model EmailCampaignRecipient {
+  id         String        @id @default(cuid())
+  campaignId String
+  campaign   EmailCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  userId     String
+  name       String
+  email      String
+  groups     Json
+  status     String        @default("PENDING")
+  acceptedAt DateTime?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@unique([campaignId, userId])
+  @@unique([campaignId, email])
+  @@index([campaignId, status])
+}
