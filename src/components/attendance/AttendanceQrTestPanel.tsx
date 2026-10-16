@@ -10,6 +10,17 @@ import {
   XCircle,
 } from "lucide-react";
 import { FormEvent, useCallback, useState } from "react";
+import {
+  card,
+  cardHeader,
+  fieldLabel,
+  hint,
+  input,
+  pill,
+  primary,
+  secondary,
+  tones,
+} from "@/components/admin/ui";
 import AttendanceQrScanner from "@/components/attendance/AttendanceQrScanner";
 import type { AttendanceEvent } from "@/types/attendance";
 
@@ -20,7 +31,7 @@ type TestResult = {
     title: string;
     status: string;
     schoolYear: string;
-  };
+  } | null;
   attendee: {
     fullName: string;
     studentNumber: string;
@@ -28,7 +39,7 @@ type TestResult = {
     section: string | null;
     source: "CSSAPPLY" | "IMPORTED";
     affiliationGroups: string[];
-    schoolYear: string;
+    schoolYear: string | null;
   } | null;
   alreadyCheckedIn?: boolean;
   message: string;
@@ -55,13 +66,15 @@ export default function AttendanceQrTestPanel({
   const [decodedValue, setDecodedValue] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<TestResult | null>(null);
+  const [testedValue, setTestedValue] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const testCredential = useCallback(
     async (credential: string) => {
       const submittedCredential = credential.trim();
-      if (!eventId || submitting || !submittedCredential) return;
+      if (submitting || !submittedCredential) return;
       setDecodedValue("");
+      setTestedValue(submittedCredential);
       setSubmitting(true);
       setResult(null);
       setError(null);
@@ -70,7 +83,7 @@ export default function AttendanceQrTestPanel({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            eventId,
+            ...(eventId ? { eventId } : {}),
             credential: submittedCredential,
           }),
         });
@@ -106,21 +119,19 @@ export default function AttendanceQrTestPanel({
 
   return (
     <div className="space-y-5">
-      <div>
-        <h2 className="font-poppins text-xl font-bold text-[#134687]">
+      <div className="min-w-0">
+        <h2 className="font-poppins text-lg font-semibold text-[#134687]">
           QR check-in test
         </h2>
-        <p className="text-sm text-[#134687]/65">
-          Test the same scanner and event roster used during check-in. Dry runs
-          never create or change attendance records.
+        <p className={`${hint} max-w-2xl`}>
+          Test the check-in scanner with or without an event roster. Tests never
+          create or change attendance records.
         </p>
       </div>
 
-      <section className="rounded-2xl border border-[#005FD9]/10 bg-white p-5">
+      <section className={`${card} p-4 sm:p-5`}>
         <label className="block">
-          <span className="mb-1 block text-xs font-semibold text-[#134687]">
-            Event roster to test
-          </span>
+          <span className={fieldLabel}>Event roster to test</span>
           <select
             value={eventId}
             disabled={submitting}
@@ -128,11 +139,9 @@ export default function AttendanceQrTestPanel({
               setEventId(event.target.value);
               clearResult();
             }}
-            className="w-full rounded-lg border border-[#005FD9]/20 px-3 py-2.5 text-sm text-[#134687] outline-none focus:border-[#044FAF] disabled:opacity-60"
+            className={input}
           >
-            <option value="" disabled>
-              Choose an event
-            </option>
+            <option value="">No event · check the QR and its owner only</option>
             {events.map((event) => (
               <option key={event.id} value={event.id}>
                 {event.title} · {event.status.toLowerCase()} · A.Y.{" "}
@@ -145,156 +154,203 @@ export default function AttendanceQrTestPanel({
 
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(330px,0.9fr)]">
         <AttendanceQrScanner
-          disabled={!eventId || submitting || Boolean(result)}
+          disabled={submitting || Boolean(result)}
           onScan={testCredential}
         />
 
-        <div className="space-y-5">
-          <section
-            className="min-h-72 rounded-2xl border border-[#005FD9]/10 bg-white p-5 shadow-sm"
-            aria-live="assertive"
-          >
-            {submitting ? (
-              <div className="flex min-h-60 flex-col items-center justify-center gap-3 text-[#134687]">
-                <LoaderCircle className="h-9 w-9 animate-spin" />
-                <strong>Testing QR against the event roster…</strong>
-              </div>
-            ) : result ? (
-              <div
-                className={`rounded-xl border p-5 text-center ${
-                  result.recognized
-                    ? "border-green-200 bg-green-50 text-green-800"
-                    : "border-red-200 bg-red-50 text-red-800"
-                }`}
-              >
-                {result.recognized ? (
-                  <CheckCircle2 className="mx-auto h-11 w-11" />
-                ) : (
-                  <XCircle className="mx-auto h-11 w-11" />
-                )}
-                <h3 className="mt-3 font-poppins text-xl font-bold">
-                  {result.recognized ? "QR check passed" : "QR check failed"}
-                </h3>
-                <div className="mt-2 flex flex-wrap justify-center gap-1.5">
-                  <span className="rounded-full bg-white/75 px-2.5 py-1 font-mono text-[10px] font-semibold">
-                    {result.credentialType === "CSS_ID_QR"
-                      ? "CSS DIGITAL ID"
-                      : result.credentialType === "UST_QR"
-                        ? "UST QR"
-                        : "UNSUPPORTED FORMAT"}
-                  </span>
-                  <span className="rounded-full bg-white/75 px-2.5 py-1 font-mono text-[10px] font-semibold uppercase">
-                    {result.event.status}
-                  </span>
-                  {result.alreadyCheckedIn && (
-                    <span className="rounded-full bg-white/75 px-2.5 py-1 font-mono text-[10px] font-semibold">
-                      ALREADY PRESENT
-                    </span>
-                  )}
-                </div>
-                <p className="mt-2 text-xs font-semibold">
-                  {result.event.title} · A.Y. {result.event.schoolYear}
-                </p>
-                {result.attendee && (
-                  <div className="my-4 rounded-lg bg-white/80 p-3 text-left">
-                    <strong className="block text-[#134687]">
-                      {result.attendee.fullName}
-                    </strong>
-                    <span className="mt-1 block font-mono text-xs text-[#134687]/65">
-                      {result.attendee.studentNumber}
-                      {result.attendee.memberId
-                        ? ` · ${result.attendee.memberId}`
-                        : ""}
-                    </span>
-                    <span className="mt-1 block text-xs text-[#134687]/60">
-                      {result.attendee.section || "No section"} ·{" "}
-                      {result.attendee.source === "CSSAPPLY"
-                        ? "CSSApply"
-                        : "Imported roster"}
-                    </span>
-                    <span className="mt-1 block text-xs capitalize text-[#134687]/60">
-                      {result.attendee.affiliationGroups
-                        .map((group) =>
-                          group.replaceAll("_", " ").toLowerCase(),
-                        )
-                        .join(", ")}
-                    </span>
-                  </div>
-                )}
-                <p className="mt-3 text-sm">{result.message}</p>
-                <button
-                  type="button"
-                  onClick={clearResult}
-                  className="mt-4 inline-flex items-center gap-2 rounded-lg border border-current/20 px-3 py-2 text-xs font-semibold"
+        <div className="min-w-0 space-y-5">
+          <section className={card} aria-live="assertive">
+            <div className={cardHeader}>
+              <h3 className="font-poppins font-semibold text-[#134687]">
+                Result
+              </h3>
+              {result && (
+                <span
+                  className={`${pill} ${result.recognized ? tones.success : tones.danger}`}
                 >
-                  <RotateCcw className="h-3.5 w-3.5" /> Test another QR
-                </button>
-              </div>
-            ) : (
-              <div className="flex min-h-60 flex-col items-center justify-center text-center text-[#134687]/60">
-                <ClipboardCheck className="mb-3 h-11 w-11 text-[#044FAF]/35" />
-                <h3 className="font-poppins text-lg font-semibold text-[#134687]">
-                  Ready to test
-                </h3>
-                <p className="mt-1 max-w-sm text-sm">
-                  Choose an event, start the camera, and hold a QR inside the
-                  frame. The selected event roster will be checked without
-                  recording attendance.
+                  {result.recognized ? "Passed" : "Failed"}
+                </span>
+              )}
+            </div>
+            <div className="flex min-h-56 flex-col justify-center p-4 sm:p-5">
+              {submitting ? (
+                <div className="flex flex-col items-center gap-3 text-[#134687]/70">
+                  <LoaderCircle className="h-7 w-7 animate-spin" />
+                  <span className="text-sm font-semibold">
+                    {eventId
+                      ? "Testing QR against the event roster…"
+                      : "Looking up the QR owner…"}
+                  </span>
+                </div>
+              ) : result ? (
+                <div>
+                  <div className="flex items-start gap-3">
+                    <span
+                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${result.recognized ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}
+                    >
+                      {result.recognized ? (
+                        <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
+                      ) : (
+                        <XCircle className="h-5 w-5" aria-hidden="true" />
+                      )}
+                    </span>
+                    <div className="min-w-0">
+                      <h4 className="font-poppins font-semibold text-[#134687]">
+                        {result.recognized
+                          ? "QR check passed"
+                          : "QR check failed"}
+                      </h4>
+                      <div className="mt-1 flex flex-wrap gap-1.5">
+                        <span className={`${pill} ${tones.info}`}>
+                          {result.credentialType === "CSS_ID_QR"
+                            ? "CSS digital ID"
+                            : result.credentialType === "UST_QR"
+                              ? "UST QR"
+                              : "Unrecognized"}
+                        </span>
+                        <span className={`${pill} ${tones.neutral}`}>
+                          {result.event
+                            ? `${result.event.title} · ${result.event.status.toLowerCase()}`
+                            : "No event roster"}
+                        </span>
+                        {result.alreadyCheckedIn && (
+                          <span className={`${pill} ${tones.warning}`}>
+                            Already present
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {result.attendee && (
+                    <dl className="mt-4 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 rounded-xl border border-[#005FD9]/10 bg-[#F9FBFF] px-4 py-3 text-sm">
+                      <dt className="text-[#134687]/55">Name</dt>
+                      <dd className="break-words font-semibold text-[#134687]">
+                        {result.attendee.fullName}
+                      </dd>
+                      <dt className="text-[#134687]/55">Student no.</dt>
+                      <dd className="font-mono text-[#134687]">
+                        {result.attendee.studentNumber || "—"}
+                      </dd>
+                      <dt className="text-[#134687]/55">Member ID</dt>
+                      <dd className="font-mono text-[#134687]">
+                        {result.attendee.memberId || "—"}
+                      </dd>
+                      <dt className="text-[#134687]/55">Section</dt>
+                      <dd className="text-[#134687]">
+                        {result.attendee.section || "—"}
+                      </dd>
+                      <dt className="text-[#134687]/55">Source</dt>
+                      <dd className="text-[#134687]">
+                        {result.attendee.source === "CSSAPPLY"
+                          ? "CSSApply"
+                          : "Imported roster"}
+                        {result.attendee.schoolYear
+                          ? ` · A.Y. ${result.attendee.schoolYear}`
+                          : ""}
+                      </dd>
+                      {result.attendee.affiliationGroups.length > 0 && (
+                        <>
+                          <dt className="text-[#134687]/55">Groups</dt>
+                          <dd className="capitalize text-[#134687]">
+                            {result.attendee.affiliationGroups
+                              .map((group) =>
+                                group.replaceAll("_", " ").toLowerCase(),
+                              )
+                              .join(", ")}
+                          </dd>
+                        </>
+                      )}
+                    </dl>
+                  )}
+
+                  <p className="mt-4 text-sm leading-relaxed text-[#134687]/75">
+                    {result.message}
+                  </p>
+                  <p className="mt-2 break-all font-mono text-[11px] text-[#134687]/50">
+                    Decoded: {testedValue}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={clearResult}
+                    className={`${secondary} mt-4 inline-flex items-center gap-2`}
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />{" "}
+                    Test another QR
+                  </button>
+                </div>
+              ) : (
+                <div className="text-center">
+                  <ClipboardCheck
+                    className="mx-auto mb-3 h-9 w-9 text-[#044FAF]/25"
+                    aria-hidden="true"
+                  />
+                  <h4 className="font-poppins font-semibold text-[#134687]">
+                    Ready to test
+                  </h4>
+                  <p className={`${hint} mx-auto mt-1 max-w-sm`}>
+                    Start the camera and hold a QR inside the frame. With an
+                    event selected, its roster is checked too.
+                  </p>
+                </div>
+              )}
+              {error && (
+                <p
+                  className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+                  role="alert"
+                >
+                  {error}
                 </p>
-              </div>
-            )}
-            {error && (
-              <p
-                className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700"
-                role="alert"
-              >
-                {error}
-              </p>
-            )}
+              )}
+            </div>
           </section>
 
-          <form
-            onSubmit={submitDecodedValue}
-            className="rounded-2xl border border-[#005FD9]/10 bg-white p-5"
-          >
-            <h3 className="font-poppins font-semibold text-[#134687]">
-              Test decoded text
-            </h3>
-            <p className="mb-3 mt-1 text-xs text-[#134687]/60">
-              If a camera is unavailable, paste the exact value decoded from the
-              QR. Do not enter a student number by itself.
-            </p>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <input
-                value={decodedValue}
-                onChange={(event) => setDecodedValue(event.target.value)}
-                disabled={submitting || Boolean(result)}
-                placeholder="CSS-2627-0001 or 2026123456-1"
-                autoComplete="off"
-                className="min-w-0 flex-1 rounded-lg border border-[#005FD9]/20 px-3 py-2.5 font-mono text-sm outline-none focus:border-[#044FAF]"
-              />
-              <button
-                type="submit"
-                disabled={
-                  !eventId ||
-                  submitting ||
-                  Boolean(result) ||
-                  !decodedValue.trim()
-                }
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#134687] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
-              >
-                <Keyboard className="h-4 w-4" /> Test value
-              </button>
+          <form onSubmit={submitDecodedValue} className={card}>
+            <div className={cardHeader}>
+              <h3 className="font-poppins font-semibold text-[#134687]">
+                Test decoded text
+              </h3>
+            </div>
+            <div className="p-4 sm:p-5">
+              <label htmlFor="qr-test-value" className={fieldLabel}>
+                QR text
+              </label>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <input
+                  id="qr-test-value"
+                  value={decodedValue}
+                  onChange={(event) => setDecodedValue(event.target.value)}
+                  disabled={submitting || Boolean(result)}
+                  placeholder="Member ID or UST QR text"
+                  autoComplete="off"
+                  className={`${input} font-mono sm:flex-1`}
+                />
+                <button
+                  type="submit"
+                  disabled={
+                    submitting || Boolean(result) || !decodedValue.trim()
+                  }
+                  className={`${primary} inline-flex shrink-0 items-center justify-center gap-2`}
+                >
+                  <Keyboard className="h-4 w-4" aria-hidden="true" /> Test
+                </button>
+              </div>
+              <p className={`${hint} mt-2`}>
+                Paste the exact text a QR contains when no camera is available.
+              </p>
             </div>
           </form>
         </div>
       </div>
 
-      <p className="flex items-start gap-2 rounded-xl border border-[#B77900] bg-white p-3 text-sm text-[#8A5A00]">
-        <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />A successful test
-        confirms the scanner, credential format, and selected event roster
-        match. It never records attendance. Actual check-in still requires the
-        event to be open within its configured check-in window.
+      <p className="flex items-start gap-2 rounded-2xl border border-[#005FD9]/10 bg-white px-4 py-3 text-xs leading-relaxed text-[#134687]/65">
+        <ShieldCheck
+          className="mt-px h-4 w-4 shrink-0 text-[#044FAF]/60"
+          aria-hidden="true"
+        />
+        A passed test confirms the scanner can read the QR and find its owner
+        (and the event roster, when one is selected). Actual check-in still
+        needs the event to be open within its check-in window.
       </p>
     </div>
   );

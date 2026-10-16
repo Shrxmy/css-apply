@@ -5,10 +5,22 @@ import {
   FileUp,
   LoaderCircle,
   Plus,
+  RefreshCw,
   UsersRound,
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import {
+  card,
+  cardHeader,
+  fieldLabel,
+  hint,
+  input,
+  pill,
+  primary,
+  secondary,
+  tones,
+} from "@/components/admin/ui";
 import type { AttendanceCycle } from "@/types/attendance";
 
 type Preview = {
@@ -199,210 +211,212 @@ export default function AttendanceImportPanel({
 
   return (
     <div className="space-y-5">
-      <div>
-        <h2 className="font-poppins text-xl font-bold text-[#134687]">
+      <div className="min-w-0">
+        <h2 className="font-poppins text-lg font-semibold text-[#134687]">
           Imported CS students
         </h2>
-        <p className="text-sm text-[#134687]/65">
-          Import attendees who are not in CSSApply. They check in using the
-          supported UST QR tied to their student number.
+        <p className={`${hint} max-w-2xl`}>
+          Add attendees who are not in CSSApply. They check in with their UST QR
+          or student number. Students imported after an event is created are
+          added to its roster on their first scan.
         </p>
       </div>
-      <p className="rounded-xl border border-[#B77900] bg-white p-3 text-sm text-[#8A5A00]">
-        Imports never rewrite an open event. Refresh any affected draft roster
-        from the Events tab after importing.
-      </p>
 
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(300px,0.75fr)]">
-        <section className="rounded-2xl border border-[#005FD9]/10 bg-white p-5 shadow-sm">
-          <div className="mb-4 flex items-center gap-3">
-            <span className="rounded-xl bg-[#E8F2FF] p-2 text-[#044FAF]">
-              <FileUp className="h-5 w-5" />
-            </span>
-            <div>
-              <p className="font-mono text-[10px] uppercase tracking-wider text-[#044FAF]/60">
-                CSV roster
-              </p>
-              <h3 className="font-poppins font-bold text-[#134687]">
-                Preview and merge students
-              </h3>
-            </div>
+        <section className={card}>
+          <div className={cardHeader}>
+            <h3 className="font-poppins font-semibold text-[#134687]">
+              Import a class list (CSV)
+            </h3>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label>
-              <span className="mb-1 block text-xs font-semibold text-[#134687]">
-                Academic year
-              </span>
-              <select
-                value={cycleId}
-                onChange={(event) => {
-                  setCycleId(event.target.value);
-                  setPreview(null);
-                }}
-                className="w-full rounded-lg border border-[#005FD9]/20 px-3 py-2.5 text-sm"
-              >
-                {cycles.map((cycle) => (
-                  <option key={cycle.id} value={cycle.id}>
-                    A.Y. {cycle.schoolYear}
-                    {cycle.isActive ? " · Active" : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <span className="mb-1 block text-xs font-semibold text-[#134687]">
-                Section override{" "}
-                <small className="font-normal text-[#134687]/50">
-                  optional
-                </small>
+          <div className="p-4 sm:p-5">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="min-w-0">
+                <span className={fieldLabel}>Academic year</span>
+                <select
+                  value={cycleId}
+                  onChange={(event) => {
+                    setCycleId(event.target.value);
+                    setPreview(null);
+                  }}
+                  className={input}
+                >
+                  {cycles.map((cycle) => (
+                    <option key={cycle.id} value={cycle.id}>
+                      A.Y. {cycle.schoolYear}
+                      {cycle.isActive ? " · Active" : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="min-w-0">
+                <span className={fieldLabel}>
+                  Section override
+                  <span className="font-normal text-[#134687]/45">
+                    {" "}
+                    · optional
+                  </span>
+                </span>
+                <input
+                  value={section}
+                  onChange={(event) => {
+                    setSection(event.target.value);
+                    setPreview(null);
+                  }}
+                  placeholder="e.g. 4CSD"
+                  className={input}
+                />
+              </label>
+            </div>
+            <label
+              className={`mt-3 flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-[#005FD9]/25 bg-[#F9FBFF] p-4 text-[#134687] transition-colors hover:bg-[#F3F8FF] focus-within:ring-2 focus-within:ring-[#044FAF]`}
+            >
+              <FileUp
+                className="h-5 w-5 shrink-0 text-[#044FAF]/70"
+                aria-hidden="true"
+              />
+              <span className="min-w-0">
+                <strong className="block truncate text-sm font-semibold">
+                  {file?.name || "Choose a class-list CSV"}
+                </strong>
+                <span className="text-xs text-[#134687]/55">
+                  Up to 2 MB · student ID and name columns required
+                </span>
               </span>
               <input
-                value={section}
+                type="file"
+                accept=".csv,text/csv"
+                className="sr-only"
                 onChange={(event) => {
-                  setSection(event.target.value);
+                  setFile(event.target.files?.[0] || null);
                   setPreview(null);
                 }}
-                placeholder="e.g. 4CSD"
-                className="w-full rounded-lg border border-[#005FD9]/20 px-3 py-2.5 text-sm"
               />
             </label>
-          </div>
-          <label className="mt-3 flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-[#044FAF]/30 bg-[#F3F8FF] p-5 text-[#134687]">
-            <FileUp className="h-6 w-6 text-[#044FAF]" />
-            <span>
-              <strong className="block text-sm">
-                {file?.name || "Choose a class-list CSV"}
-              </strong>
-              <small className="text-[#134687]/55">
-                Up to 2 MB · Student ID and name columns required
-              </small>
-            </span>
-            <input
-              type="file"
-              accept=".csv,text/csv"
-              className="sr-only"
-              onChange={(event) => {
-                setFile(event.target.files?.[0] || null);
-                setPreview(null);
-              }}
-            />
-          </label>
-          <button
-            type="button"
-            onClick={() => void previewCsv()}
-            disabled={!file || previewing || importing}
-            className="mt-3 inline-flex items-center gap-2 rounded-lg border border-[#005FD9]/15 px-4 py-2.5 text-sm font-semibold text-[#134687] disabled:opacity-50"
-          >
-            {previewing ? (
-              <LoaderCircle className="h-4 w-4 animate-spin" />
-            ) : (
-              <FileCheck2 className="h-4 w-4" />
-            )}
-            {previewing ? "Reading CSV…" : "Preview normalized rows"}
-          </button>
+            <button
+              type="button"
+              onClick={() => void previewCsv()}
+              disabled={!file || previewing || importing}
+              className={`${secondary} mt-3 inline-flex items-center gap-2`}
+            >
+              {previewing ? (
+                <LoaderCircle className="h-4 w-4 animate-spin" />
+              ) : (
+                <FileCheck2 className="h-4 w-4" aria-hidden="true" />
+              )}
+              {previewing ? "Reading CSV…" : "Preview rows"}
+            </button>
 
-          {preview && (
-            <div className="mt-5 space-y-4 border-t border-[#005FD9]/10 pt-5">
-              <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                <span className="rounded-lg bg-[#F3F8FF] p-2">
-                  <strong className="block text-lg text-[#044FAF]">
-                    {preview.studentCount}
-                  </strong>
-                  students
-                </span>
-                <span className="rounded-lg bg-[#F3F8FF] p-2">
-                  <strong className="block text-lg text-[#8A5A00]">
-                    {warningCount}
-                  </strong>
-                  warnings
-                </span>
-                <span className="rounded-lg bg-[#F3F8FF] p-2">
-                  <strong className="block text-lg text-red-700">
-                    {errorCount}
-                  </strong>
-                  errors
-                </span>
-              </div>
-              {preview.issues.length > 0 && (
-                <div className="max-h-40 space-y-2 overflow-y-auto">
-                  {preview.issues.map((issue, index) => (
-                    <p
-                      key={`${issue.code}-${issue.rowNumber}-${index}`}
-                      className={`rounded-lg border p-2 text-xs ${issue.severity === "ERROR" ? "border-red-200 bg-red-50 text-red-700" : "border-[#B77900] bg-white text-[#8A5A00]"}`}
+            {preview && (
+              <div className="mt-5 space-y-4 border-t border-[#005FD9]/10 pt-5">
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  {[
+                    {
+                      label: "students",
+                      value: preview.studentCount,
+                      color: "text-[#134687]",
+                    },
+                    {
+                      label: "warnings",
+                      value: warningCount,
+                      color: "text-[#8A5A00]",
+                    },
+                    {
+                      label: "errors",
+                      value: errorCount,
+                      color: "text-red-700",
+                    },
+                  ].map((stat) => (
+                    <div
+                      key={stat.label}
+                      className="rounded-xl bg-[#F3F8FF] px-2 py-2.5"
                     >
-                      <strong>
-                        {issue.severity}
-                        {issue.rowNumber ? ` · row ${issue.rowNumber}` : ""}:
-                      </strong>{" "}
-                      {issue.message}
-                    </p>
+                      <strong
+                        className={`block font-poppins text-lg font-semibold ${stat.color}`}
+                      >
+                        {stat.value}
+                      </strong>
+                      <span className="text-xs text-[#134687]/60">
+                        {stat.label}
+                      </span>
+                    </div>
                   ))}
                 </div>
-              )}
-              <div className="max-h-72 overflow-auto rounded-lg border border-[#005FD9]/10">
-                <table className="w-full min-w-[560px] text-left text-xs">
-                  <thead className="sticky top-0 bg-[#F3F8FF] font-mono uppercase text-[#134687]/60">
-                    <tr>
-                      <th className="px-3 py-2">Row</th>
-                      <th className="px-3 py-2">Student number</th>
-                      <th className="px-3 py-2">Name</th>
-                      <th className="px-3 py-2">Section</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#005FD9]/5">
-                    {preview.students.map((student) => (
-                      <tr key={`${student.studentNumber}-${student.rowNumber}`}>
-                        <td className="px-3 py-2">{student.rowNumber}</td>
-                        <td className="px-3 py-2 font-mono">
-                          {student.studentNumber}
-                        </td>
-                        <td className="px-3 py-2 font-semibold text-[#134687]">
-                          {student.fullName}
-                        </td>
-                        <td className="px-3 py-2">{student.section}</td>
-                      </tr>
+                {preview.issues.length > 0 && (
+                  <ul className="max-h-40 space-y-1.5 overflow-y-auto">
+                    {preview.issues.map((issue, index) => (
+                      <li
+                        key={`${issue.code}-${issue.rowNumber}-${index}`}
+                        className={`rounded-lg px-3 py-2 text-xs ${issue.severity === "ERROR" ? "bg-red-50 text-red-700" : "bg-[#FFF8E7] text-[#6F4B00]"}`}
+                      >
+                        <strong className="font-semibold">
+                          {issue.severity === "ERROR" ? "Error" : "Warning"}
+                          {issue.rowNumber ? ` · row ${issue.rowNumber}` : ""}:
+                        </strong>{" "}
+                        {issue.message}
+                      </li>
                     ))}
-                  </tbody>
-                </table>
-              </div>
-              <button
-                type="button"
-                onClick={() => void importCsv()}
-                disabled={!preview.canImport || importing}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#134687] px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"
-              >
-                {importing ? (
-                  <LoaderCircle className="h-4 w-4 animate-spin" />
-                ) : (
-                  <UsersRound className="h-4 w-4" />
+                  </ul>
                 )}
-                {importing
-                  ? "Importing…"
-                  : `Import ${preview.studentCount} students`}
-              </button>
-            </div>
-          )}
+                <div className="max-h-72 overflow-auto rounded-xl border border-[#005FD9]/10">
+                  <table className="w-full min-w-[520px] text-left text-xs">
+                    <thead className="sticky top-0 bg-[#F9FBFF] text-[11px] font-semibold uppercase tracking-wide text-[#134687]/55">
+                      <tr>
+                        <th className="px-3 py-2">Row</th>
+                        <th className="px-3 py-2">Student number</th>
+                        <th className="px-3 py-2">Name</th>
+                        <th className="px-3 py-2">Section</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#005FD9]/10 text-[#134687]/80">
+                      {preview.students.map((student) => (
+                        <tr
+                          key={`${student.studentNumber}-${student.rowNumber}`}
+                        >
+                          <td className="px-3 py-2">{student.rowNumber}</td>
+                          <td className="px-3 py-2 font-mono">
+                            {student.studentNumber}
+                          </td>
+                          <td className="px-3 py-2 font-semibold text-[#134687]">
+                            {student.fullName}
+                          </td>
+                          <td className="px-3 py-2">{student.section}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void importCsv()}
+                  disabled={!preview.canImport || importing}
+                  className={`${primary} inline-flex w-full items-center justify-center gap-2 py-2.5`}
+                >
+                  {importing ? (
+                    <LoaderCircle className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <UsersRound className="h-4 w-4" aria-hidden="true" />
+                  )}
+                  {importing
+                    ? "Importing…"
+                    : `Import ${preview.studentCount} students`}
+                </button>
+              </div>
+            )}
+          </div>
         </section>
 
-        <section className="rounded-2xl border border-[#005FD9]/10 bg-white p-5 shadow-sm">
-          <div className="mb-4 flex items-center gap-3">
-            <span className="rounded-xl bg-[#E8F2FF] p-2 text-[#044FAF]">
-              <Plus className="h-5 w-5" />
-            </span>
-            <div>
-              <p className="font-mono text-[10px] uppercase tracking-wider text-[#044FAF]/60">
-                Missing from CSV
-              </p>
-              <h3 className="font-poppins font-bold text-[#134687]">
-                Add one student
-              </h3>
-            </div>
+        <section className={card}>
+          <div className={cardHeader}>
+            <h3 className="font-poppins font-semibold text-[#134687]">
+              Add one student
+            </h3>
           </div>
-          <form onSubmit={addStudent} className="space-y-3">
+          <form onSubmit={addStudent} className="space-y-3 p-4 sm:p-5">
             <ImportField
               label="Student number"
               name="studentNumber"
-              placeholder="2026123456"
+              placeholder="10-digit student number"
               inputMode="numeric"
             />
             <ImportField
@@ -414,12 +428,12 @@ export default function AttendanceImportPanel({
             <button
               type="submit"
               disabled={adding || !cycleId}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#134687] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+              className={`${primary} inline-flex w-full items-center justify-center gap-2`}
             >
               {adding ? (
                 <LoaderCircle className="h-4 w-4 animate-spin" />
               ) : (
-                <Plus className="h-4 w-4" />
+                <Plus className="h-4 w-4" aria-hidden="true" />
               )}
               {adding ? "Adding…" : "Add student"}
             </button>
@@ -427,52 +441,59 @@ export default function AttendanceImportPanel({
         </section>
       </div>
 
-      <section className="rounded-2xl border border-[#005FD9]/10 bg-white p-5">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h3 className="font-poppins font-bold text-[#134687]">
+      <section className={card}>
+        <div className={cardHeader}>
+          <div className="min-w-0">
+            <h3 className="font-poppins font-semibold text-[#134687]">
               Current imported roster
             </h3>
-            <p className="text-xs text-[#134687]/55">
+            <p className="text-xs text-[#134687]/60">
               {guests.filter((guest) => guest.isActive).length} active students
             </p>
           </div>
           <button
             type="button"
             onClick={() => void loadGuests()}
-            className="rounded-lg border border-[#005FD9]/15 px-3 py-2 text-xs font-semibold text-[#134687]"
+            disabled={loadingGuests}
+            className={`${secondary} inline-flex items-center gap-1.5`}
           >
+            <RefreshCw
+              className={`h-3.5 w-3.5 ${loadingGuests ? "animate-spin" : ""}`}
+              aria-hidden="true"
+            />
             Refresh
           </button>
         </div>
-        {loadingGuests ? (
+        {loadingGuests && guests.length === 0 ? (
           <div className="flex justify-center py-10">
             <LoaderCircle className="h-6 w-6 animate-spin text-[#044FAF]" />
           </div>
         ) : guests.length ? (
-          <div className="mt-4 max-h-96 overflow-auto rounded-lg border border-[#005FD9]/10">
-            <table className="w-full min-w-[560px] text-left text-sm">
-              <thead className="sticky top-0 bg-[#F3F8FF] font-mono text-[10px] uppercase text-[#134687]/55">
+          <div className="max-h-96 overflow-auto">
+            <table className="w-full min-w-[520px] text-left text-sm">
+              <thead className="sticky top-0 bg-[#F9FBFF] text-[11px] font-semibold uppercase tracking-wide text-[#134687]/55">
                 <tr>
-                  <th className="px-3 py-2">Name</th>
-                  <th className="px-3 py-2">Student number</th>
-                  <th className="px-3 py-2">Section</th>
-                  <th className="px-3 py-2">Status</th>
+                  <th className="px-4 py-2.5 sm:px-5">Name</th>
+                  <th className="px-4 py-2.5">Student number</th>
+                  <th className="px-4 py-2.5">Section</th>
+                  <th className="px-4 py-2.5 sm:px-5">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#005FD9]/5">
+              <tbody className="divide-y divide-[#005FD9]/10">
                 {guests.map((guest) => (
                   <tr key={guest.id}>
-                    <td className="px-3 py-2 font-semibold text-[#134687]">
+                    <td className="break-words px-4 py-2.5 font-semibold text-[#134687] sm:px-5">
                       {guest.fullName}
                     </td>
-                    <td className="px-3 py-2 font-mono text-xs">
+                    <td className="px-4 py-2.5 font-mono text-xs text-[#134687]/70">
                       {guest.studentNumber}
                     </td>
-                    <td className="px-3 py-2">{guest.section || "—"}</td>
-                    <td className="px-3 py-2">
+                    <td className="px-4 py-2.5 text-[#134687]/70">
+                      {guest.section || "—"}
+                    </td>
+                    <td className="px-4 py-2.5 sm:px-5">
                       <span
-                        className={`rounded-full px-2 py-1 text-xs ${guest.isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}
+                        className={`${pill} ${guest.isActive ? tones.success : tones.neutral}`}
                       >
                         {guest.isActive ? "Active" : "Inactive"}
                       </span>
@@ -504,17 +525,15 @@ function ImportField({
   inputMode?: "numeric";
 }) {
   return (
-    <label>
-      <span className="mb-1 block text-xs font-semibold text-[#134687]">
-        {label}
-      </span>
+    <label className="block min-w-0">
+      <span className={fieldLabel}>{label}</span>
       <input
         name={name}
         required
         placeholder={placeholder}
         inputMode={inputMode}
         autoComplete="off"
-        className="w-full rounded-lg border border-[#005FD9]/20 px-3 py-2.5 text-sm outline-none focus:border-[#044FAF]"
+        className={input}
       />
     </label>
   );

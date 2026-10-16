@@ -7,11 +7,10 @@ import {
   Upload,
   UsersRound,
 } from "lucide-react";
-import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useState } from "react";
-import AdminContentLoading from "@/components/AdminContentLoading";
 import MobileSidebar from "@/components/AdminMobileSB";
 import SidebarContent from "@/components/AdminSidebar";
+import { focus } from "@/components/admin/ui";
 import AttendanceEventsPanel from "@/components/attendance/AttendanceEventsPanel";
 import AttendanceImportPanel from "@/components/attendance/AttendanceImportPanel";
 import AttendanceQrTestPanel from "@/components/attendance/AttendanceQrTestPanel";
@@ -20,12 +19,27 @@ import type { AttendanceCycle, AttendanceEvent } from "@/types/attendance";
 
 type Tab = "events" | "check-in" | "qr-test" | "import";
 
+type AttendanceOverview = {
+  events: AttendanceEvent[];
+  cycles: AttendanceCycle[];
+  canManage: boolean;
+};
+
+// Kept across client-side navigation so a revisit renders immediately while
+// fresh data loads in the background.
+let cachedOverview: AttendanceOverview | null = null;
+
 export default function AttendanceAdminPage() {
-  const { status } = useSession();
   const [tab, setTab] = useState<Tab>("events");
-  const [events, setEvents] = useState<AttendanceEvent[]>([]);
-  const [cycles, setCycles] = useState<AttendanceCycle[]>([]);
-  const [canManage, setCanManage] = useState(false);
+  const [events, setEvents] = useState<AttendanceEvent[]>(
+    () => cachedOverview?.events ?? [],
+  );
+  const [cycles, setCycles] = useState<AttendanceCycle[]>(
+    () => cachedOverview?.cycles ?? [],
+  );
+  const [canManage, setCanManage] = useState(
+    () => cachedOverview?.canManage ?? false,
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
@@ -46,9 +60,14 @@ export default function AttendanceAdminPage() {
       if (!response.ok) {
         throw new Error(body.error || "Attendance events could not be loaded");
       }
-      setEvents(body.events || []);
-      setCycles(body.cycles || []);
-      setCanManage(Boolean(body.canManage));
+      cachedOverview = {
+        events: body.events || [],
+        cycles: body.cycles || [],
+        canManage: Boolean(body.canManage),
+      };
+      setEvents(cachedOverview.events);
+      setCycles(cachedOverview.cycles);
+      setCanManage(cachedOverview.canManage);
     } catch (loadError) {
       setError(
         loadError instanceof Error
@@ -60,17 +79,11 @@ export default function AttendanceAdminPage() {
     }
   }, []);
 
+  // The API checks the session itself, so there is no need to wait for the
+  // client session round trip before loading.
   useEffect(() => {
-    if (status === "authenticated") void loadEvents();
-  }, [loadEvents, status]);
-
-  if (status === "loading") {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#F3F3FD]">
-        <AdminContentLoading description="Loading attendance tools..." />
-      </div>
-    );
-  }
+    void loadEvents();
+  }, [loadEvents]);
 
   const tabs: Array<{
     id: Tab;
@@ -117,31 +130,34 @@ export default function AttendanceAdminPage() {
         </header>
 
         <nav
-          className="mb-5 flex flex-wrap gap-2 rounded-xl border border-[#005FD9]/10 bg-white p-2"
+          className="mb-5 rounded-2xl border border-[#005FD9]/10 bg-white p-2 shadow-sm"
           aria-label="Attendance sections"
         >
-          {tabs
-            .filter((item) => item.visible)
-            .map((item) => {
-              const Icon = item.icon;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setTab(item.id)}
-                  className={`inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition ${tab === item.id ? "bg-[#134687] text-white shadow-sm" : "text-[#134687] hover:bg-[#F3F8FF]"}`}
-                  aria-current={tab === item.id ? "page" : undefined}
-                >
-                  <Icon className="h-4 w-4" />
-                  {item.label}
-                </button>
-              );
-            })}
+          <div className="flex gap-1 overflow-x-auto">
+            {tabs
+              .filter((item) => item.visible)
+              .map((item) => {
+                const Icon = item.icon;
+                const active = tab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setTab(item.id)}
+                    className={`inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-4 py-2.5 font-poppins text-sm font-semibold transition-colors ${focus} ${active ? "bg-[#E8F2FF] text-[#134687]" : "text-[#134687]/55 hover:bg-[#F7F9FC] hover:text-[#134687]"}`}
+                    aria-current={active ? "page" : undefined}
+                  >
+                    <Icon className="h-4 w-4" aria-hidden="true" />
+                    {item.label}
+                  </button>
+                );
+              })}
+          </div>
         </nav>
 
         {error && (
           <div
-            className="mb-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+            className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
             role="alert"
           >
             {error}
@@ -174,8 +190,11 @@ export default function AttendanceAdminPage() {
         )}
 
         {!loading && cycles.length === 0 && (
-          <div className="mt-5 rounded-xl border border-[#B77900] bg-white p-4 text-sm text-[#8A5A00]">
-            <UsersRound className="mr-2 inline h-4 w-4" />
+          <div className="mt-5 flex items-start gap-2 rounded-2xl border border-[#D6A326]/30 bg-[#FFF8E7] px-4 py-3 text-sm text-[#6F4B00]">
+            <UsersRound
+              className="mt-0.5 h-4 w-4 shrink-0"
+              aria-hidden="true"
+            />
             Create a recruitment cycle before configuring attendance events.
           </div>
         )}

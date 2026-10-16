@@ -4,18 +4,33 @@ import {
   Archive,
   CalendarDays,
   CalendarPlus,
+  Clock3,
   Download,
   FileText,
   LoaderCircle,
   MapPin,
   Pencil,
   Play,
+  QrCode,
   RefreshCw,
   Square,
   Trash2,
 } from "lucide-react";
 import { FormEvent, useState } from "react";
 import { toast } from "sonner";
+import {
+  card,
+  cardHeader,
+  checkbox,
+  fieldLabel,
+  focus,
+  hint,
+  input,
+  pill,
+  primary,
+  secondary,
+  tones,
+} from "@/components/admin/ui";
 import type {
   AttendanceCycle,
   AttendanceEvent,
@@ -29,6 +44,28 @@ const GROUP_OPTIONS: Array<{ value: AttendanceGroup; label: string }> = [
   { value: "EXECUTIVE_ASSOCIATE", label: "Executive Associates" },
   { value: "IMPORTED_STUDENT", label: "Imported CS students" },
 ];
+
+const STATUS_LABELS: Record<AttendanceEventStatus, string> = {
+  DRAFT: "Draft",
+  OPEN: "Open",
+  CLOSED: "Closed",
+  ARCHIVED: "Archived",
+};
+const STATUS_TONES: Record<AttendanceEventStatus, string> = {
+  DRAFT: tones.info,
+  OPEN: tones.success,
+  CLOSED: tones.neutral,
+  ARCHIVED: tones.neutral,
+};
+const actionButton = `${secondary} inline-flex items-center gap-1.5`;
+const quietButton = `inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold text-[#134687]/70 transition-colors hover:bg-[#F3F8FF] hover:text-[#134687] disabled:cursor-not-allowed disabled:opacity-50 ${focus}`;
+
+function formatDateTime(value: string) {
+  return new Date(value).toLocaleString("en-PH", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
 
 function localInputValue(date: Date) {
   const offset = date.getTimezoneOffset() * 60_000;
@@ -172,9 +209,14 @@ export default function AttendanceEventsPanel({
           await readError(response, "Roster could not be refreshed"),
         );
       }
-      const body = (await response.json()) as { rosterCount: number };
+      const body = (await response.json()) as {
+        rosterCount: number;
+        added: number | null;
+      };
       toast.success(
-        `Roster refreshed with ${body.rosterCount} eligible attendees`,
+        body.added === null
+          ? `Roster refreshed with ${body.rosterCount} eligible attendees`
+          : `Added ${body.added} new attendees (${body.rosterCount} on roster)`,
       );
       await onReload();
     } catch (error) {
@@ -253,14 +295,14 @@ export default function AttendanceEventsPanel({
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="font-poppins text-xl font-bold text-[#134687]">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="font-poppins text-lg font-semibold text-[#134687]">
             Events
           </h2>
-          <p className="text-sm text-[#134687]/65">
-            Event rosters are snapshots. Later member or CSV updates do not
-            rewrite attendance history.
+          <p className={`${hint} max-w-2xl`}>
+            Each event keeps a roster snapshot. People approved or imported
+            later are added on their first scan, or with Sync roster.
           </p>
         </div>
         {canManage && (
@@ -270,9 +312,9 @@ export default function AttendanceEventsPanel({
               setEditingEvent(null);
               setShowCreate((value) => !value);
             }}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#134687] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#044FAF]"
+            className={`${primary} inline-flex shrink-0 items-center gap-2`}
           >
-            <CalendarPlus className="h-4 w-4" />
+            <CalendarPlus className="h-4 w-4" aria-hidden="true" />
             {showCreate ? "Close form" : "Create event"}
           </button>
         )}
@@ -283,138 +325,137 @@ export default function AttendanceEventsPanel({
           id="attendance-event-form"
           key={editingEvent?.id || "create"}
           onSubmit={saveEvent}
-          className="grid scroll-mt-6 gap-4 rounded-2xl border border-[#005FD9]/10 bg-white p-5 shadow-sm md:grid-cols-2"
+          className={`${card} scroll-mt-6`}
         >
-          <div className="md:col-span-2">
-            <p className="font-mono text-[10px] uppercase tracking-wider text-[#044FAF]/60">
-              {editingEvent ? "Update event" : "New event"}
-            </p>
-            <h3 className="font-poppins text-lg font-bold text-[#134687]">
-              {editingEvent ? editingEvent.title : "Create a draft event"}
+          <div className={cardHeader}>
+            <h3 className="font-poppins font-semibold text-[#134687]">
+              {editingEvent
+                ? `Edit “${editingEvent.title}”`
+                : "New draft event"}
             </h3>
           </div>
-          <label className="md:col-span-2">
-            <span className="mb-1 block text-xs font-semibold text-[#134687]">
-              Academic year
-            </span>
-            <select
-              name="recruitmentCycleId"
-              required
-              defaultValue={
-                editingEvent?.recruitmentCycleId ||
-                cycles.find((cycle) => cycle.isActive)?.id ||
-                ""
-              }
-              className="w-full rounded-lg border border-[#005FD9]/20 px-3 py-2.5 text-sm"
-            >
-              <option value="" disabled>
-                Select an academic year
-              </option>
-              {cycles.map((cycle) => (
-                <option key={cycle.id} value={cycle.id}>
-                  A.Y. {cycle.schoolYear}
-                  {cycle.isActive ? " · Active" : ""}
+          <div className="grid gap-4 p-4 sm:p-5 md:grid-cols-2">
+            <label className="min-w-0 md:col-span-2">
+              <span className={fieldLabel}>Academic year</span>
+              <select
+                name="recruitmentCycleId"
+                required
+                defaultValue={
+                  editingEvent?.recruitmentCycleId ||
+                  cycles.find((cycle) => cycle.isActive)?.id ||
+                  ""
+                }
+                className={input}
+              >
+                <option value="" disabled>
+                  Select an academic year
                 </option>
-              ))}
-            </select>
-          </label>
-          <FormField
-            label="Event name"
-            name="title"
-            maxLength={160}
-            defaultValue={editingEvent?.title}
-          />
-          <FormField
-            label="Venue"
-            name="venue"
-            maxLength={160}
-            defaultValue={editingEvent?.venue}
-          />
-          <FormField
-            label="Event starts"
-            name="startsAt"
-            type="datetime-local"
-            defaultValue={localInputValue(
-              editingEvent ? new Date(editingEvent.startsAt) : defaultStart,
-            )}
-          />
-          <FormField
-            label="Event ends"
-            name="endsAt"
-            type="datetime-local"
-            defaultValue={localInputValue(
-              editingEvent
-                ? new Date(editingEvent.endsAt)
-                : new Date(defaultStart.getTime() + 3 * 60 * 60_000),
-            )}
-          />
-          <FormField
-            label="Check-in opens"
-            name="checkInOpensAt"
-            type="datetime-local"
-            defaultValue={localInputValue(
-              editingEvent
-                ? new Date(editingEvent.checkInOpensAt)
-                : new Date(defaultStart.getTime() - 30 * 60_000),
-            )}
-          />
-          <FormField
-            label="Check-in closes"
-            name="checkInClosesAt"
-            type="datetime-local"
-            defaultValue={localInputValue(
-              editingEvent
-                ? new Date(editingEvent.checkInClosesAt)
-                : new Date(defaultStart.getTime() + 2 * 60 * 60_000),
-            )}
-          />
-          <fieldset className="rounded-xl border border-[#005FD9]/10 p-4 md:col-span-2">
-            <legend className="px-2 text-xs font-semibold text-[#134687]">
-              Eligible groups
-            </legend>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {GROUP_OPTIONS.map((group) => (
-                <label
-                  key={group.value}
-                  className="flex items-center gap-2 text-sm text-[#134687]"
-                >
-                  <input
-                    type="checkbox"
-                    name={group.value}
-                    defaultChecked={
-                      editingEvent
-                        ? editingEvent.eligibleGroups.includes(group.value)
-                        : true
-                    }
-                    className="h-4 w-4 accent-[#044FAF]"
-                  />
-                  {group.label}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-          <div className="flex justify-end gap-2 md:col-span-2">
+                {cycles.map((cycle) => (
+                  <option key={cycle.id} value={cycle.id}>
+                    A.Y. {cycle.schoolYear}
+                    {cycle.isActive ? " · Active" : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <FormField
+              label="Event name"
+              name="title"
+              maxLength={160}
+              defaultValue={editingEvent?.title}
+            />
+            <FormField
+              label="Venue"
+              name="venue"
+              maxLength={160}
+              defaultValue={editingEvent?.venue}
+            />
+            <FormField
+              label="Event starts"
+              name="startsAt"
+              type="datetime-local"
+              defaultValue={localInputValue(
+                editingEvent ? new Date(editingEvent.startsAt) : defaultStart,
+              )}
+            />
+            <FormField
+              label="Event ends"
+              name="endsAt"
+              type="datetime-local"
+              defaultValue={localInputValue(
+                editingEvent
+                  ? new Date(editingEvent.endsAt)
+                  : new Date(defaultStart.getTime() + 3 * 60 * 60_000),
+              )}
+            />
+            <FormField
+              label="Check-in opens"
+              name="checkInOpensAt"
+              type="datetime-local"
+              defaultValue={localInputValue(
+                editingEvent
+                  ? new Date(editingEvent.checkInOpensAt)
+                  : new Date(defaultStart.getTime() - 30 * 60_000),
+              )}
+            />
+            <FormField
+              label="Check-in closes"
+              name="checkInClosesAt"
+              type="datetime-local"
+              defaultValue={localInputValue(
+                editingEvent
+                  ? new Date(editingEvent.checkInClosesAt)
+                  : new Date(defaultStart.getTime() + 2 * 60 * 60_000),
+              )}
+            />
+            <fieldset className="rounded-xl border border-[#005FD9]/10 p-4 md:col-span-2">
+              <legend className="px-1 text-xs font-semibold text-[#134687]/80">
+                Eligible groups
+              </legend>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {GROUP_OPTIONS.map((group) => (
+                  <label
+                    key={group.value}
+                    className="flex items-center gap-2 text-sm text-[#134687]"
+                  >
+                    <input
+                      type="checkbox"
+                      name={group.value}
+                      defaultChecked={
+                        editingEvent
+                          ? editingEvent.eligibleGroups.includes(group.value)
+                          : true
+                      }
+                      className={checkbox}
+                    />
+                    {group.label}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          </div>
+          <div className="flex flex-wrap justify-end gap-2 border-t border-[#005FD9]/10 bg-[#F9FBFF] px-4 py-3 sm:px-5">
             <button
               type="button"
               onClick={() => {
                 setShowCreate(false);
                 setEditingEvent(null);
               }}
-              className="rounded-lg border border-[#005FD9]/15 px-4 py-2 text-sm font-semibold text-[#134687]"
+              className={secondary}
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="inline-flex items-center gap-2 rounded-lg bg-[#134687] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              className={`${primary} inline-flex items-center gap-2`}
             >
               {submitting ? (
                 <LoaderCircle className="h-4 w-4 animate-spin" />
               ) : editingEvent ? (
-                <Pencil className="h-4 w-4" />
+                <Pencil className="h-4 w-4" aria-hidden="true" />
               ) : (
-                <CalendarPlus className="h-4 w-4" />
+                <CalendarPlus className="h-4 w-4" aria-hidden="true" />
               )}
               {submitting
                 ? "Saving…"
@@ -426,183 +467,228 @@ export default function AttendanceEventsPanel({
         </form>
       )}
 
-      {loading ? (
-        <div className="flex min-h-64 items-center justify-center rounded-2xl bg-white">
-          <LoaderCircle className="h-7 w-7 animate-spin text-[#044FAF]" />
+      {loading && events.length === 0 ? (
+        <div className="grid gap-4 xl:grid-cols-2" aria-busy="true">
+          {[0, 1].map((index) => (
+            <div key={index} className={`${card} animate-pulse p-5`}>
+              <div className="h-4 w-16 rounded-full bg-[#F3F3FD]" />
+              <div className="mt-3 h-5 w-2/3 rounded bg-[#F3F3FD]" />
+              <div className="mt-3 h-3 w-1/2 rounded bg-[#F3F3FD]" />
+              <div className="mt-2 h-3 w-1/3 rounded bg-[#F3F3FD]" />
+            </div>
+          ))}
         </div>
       ) : events.length === 0 ? (
-        <div className="rounded-2xl border border-[#005FD9]/10 bg-white p-10 text-center">
-          <CalendarDays className="mx-auto mb-3 h-10 w-10 text-[#044FAF]/40" />
+        <div className={`${card} p-10 text-center`}>
+          <CalendarDays
+            className="mx-auto mb-3 h-9 w-9 text-[#044FAF]/35"
+            aria-hidden="true"
+          />
           <h3 className="font-poppins font-semibold text-[#134687]">
             No attendance events yet
           </h3>
-          <p className="mt-1 text-sm text-[#134687]/60">
-            Create a draft event to materialize its first roster.
+          <p className={`${hint} mt-1`}>
+            Create a draft event to build its first roster.
           </p>
         </div>
       ) : (
         <div className="grid gap-4 xl:grid-cols-2">
-          {events.map((event) => (
-            <article
-              key={event.id}
-              className="rounded-2xl border border-[#005FD9]/10 bg-white p-5 shadow-sm"
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <div className="mb-2 flex flex-wrap items-center gap-2">
-                    <span
-                      className={`rounded-full px-2.5 py-1 font-mono text-[10px] font-bold uppercase ${event.status === "OPEN" ? "bg-green-100 text-green-700" : event.status === "CLOSED" ? "bg-gray-100 text-gray-700" : event.status === "ARCHIVED" ? "bg-slate-100 text-slate-500" : "bg-[#E8F2FF] text-[#044FAF]"}`}
-                    >
-                      {event.status}
-                    </span>
-                    <span className="font-mono text-[10px] text-[#134687]/50">
-                      A.Y. {event.schoolYear}
+          {events.map((event) => {
+            const busy = changingId === event.id;
+            return (
+              <article key={event.id} className={`${card} flex flex-col`}>
+                <div className="flex items-start justify-between gap-4 p-4 sm:p-5">
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-1.5 flex flex-wrap items-center gap-2">
+                      <span className={`${pill} ${STATUS_TONES[event.status]}`}>
+                        {STATUS_LABELS[event.status]}
+                      </span>
+                      <span className="text-[11px] text-[#134687]/55">
+                        A.Y. {event.schoolYear}
+                      </span>
+                    </div>
+                    <h3 className="break-words font-poppins text-base font-semibold text-[#134687]">
+                      {event.title}
+                    </h3>
+                    <ul className="mt-2 space-y-1 text-xs text-[#134687]/65">
+                      <li className="flex items-start gap-1.5">
+                        <MapPin
+                          className="mt-px h-3.5 w-3.5 shrink-0"
+                          aria-hidden="true"
+                        />
+                        <span className="min-w-0 break-words">
+                          {event.venue}
+                        </span>
+                      </li>
+                      <li className="flex items-start gap-1.5">
+                        <CalendarDays
+                          className="mt-px h-3.5 w-3.5 shrink-0"
+                          aria-hidden="true"
+                        />
+                        <span>{formatDateTime(event.startsAt)}</span>
+                      </li>
+                      <li className="flex items-start gap-1.5">
+                        <Clock3
+                          className="mt-px h-3.5 w-3.5 shrink-0"
+                          aria-hidden="true"
+                        />
+                        <span>
+                          Check-in {formatDateTime(event.checkInOpensAt)} –{" "}
+                          {formatDateTime(event.checkInClosesAt)}
+                        </span>
+                      </li>
+                    </ul>
+                  </div>
+                  <div className="shrink-0 rounded-xl bg-[#F3F8FF] px-3 py-2 text-center">
+                    <strong className="block font-poppins text-xl font-semibold text-[#134687]">
+                      {event.attendanceCount}
+                    </strong>
+                    <span className="text-[11px] text-[#134687]/60">
+                      of {event.rosterCount} present
                     </span>
                   </div>
-                  <h3 className="truncate font-poppins text-lg font-bold text-[#134687]">
-                    {event.title}
-                  </h3>
-                  <p className="mt-1 flex items-center gap-1.5 text-sm text-[#134687]/65">
-                    <MapPin className="h-4 w-4" /> {event.venue}
-                  </p>
-                  <p className="mt-1 flex items-center gap-1.5 text-xs text-[#134687]/55">
-                    <CalendarDays className="h-4 w-4" />{" "}
-                    {new Date(event.startsAt).toLocaleString("en-PH", {
-                      dateStyle: "medium",
-                      timeStyle: "short",
-                    })}
-                  </p>
                 </div>
-                <div className="shrink-0 text-right">
-                  <strong className="block font-poppins text-2xl text-[#044FAF]">
-                    {event.attendanceCount}
-                  </strong>
-                  <span className="text-[11px] text-[#134687]/55">
-                    of {event.rosterCount} present
-                  </span>
-                </div>
-              </div>
-              <div className="mt-4 flex flex-wrap gap-2 border-t border-[#005FD9]/10 pt-4">
-                {canManage &&
-                  (event.status === "DRAFT" || event.status === "OPEN") && (
+
+                <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-[#005FD9]/10 bg-[#F9FBFF] px-4 py-3 sm:px-5">
+                  {event.status === "OPEN" && (
                     <button
                       type="button"
-                      onClick={() => {
-                        setShowCreate(false);
-                        setEditingEvent(event);
-                        window.requestAnimationFrame(() =>
-                          document
-                            .getElementById("attendance-event-form")
-                            ?.scrollIntoView({
-                              behavior: "smooth",
-                              block: "start",
-                            }),
-                        );
-                      }}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-[#005FD9]/15 px-3 py-2 text-xs font-semibold text-[#134687] hover:bg-[#F3F8FF]"
+                      onClick={() => onCheckIn(event.id)}
+                      className={`${primary} inline-flex items-center gap-1.5 py-1.5`}
                     >
-                      <Pencil className="h-3.5 w-3.5" /> Edit
+                      <QrCode className="h-4 w-4" aria-hidden="true" /> Check in
                     </button>
                   )}
-                {event.status === "OPEN" && (
-                  <button
-                    type="button"
-                    onClick={() => onCheckIn(event.id)}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-[#134687] px-3 py-2 text-xs font-semibold text-white hover:bg-[#044FAF]"
-                  >
-                    <Play className="h-3.5 w-3.5" /> Check in
-                  </button>
-                )}
-                <button
-                  type="button"
-                  disabled={exportingKey !== null}
-                  onClick={() => void exportAttendance(event, "csv")}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#005FD9]/15 px-3 py-2 text-xs font-semibold text-[#134687] hover:bg-[#F3F8FF] disabled:opacity-50"
-                >
-                  {exportingKey === `${event.id}:csv` ? (
-                    <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Download className="h-3.5 w-3.5" />
-                  )}
-                  CSV
-                </button>
-                <button
-                  type="button"
-                  disabled={exportingKey !== null}
-                  onClick={() => void exportAttendance(event, "pdf")}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#E8F2FF] px-3 py-2 text-xs font-semibold text-[#044FAF] hover:bg-[#D8E9FF] disabled:opacity-50"
-                >
-                  {exportingKey === `${event.id}:pdf` ? (
-                    <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <FileText className="h-3.5 w-3.5" />
-                  )}
-                  PDF
-                </button>
-                {canManage && event.status === "DRAFT" && (
-                  <>
+                  {canManage && event.status === "DRAFT" && (
                     <button
                       type="button"
-                      disabled={changingId === event.id}
-                      onClick={() => void refreshRoster(event)}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-[#005FD9]/15 px-3 py-2 text-xs font-semibold text-[#134687] disabled:opacity-50"
-                    >
-                      <RefreshCw className="h-3.5 w-3.5" /> Refresh roster
-                    </button>
-                    <button
-                      type="button"
-                      disabled={changingId === event.id}
+                      disabled={busy}
                       onClick={() => void changeStatus(event, "OPEN")}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-green-200 px-3 py-2 text-xs font-semibold text-green-700 disabled:opacity-50"
+                      className={`${primary} inline-flex items-center gap-1.5 py-1.5`}
                     >
-                      <Play className="h-3.5 w-3.5" /> Open
-                    </button>
-                  </>
-                )}
-                {canManage && event.status === "OPEN" && (
-                  <button
-                    type="button"
-                    disabled={changingId === event.id}
-                    onClick={() => void changeStatus(event, "CLOSED")}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-[#005FD9]/15 px-3 py-2 text-xs font-semibold text-[#134687] disabled:opacity-50"
-                  >
-                    <Square className="h-3.5 w-3.5" /> Close
-                  </button>
-                )}
-                {canManage && event.status === "CLOSED" && (
-                  <button
-                    type="button"
-                    disabled={changingId === event.id}
-                    onClick={() => void changeStatus(event, "OPEN")}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-green-200 px-3 py-2 text-xs font-semibold text-green-700 disabled:opacity-50"
-                  >
-                    <Play className="h-3.5 w-3.5" /> Reopen
-                  </button>
-                )}
-                {canManage &&
-                  (event.status === "DRAFT" || event.status === "CLOSED") && (
-                    <button
-                      type="button"
-                      disabled={changingId === event.id}
-                      onClick={() => void changeStatus(event, "ARCHIVED")}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 disabled:opacity-50"
-                    >
-                      <Archive className="h-3.5 w-3.5" /> Archive
+                      <Play className="h-4 w-4" aria-hidden="true" /> Open
+                      check-in
                     </button>
                   )}
+                  {canManage && event.status === "OPEN" && (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void changeStatus(event, "CLOSED")}
+                      className={actionButton}
+                    >
+                      <Square className="h-3.5 w-3.5" aria-hidden="true" />{" "}
+                      Close
+                    </button>
+                  )}
+                  {canManage && event.status === "CLOSED" && (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void changeStatus(event, "OPEN")}
+                      className={actionButton}
+                    >
+                      <Play className="h-3.5 w-3.5" aria-hidden="true" /> Reopen
+                    </button>
+                  )}
+                  <div className="ml-auto flex flex-wrap gap-2">
+                    {(["csv", "pdf"] as const).map((format) => (
+                      <button
+                        key={format}
+                        type="button"
+                        disabled={exportingKey !== null}
+                        onClick={() => void exportAttendance(event, format)}
+                        className={actionButton}
+                      >
+                        {exportingKey === `${event.id}:${format}` ? (
+                          <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                        ) : format === "csv" ? (
+                          <Download
+                            className="h-3.5 w-3.5"
+                            aria-hidden="true"
+                          />
+                        ) : (
+                          <FileText
+                            className="h-3.5 w-3.5"
+                            aria-hidden="true"
+                          />
+                        )}
+                        {format.toUpperCase()}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {canManage && (
-                  <button
-                    type="button"
-                    disabled={changingId === event.id}
-                    onClick={() => void deleteEvent(event)}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" /> Delete
-                  </button>
+                  <div className="flex flex-wrap items-center gap-1 border-t border-[#005FD9]/10 px-3 py-2 sm:px-4">
+                    {(event.status === "DRAFT" || event.status === "OPEN") && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowCreate(false);
+                          setEditingEvent(event);
+                          window.requestAnimationFrame(() =>
+                            document
+                              .getElementById("attendance-event-form")
+                              ?.scrollIntoView({
+                                behavior: "smooth",
+                                block: "start",
+                              }),
+                          );
+                        }}
+                        className={quietButton}
+                      >
+                        <Pencil className="h-3.5 w-3.5" aria-hidden="true" />{" "}
+                        Edit
+                      </button>
+                    )}
+                    {event.status !== "ARCHIVED" && (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void refreshRoster(event)}
+                        title={
+                          event.status === "DRAFT"
+                            ? "Rebuild the roster from current approvals and imports"
+                            : "Add newly eligible attendees without removing anyone"
+                        }
+                        className={quietButton}
+                      >
+                        <RefreshCw
+                          className={`h-3.5 w-3.5 ${busy ? "animate-spin" : ""}`}
+                          aria-hidden="true"
+                        />
+                        {event.status === "DRAFT"
+                          ? "Refresh roster"
+                          : "Sync roster"}
+                      </button>
+                    )}
+                    {(event.status === "DRAFT" ||
+                      event.status === "CLOSED") && (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void changeStatus(event, "ARCHIVED")}
+                        className={quietButton}
+                      >
+                        <Archive className="h-3.5 w-3.5" aria-hidden="true" />{" "}
+                        Archive
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void deleteEvent(event)}
+                      className={`${quietButton} ml-auto text-red-700/80 hover:bg-red-50 hover:text-red-700`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />{" "}
+                      Delete
+                    </button>
+                  </div>
                 )}
-              </div>
-            </article>
-          ))}
+              </article>
+            );
+          })}
         </div>
       )}
     </div>
@@ -623,17 +709,15 @@ function FormField({
   maxLength?: number;
 }) {
   return (
-    <label>
-      <span className="mb-1 block text-xs font-semibold text-[#134687]">
-        {label}
-      </span>
+    <label className="min-w-0">
+      <span className={fieldLabel}>{label}</span>
       <input
         name={name}
         type={type}
         required
         defaultValue={defaultValue}
         maxLength={maxLength}
-        className="w-full rounded-lg border border-[#005FD9]/20 px-3 py-2.5 text-sm outline-none focus:border-[#044FAF] focus:ring-2 focus:ring-[#044FAF]/10"
+        className={input}
       />
     </label>
   );
