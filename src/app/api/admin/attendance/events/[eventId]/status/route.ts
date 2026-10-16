@@ -4,6 +4,7 @@ import { z } from "zod";
 import {
   addAttendanceAudit,
   materializeAttendanceRoster,
+  syncAttendanceRoster,
 } from "@/lib/attendance";
 import { authorizeAttendanceOperator } from "@/lib/attendance-auth";
 import { prisma } from "@/lib/prisma";
@@ -120,13 +121,37 @@ export async function POST(
         where: { id: eventId },
       });
       if (!event) return { error: "Event not found", status: 404 } as const;
-      if (event.status !== AttendanceEventStatus.DRAFT) {
+      if (event.status === AttendanceEventStatus.ARCHIVED) {
         return {
-          error: "Only draft event rosters can be refreshed",
+          error: "Archived event rosters cannot be changed",
           status: 409,
         } as const;
       }
-      const rosterCount = await materializeAttendanceRoster(
+      if (event.status === AttendanceEventStatus.DRAFT) {
+        const rosterCount = await materializeAttendanceRoster(
+          tx,
+          event.id,
+          event.recruitmentCycleId,
+          event.eligibleGroups,
+        );
+        await addAttendanceAudit(
+          tx,
+          authorization.operator.id,
+          "ATTENDANCE_EVENT_ROSTER_REFRESHED",
+          "attendance_event",
+          event.id,
+          { mode: "replace", rosterCount },
+        );
+        return {
+          mode: "replace",
+          rosterCount,
+          added: null,
+          status: 200,
+        } as const;
+      }
+
+      // Open/closed events already have check-ins tied to roster rows.
+      const synced = await syncAttendanceRoster(
         tx,
         event.id,
         event.recruitmentCycleId,
@@ -135,12 +160,17 @@ export async function POST(
       await addAttendanceAudit(
         tx,
         authorization.operator.id,
-        "ATTENDANCE_EVENT_ROSTER_REFRESHED",
+        "ATTENDANCE_EVENT_ROSTER_SYNCED",
         "attendance_event",
         event.id,
-        { rosterCount },
+        { mode: "add_only", ...synced },
       );
-      return { rosterCount, status: 200 } as const;
+      return {
+        mode: "add_only",
+        rosterCount: synced.rosterCount,
+        added: synced.added,
+        status: 200,
+      } as const;
     });
 
     if ("error" in result) {
@@ -149,7 +179,11 @@ export async function POST(
         { status: result.status },
       );
     }
-    return NextResponse.json({ rosterCount: result.rosterCount });
+    return NextResponse.json({
+      mode: result.mode,
+      rosterCount: result.rosterCount,
+      added: result.added,
+    });
   } catch (error) {
     console.error(
       "Refresh attendance roster failed",

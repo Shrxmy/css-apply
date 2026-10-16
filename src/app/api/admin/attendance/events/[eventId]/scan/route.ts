@@ -7,6 +7,9 @@ import {
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import {
+  addAttendanceAudit,
+  addEligibleAttendee,
+  credentialStudentNumber,
   normalizeStudentNumber,
   parseAttendanceCredential,
 } from "@/lib/attendance";
@@ -165,16 +168,42 @@ export async function POST(
         });
       }
 
-      const rosterEntry = await tx.attendanceEventRoster.findFirst({
-        where: {
-          eventId,
-          ...(parsedBody.data.mode === "MANUAL"
-            ? { studentNumber: manualStudentNumber! }
-            : parsedCredential?.method === AttendanceMethod.CSS_ID_QR
-              ? { memberId: parsedCredential.memberId }
-              : { studentNumber: parsedCredential!.studentNumber }),
-        },
+      const rosterWhere = {
+        eventId,
+        ...(parsedBody.data.mode === "MANUAL"
+          ? { studentNumber: manualStudentNumber! }
+          : parsedCredential?.method === AttendanceMethod.CSS_ID_QR
+            ? { memberId: parsedCredential.memberId }
+            : { studentNumber: parsedCredential!.studentNumber }),
+      };
+      let rosterEntry = await tx.attendanceEventRoster.findFirst({
+        where: rosterWhere,
       });
+
+      if (!rosterEntry) {
+        // People approved or imported after the snapshot are added on first scan.
+        const studentNumber =
+          manualStudentNumber ??
+          (await credentialStudentNumber(tx, parsedCredential!));
+        if (
+          studentNumber &&
+          (await addEligibleAttendee(tx, event, studentNumber))
+        ) {
+          rosterEntry = await tx.attendanceEventRoster.findFirst({
+            where: rosterWhere,
+          });
+          if (rosterEntry) {
+            await addAttendanceAudit(
+              tx,
+              authorization.operator.id,
+              "ATTENDANCE_ROSTER_AUTO_ADDED",
+              "attendance_event",
+              eventId,
+              { rosterEntryId: rosterEntry.id, studentNumber },
+            );
+          }
+        }
+      }
 
       if (!rosterEntry) {
         const knownPerson = await isKnownCredential(

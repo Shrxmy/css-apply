@@ -42,7 +42,7 @@ function eaRole(roleId: string): DigitalIdRole {
   };
 }
 
-function acceptedDestination(
+export function acceptedDestination(
   application: RedirectableApplication,
 ): DigitalIdRole | null {
   // The source stays canonical after acceptance; its original choice is history,
