@@ -51,10 +51,10 @@ const eventSchema = z
 
 export async function GET() {
   try {
-    const authorization = await authorizeAttendanceOperator();
-    if (authorization.response) return authorization.response;
-
-    const [events, cycles] = await Promise.all([
+    // Reads run alongside the authorization lookup to save a database round
+    // trip; nothing is returned unless authorization passes.
+    const [authorization, events, cycles] = await Promise.all([
+      authorizeAttendanceOperator(),
       prisma.attendanceEvent.findMany({
         orderBy: { startsAt: "desc" },
         include: {
@@ -68,6 +68,7 @@ export async function GET() {
         select: { id: true, schoolYear: true, isActive: true },
       }),
     ]);
+    if (authorization.response) return authorization.response;
 
     return NextResponse.json({
       canManage: authorization.operator.role === "super_admin",

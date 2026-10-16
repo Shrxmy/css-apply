@@ -105,7 +105,29 @@ function createDb(seed = {}) {
     );
 
   const prisma = {
-    $queryRaw: async () => [],
+    // Answers the scan route's lock-and-read statements; other raw
+    // statements (plain row locks) return nothing.
+    $queryRaw: async (strings, ...values) => {
+      const sql = strings.join("?");
+      if (sql.includes('FROM "AttendanceEvent"') && sql.includes('"status"')) {
+        const event = db.events.find((e) => e.id === values[0]);
+        return event ? [event] : [];
+      }
+      if (
+        sql.includes('FROM "AttendanceEventRoster"') &&
+        sql.includes('"fullName"')
+      ) {
+        const [eventId, key] = values;
+        const byMemberId = sql.includes('"memberId" = ?');
+        const entry = db.roster.find(
+          (r) =>
+            r.eventId === eventId &&
+            (byMemberId ? r.memberId === key : r.studentNumber === key),
+        );
+        return entry ? [entry] : [];
+      }
+      return [];
+    },
     $transaction: async (fn) => fn(prisma),
     attendanceEvent: {
       findUnique: async ({ where }) =>

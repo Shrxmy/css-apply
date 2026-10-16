@@ -49,9 +49,6 @@ export async function GET(
   { params }: { params: Promise<{ eventId: string }> },
 ) {
   try {
-    const authorization = await authorizeAttendanceOperator();
-    if (authorization.response) return authorization.response;
-
     const { eventId } = await params;
     const page = Math.max(
       1,
@@ -79,19 +76,18 @@ export async function GET(
         : {}),
     };
 
-    const event = await prisma.attendanceEvent.findUnique({
-      where: { id: eventId },
-      include: {
-        recruitmentCycle: { select: { schoolYear: true } },
-        createdBy: { select: { name: true } },
-        _count: { select: { rosterEntries: true, attendances: true } },
-      },
-    });
-    if (!event) {
-      return NextResponse.json({ error: "Event not found" }, { status: 404 });
-    }
-
-    const [entries, total] = await Promise.all([
+    // All reads run alongside the authorization lookup to save database round
+    // trips; nothing is returned unless authorization passes.
+    const [authorization, event, entries, total] = await Promise.all([
+      authorizeAttendanceOperator(),
+      prisma.attendanceEvent.findUnique({
+        where: { id: eventId },
+        include: {
+          recruitmentCycle: { select: { schoolYear: true } },
+          createdBy: { select: { name: true } },
+          _count: { select: { rosterEntries: true, attendances: true } },
+        },
+      }),
       prisma.attendanceEventRoster.findMany({
         where,
         orderBy: [{ attendance: { checkedInAt: "desc" } }, { fullName: "asc" }],
@@ -110,6 +106,10 @@ export async function GET(
       }),
       prisma.attendanceEventRoster.count({ where }),
     ]);
+    if (authorization.response) return authorization.response;
+    if (!event) {
+      return NextResponse.json({ error: "Event not found" }, { status: 404 });
+    }
 
     return NextResponse.json({
       canManage: authorization.operator.role === "super_admin",

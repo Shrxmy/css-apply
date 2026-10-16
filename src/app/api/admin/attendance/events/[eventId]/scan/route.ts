@@ -1,5 +1,6 @@
 import {
   AttendanceEventStatus,
+  AttendanceGroup,
   AttendanceMethod,
   AttendanceScanOutcome,
   Prisma,
@@ -28,6 +29,24 @@ const scanSchema = z.discriminatedUnion("mode", [
     studentNumber: z.string().min(1).max(32),
   }),
 ]);
+
+type LockedEvent = {
+  id: string;
+  status: string;
+  checkInOpensAt: Date;
+  checkInClosesAt: Date;
+  recruitmentCycleId: string;
+  eligibleGroups: AttendanceGroup[];
+};
+
+type LockedRosterEntry = {
+  id: string;
+  fullName: string;
+  studentNumber: string;
+  memberId: string | null;
+  section: string | null;
+  isActive: boolean;
+};
 
 type AttemptResponse = {
   attemptId: string;
@@ -78,11 +97,28 @@ export async function POST(
 ) {
   let submittedClientScanId: string | null = null;
   try {
-    const authorization = await authorizeAttendanceOperator();
-    if (authorization.response) return authorization.response;
     const { eventId } = await params;
-
-    const parsedBody = scanSchema.safeParse(await request.json());
+    const parsedBody = await request.json().then(
+      (body: unknown) => scanSchema.safeParse(body),
+      () => null,
+    );
+    const clientScanId = parsedBody?.success
+      ? parsedBody.data.clientScanId
+      : null;
+    // Every database call is a network round trip, so independent reads run
+    // together. Nothing is returned before authorization passes.
+    const [authorization, existingAttempt] = await Promise.all([
+      authorizeAttendanceOperator(),
+      clientScanId
+        ? prisma.attendanceScanAttempt.findUnique({
+            where: { eventId_clientScanId: { eventId, clientScanId } },
+          })
+        : null,
+    ]);
+    if (authorization.response) return authorization.response;
+    if (!parsedBody) {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
     if (!parsedBody.success) {
       return NextResponse.json(
         {
@@ -93,14 +129,6 @@ export async function POST(
     }
 
     submittedClientScanId = parsedBody.data.clientScanId;
-    const existingAttempt = await prisma.attendanceScanAttempt.findUnique({
-      where: {
-        eventId_clientScanId: {
-          eventId,
-          clientScanId: parsedBody.data.clientScanId,
-        },
-      },
-    });
     if (existingAttempt) {
       return NextResponse.json(
         await responseFromAttempt(existingAttempt, true),
@@ -134,11 +162,12 @@ export async function POST(
         ? AttendanceMethod.MANUAL
         : (parsedCredential?.method ?? AttendanceMethod.QR);
 
-    const attempt = await prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT 1 FROM "AttendanceEvent" WHERE "id" = ${eventId} FOR SHARE`;
-      const event = await tx.attendanceEvent.findUnique({
-        where: { id: eventId },
-      });
+    const outcome = await prisma.$transaction(async (tx) => {
+      const [event] = await tx.$queryRaw<LockedEvent[]>`
+        SELECT "id", "status"::text AS "status", "checkInOpensAt",
+          "checkInClosesAt", "recruitmentCycleId",
+          "eligibleGroups"::text[] AS "eligibleGroups"
+        FROM "AttendanceEvent" WHERE "id" = ${eventId} FOR SHARE`;
       if (!event) throw new Error("EVENT_NOT_FOUND");
 
       const attemptedAt = new Date();
@@ -154,31 +183,55 @@ export async function POST(
         attemptedAt < event.checkInOpensAt ||
         attemptedAt > event.checkInClosesAt
       ) {
-        return tx.attendanceScanAttempt.create({
-          data: {
-            ...attemptBase,
-            outcome: AttendanceScanOutcome.OUTSIDE_WINDOW,
-          },
-        });
+        return {
+          attempt: await tx.attendanceScanAttempt.create({
+            data: {
+              ...attemptBase,
+              outcome: AttendanceScanOutcome.OUTSIDE_WINDOW,
+            },
+          }),
+          attendee: null,
+        };
       }
 
       if (parsedBody.data.mode === "QR" && !parsedCredential) {
-        return tx.attendanceScanAttempt.create({
-          data: { ...attemptBase, outcome: AttendanceScanOutcome.UNKNOWN },
-        });
+        return {
+          attempt: await tx.attendanceScanAttempt.create({
+            data: { ...attemptBase, outcome: AttendanceScanOutcome.UNKNOWN },
+          }),
+          attendee: null,
+        };
       }
 
-      const rosterWhere = {
-        eventId,
-        ...(parsedBody.data.mode === "MANUAL"
-          ? { studentNumber: manualStudentNumber! }
-          : parsedCredential?.method === AttendanceMethod.CSS_ID_QR
-            ? { memberId: parsedCredential.memberId }
-            : { studentNumber: parsedCredential!.studentNumber }),
+      const memberId =
+        parsedCredential?.method === AttendanceMethod.CSS_ID_QR
+          ? parsedCredential.memberId
+          : null;
+      const lookupStudentNumber =
+        manualStudentNumber ??
+        (parsedCredential?.method === AttendanceMethod.UST_QR
+          ? parsedCredential.studentNumber
+          : null);
+      // Row lock taken in the same statement, so scans of one attendee and
+      // check-in undos serialize.
+      const lockRosterEntry = async () => {
+        const rows = memberId
+          ? await tx.$queryRaw<LockedRosterEntry[]>`
+              SELECT "id", "fullName", "studentNumber", "memberId", "section",
+                "isActive"
+              FROM "AttendanceEventRoster"
+              WHERE "eventId" = ${eventId} AND "memberId" = ${memberId}
+              FOR UPDATE`
+          : await tx.$queryRaw<LockedRosterEntry[]>`
+              SELECT "id", "fullName", "studentNumber", "memberId", "section",
+                "isActive"
+              FROM "AttendanceEventRoster"
+              WHERE "eventId" = ${eventId}
+                AND "studentNumber" = ${lookupStudentNumber}
+              FOR UPDATE`;
+        return rows[0] ?? null;
       };
-      let rosterEntry = await tx.attendanceEventRoster.findFirst({
-        where: rosterWhere,
-      });
+      let rosterEntry = await lockRosterEntry();
 
       if (!rosterEntry) {
         // People approved or imported after the snapshot are added on first scan.
@@ -189,9 +242,7 @@ export async function POST(
           studentNumber &&
           (await addEligibleAttendee(tx, event, studentNumber))
         ) {
-          rosterEntry = await tx.attendanceEventRoster.findFirst({
-            where: rosterWhere,
-          });
+          rosterEntry = await lockRosterEntry();
           if (rosterEntry) {
             await addAttendanceAudit(
               tx,
@@ -212,38 +263,54 @@ export async function POST(
           manualStudentNumber,
           event.recruitmentCycleId,
         );
-        return tx.attendanceScanAttempt.create({
-          data: {
-            ...attemptBase,
-            outcome: knownPerson
-              ? AttendanceScanOutcome.INELIGIBLE
-              : AttendanceScanOutcome.UNKNOWN,
-          },
-        });
+        return {
+          attempt: await tx.attendanceScanAttempt.create({
+            data: {
+              ...attemptBase,
+              outcome: knownPerson
+                ? AttendanceScanOutcome.INELIGIBLE
+                : AttendanceScanOutcome.UNKNOWN,
+            },
+          }),
+          attendee: null,
+        };
       }
+      const attendee = {
+        fullName: rosterEntry.fullName,
+        studentNumber: rosterEntry.studentNumber,
+        memberId: rosterEntry.memberId,
+        section: rosterEntry.section,
+      };
       if (!rosterEntry.isActive) {
-        return tx.attendanceScanAttempt.create({
-          data: {
-            ...attemptBase,
-            outcome: AttendanceScanOutcome.INACTIVE,
-            rosterEntryId: rosterEntry.id,
-          },
-        });
+        return {
+          attempt: await tx.attendanceScanAttempt.create({
+            data: {
+              ...attemptBase,
+              outcome: AttendanceScanOutcome.INACTIVE,
+              rosterEntryId: rosterEntry.id,
+            },
+          }),
+          attendee,
+        };
       }
 
-      await tx.$queryRaw`SELECT "id" FROM "AttendanceEventRoster" WHERE "id" = ${rosterEntry.id} FOR UPDATE`;
+      // Read after the row lock, so a check-in committed meanwhile is seen.
       const existingAttendance = await tx.eventAttendance.findUnique({
         where: { rosterEntryId: rosterEntry.id },
+        select: { id: true },
       });
       if (existingAttendance) {
-        return tx.attendanceScanAttempt.create({
-          data: {
-            ...attemptBase,
-            outcome: AttendanceScanOutcome.DUPLICATE,
-            rosterEntryId: rosterEntry.id,
-            attendanceId: existingAttendance.id,
-          },
-        });
+        return {
+          attempt: await tx.attendanceScanAttempt.create({
+            data: {
+              ...attemptBase,
+              outcome: AttendanceScanOutcome.DUPLICATE,
+              rosterEntryId: rosterEntry.id,
+              attendanceId: existingAttendance.id,
+            },
+          }),
+          attendee,
+        };
       }
 
       const attendance = await tx.eventAttendance.create({
@@ -255,17 +322,27 @@ export async function POST(
           checkedInAt: attemptedAt,
         },
       });
-      return tx.attendanceScanAttempt.create({
-        data: {
-          ...attemptBase,
-          outcome: AttendanceScanOutcome.ACCEPTED,
-          rosterEntryId: rosterEntry.id,
-          attendanceId: attendance.id,
-        },
-      });
+      return {
+        attempt: await tx.attendanceScanAttempt.create({
+          data: {
+            ...attemptBase,
+            outcome: AttendanceScanOutcome.ACCEPTED,
+            rosterEntryId: rosterEntry.id,
+            attendanceId: attendance.id,
+          },
+        }),
+        attendee,
+      };
     });
 
-    return NextResponse.json(await responseFromAttempt(attempt));
+    // The attendee comes from the locked roster row; no extra lookup needed.
+    return NextResponse.json({
+      attemptId: outcome.attempt.id,
+      outcome: outcome.attempt.outcome,
+      attendanceId: outcome.attempt.attendanceId,
+      attendee: outcome.attendee,
+      idempotentReplay: false,
+    } satisfies AttemptResponse);
   } catch (error) {
     if (error instanceof SyntaxError) {
       return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
