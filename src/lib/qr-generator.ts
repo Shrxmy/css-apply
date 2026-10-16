@@ -44,8 +44,9 @@ function rsCompute(data: number[], ecCount: number): number[] {
     const factor = data[i] ^ remainder[0];
     remainder.shift();
     remainder.push(0);
+    // gen is stored lowest degree first; the division needs it highest first.
     for (let j = 0; j < ecCount; j++) {
-      remainder[j] ^= gfMul(gen[j], factor);
+      remainder[j] ^= gfMul(gen[ecCount - 1 - j], factor);
     }
   }
   return remainder;
@@ -132,6 +133,75 @@ function calcFormatBits(mask: number): number {
     }
   }
   return ((data << 10) | rem) ^ FORMAT_MASK;
+}
+
+// ISO/IEC 18004 mask penalty (rules N1-N4). Scoring only part of it lets a
+// mask through that draws finder-like patterns, which scanners misdetect.
+function maskPenalty(grid: boolean[][]): number {
+  const size = grid.length;
+  let penalty = 0;
+
+  const addHistory = (runLength: number, history: number[]) => {
+    if (history[0] === 0) runLength += size; // light border before the line
+    history.pop();
+    history.unshift(runLength);
+  };
+  const countFinderLike = (h: number[]) => {
+    const n = h[1];
+    const core =
+      n > 0 && h[2] === n && h[3] === n * 3 && h[4] === n && h[5] === n;
+    return (
+      (core && h[0] >= n * 4 && h[6] >= n ? 1 : 0) +
+      (core && h[6] >= n * 4 && h[0] >= n ? 1 : 0)
+    );
+  };
+
+  for (const vertical of [false, true]) {
+    for (let a = 0; a < size; a++) {
+      let runColor = false;
+      let runLength = 0;
+      const history = [0, 0, 0, 0, 0, 0, 0];
+      for (let b = 0; b < size; b++) {
+        const dark = vertical ? grid[b][a] : grid[a][b];
+        if (dark === runColor) {
+          runLength++;
+          if (runLength === 5) penalty += 3;
+          else if (runLength > 5) penalty += 1;
+        } else {
+          addHistory(runLength, history);
+          if (!runColor) penalty += countFinderLike(history) * 40;
+          runColor = dark;
+          runLength = 1;
+        }
+      }
+      if (runColor) {
+        addHistory(runLength, history);
+        runLength = 0;
+      }
+      addHistory(runLength + size, history); // light border after the line
+      penalty += countFinderLike(history) * 40;
+    }
+  }
+
+  let darkCount = 0;
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
+      if (grid[r][c]) darkCount++;
+      if (
+        r < size - 1 &&
+        c < size - 1 &&
+        grid[r][c] === grid[r + 1][c] &&
+        grid[r][c] === grid[r][c + 1] &&
+        grid[r][c] === grid[r + 1][c + 1]
+      ) {
+        penalty += 3;
+      }
+    }
+  }
+  const total = size * size;
+  penalty +=
+    (Math.ceil(Math.abs(darkCount * 20 - total * 10) / total) - 1) * 10;
+  return penalty;
 }
 
 export function generateQRCodeMatrix(text: string): boolean[][] {
@@ -392,46 +462,17 @@ export function generateQRCodeMatrix(text: string): boolean[][] {
     // Write format bits for penalty testing
     for (let i = 0; i < 15; i++) {
       const bit = ((formatBits >> i) & 1) === 1;
-      if (i < 6) testMatrix[8][i] = bit;
-      else if (i === 6) testMatrix[8][7] = bit;
+      if (i < 6) testMatrix[i][8] = bit;
+      else if (i === 6) testMatrix[7][8] = bit;
       else if (i === 7) testMatrix[8][8] = bit;
-      else if (i === 8) testMatrix[7][8] = bit;
-      else testMatrix[14 - i][8] = bit;
+      else if (i === 8) testMatrix[8][7] = bit;
+      else testMatrix[8][14 - i] = bit;
 
-      if (i < 8) testMatrix[size - 1 - i][8] = bit;
-      else testMatrix[8][size - 15 + i] = bit;
+      if (i < 8) testMatrix[8][size - 1 - i] = bit;
+      else testMatrix[size - 15 + i][8] = bit;
     }
 
-    // Penalty evaluation (N1: runs of 5+, N2: 2x2 blocks)
-    let penalty = 0;
-    // N1
-    for (let r = 0; r < size; r++) {
-      let count = 0;
-      let lastColor = false;
-      for (let c = 0; c < size; c++) {
-        if (testMatrix[r][c] === lastColor) {
-          count++;
-          if (count === 5) penalty += 3;
-          else if (count > 5) penalty += 1;
-        } else {
-          lastColor = testMatrix[r][c];
-          count = 1;
-        }
-      }
-    }
-    // N2 (2x2 blocks)
-    for (let r = 0; r < size - 1; r++) {
-      for (let c = 0; c < size - 1; c++) {
-        const val = testMatrix[r][c];
-        if (
-          val === testMatrix[r + 1][c] &&
-          val === testMatrix[r][c + 1] &&
-          val === testMatrix[r + 1][c + 1]
-        ) {
-          penalty += 3;
-        }
-      }
-    }
+    const penalty = maskPenalty(testMatrix);
 
     if (penalty < minPenalty) {
       minPenalty = penalty;
@@ -453,15 +494,15 @@ export function generateQRCodeMatrix(text: string): boolean[][] {
   for (let i = 0; i < 15; i++) {
     const bit = ((finalFormat >> i) & 1) === 1;
     // Around top-left
-    if (i < 6) finalMatrix[8][i] = bit;
-    else if (i === 6) finalMatrix[8][7] = bit;
+    if (i < 6) finalMatrix[i][8] = bit;
+    else if (i === 6) finalMatrix[7][8] = bit;
     else if (i === 7) finalMatrix[8][8] = bit;
-    else if (i === 8) finalMatrix[7][8] = bit;
-    else finalMatrix[14 - i][8] = bit;
+    else if (i === 8) finalMatrix[8][7] = bit;
+    else finalMatrix[8][14 - i] = bit;
 
     // Around other finders
-    if (i < 8) finalMatrix[size - 1 - i][8] = bit;
-    else finalMatrix[8][size - 15 + i] = bit;
+    if (i < 8) finalMatrix[8][size - 1 - i] = bit;
+    else finalMatrix[size - 15 + i][8] = bit;
   }
 
   return finalMatrix;
